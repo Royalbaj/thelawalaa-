@@ -35,8 +35,14 @@ export async function createOrder(input: unknown) {
   const data = parsed.data;
 
   const { user, profile } = await getVerifiedUser();
-  if (!user || !profile || !["customer", "admin"].includes(profile.role)) {
-    return { error: "Please log in to order" };
+  // Allow anonymous checkouts OR logged in customers/admins
+  if (user && profile && !["customer", "admin"].includes(profile.role)) {
+    return { error: "Your account is not authorized to place customer orders" };
+  }
+
+  const isGuest = !user;
+  if (isGuest && (!data.guest_name || !data.guest_phone)) {
+    return { error: "Please provide your name and phone number to order" };
   }
 
   // ── Re-price everything server-side ──────────────────────────
@@ -71,13 +77,15 @@ export async function createOrder(input: unknown) {
   });
 
   // Verify the delivery address belongs to THIS customer
-  if (data.type === "delivery") {
+  if (data.type === "delivery" && !isGuest && data.delivery_address_id) {
     const { data: addr } = await supabaseAdmin
       .from("addresses")
       .select("id, customer_id")
-      .eq("id", data.delivery_address_id!)
+      .eq("id", data.delivery_address_id)
       .single();
-    if (!addr || addr.customer_id !== user.id) return { error: "Invalid delivery address" };
+    if (!addr || addr.customer_id !== user?.id) return { error: "Invalid delivery address" };
+  } else if (data.type === "delivery" && isGuest && !data.guest_address) {
+    return { error: "Please provide a delivery address" };
   }
 
   const delivery_fee = data.type === "delivery" ? DELIVERY_FEE : 0;
@@ -118,25 +126,30 @@ export async function createOrder(input: unknown) {
   }
 
   const total = Math.max(0, subtotal + delivery_fee - discount_amount);
+  
+  let finalNotes = data.notes ? data.notes.trim() : "";
+  if (isGuest) {
+    finalNotes = `[Guest Checkout]\nName: ${data.guest_name}\nPhone: ${data.guest_phone}${data.type === 'delivery' ? `\nAddress: ${data.guest_address}` : ""}\n\n${finalNotes}`.trim();
+  }
 
   // ── Insert order + items ─────────────────────────────────────
   const { data: order, error: orderErr } = await supabaseAdmin
     .from("orders")
     .insert({
       order_number: "pending", // replaced by trigger
-      customer_id: user.id,
+      customer_id: user?.id ?? null,
       branch_id: data.branch_id ?? null,
       type: data.type,
       subtotal,
       delivery_fee,
       discount_amount,
       total,
-      delivery_address_id: data.delivery_address_id ?? null,
+      delivery_address_id: !isGuest ? (data.delivery_address_id ?? null) : null,
       pickup_time: data.pickup_time ?? null,
       payment_method: data.payment_method,
       payment_status: "pending", // admin confirms cash/QR manually
       promo_code_id,
-      notes: data.notes ?? null,
+      notes: finalNotes || null,
     })
     .select("id, order_number, total")
     .single();
@@ -158,14 +171,14 @@ export async function createOrder(input: unknown) {
   }
 
   await audit({
-    actor_id: user.id,
+    actor_id: user?.id ?? null,
     action: "CREATE_ORDER",
     target_table: "orders",
     target_id: order.id,
     new_data: { total, type: data.type, payment_method: data.payment_method },
   });
 
-  if (resend && user.email) {
+  if (resend && user?.email) {
     try {
       await resend.emails.send({
         from: "Thelawalaa <orders@thelawalaa.com>",

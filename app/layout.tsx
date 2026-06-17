@@ -63,11 +63,14 @@ export const viewport = {
   initialScale: 1,
 };
 
+import MobileNav from "@/components/mobile-nav";
+
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en-NP" className={`${display.variable} ${body.variable}`}>
-      <body>
+      <body className="pb-20 sm:pb-0">
         {children}
+        <MobileNav />
         <Toaster position="top-center" toastOptions={{ style: { borderRadius: "999px", fontWeight: 700 } }} />
       </body>
     </html>

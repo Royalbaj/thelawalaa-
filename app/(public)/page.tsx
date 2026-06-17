@@ -44,23 +44,26 @@ export default async function HomePage() {
     <>
       <StructuredData faqs={FAQS} menu={(menuItems ?? []).map((m) => ({ name: m.name, description: m.description, price: Number(m.price) }))} />
       {/* HERO */}
-      <section id="home" className="relative flex min-h-screen flex-col items-center justify-center bg-brand-dark px-4 text-center">
-        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,rgba(249,115,22,0.18),transparent_60%)]" />
+      <section id="home" className="relative flex min-h-[80vh] flex-col items-center justify-center bg-brand-cream px-4 text-center overflow-hidden">
+        {/* Background blobs matching the screenshot */}
+        <div className="absolute top-0 right-0 h-96 w-96 -translate-y-1/4 translate-x-1/4 rounded-full bg-yellow-100/60 blur-3xl" />
+        <div className="absolute bottom-0 left-0 h-80 w-80 translate-y-1/4 -translate-x-1/4 rounded-full bg-orange-100/60 blur-3xl" />
+        
         <div className="absolute top-0 w-full bg-brand-yellow py-2 text-sm font-extrabold text-brand-dark">
-          {announcement?.message ?? "🛵 Home delivery within 5km of Manigram — flat Nrs 20"}
+          {announcement?.message ?? "🛵 Free delivery on orders above Rs 500"}
         </div>
-        <div className="relative">
-          <p className="mb-4 text-6xl" aria-hidden>🥘</p>
-          <h1 className="font-display text-5xl font-bold text-white md:text-7xl">
-            Butwal&apos;s Most Flavourful <span className="brand-gradient-text">Street Food</span>
+        
+        <div className="relative z-10 mt-12">
+          <p className="font-bold tracking-widest text-brand-orange text-xs mb-3">KATHMANDU • PATAN • BHAKTAPUR</p>
+          <h1 className="font-display text-5xl font-extrabold text-brand-brown md:text-7xl max-w-2xl mx-auto leading-tight">
+            Street food that<br/>hits different <span aria-hidden>🥘</span>
           </h1>
-          <p className="mx-auto mt-4 max-w-xl text-lg text-orange-100/80">
-            Chatpate in 5 varieties, panipuri, fulki &amp; momo — made fresh and hygienic,
-            delivered hot within 5km of Manigram for just Nrs 20.
+          <p className="mx-auto mt-6 max-w-lg text-stone-600">
+            Chatpate, pani puri, momo chaat and more — made fresh on the tawa, delivered hot to your tole.
           </p>
           <div className="mt-8 flex flex-wrap justify-center gap-4">
-            <Link href="/order" className="btn-primary text-lg">Order Now →</Link>
-            <a href="#menu" className="btn-outline text-lg">See Menu</a>
+            <Link href="/order" className="btn-primary text-lg px-8 py-3 rounded-full shadow-lg shadow-orange-500/30">Start an order</Link>
+            <a href="#menu" className="btn-outline text-lg px-8 py-3 rounded-full bg-white border-2 border-brand-orange text-brand-orange">See menu</a>
           </div>
         </div>
       </section>
@@ -97,9 +100,10 @@ export default async function HomePage() {
       </section>
 
       {/* MENU PREVIEW */}
-      <section id="menu" className="bg-white px-4 py-20">
+      <section id="menu" className="bg-white px-4 py-16">
         <div className="mx-auto max-w-6xl">
-          <h2 className="font-display text-4xl font-bold text-brand-brown">Our Bestsellers</h2>
+          <p className="font-bold tracking-widest text-brand-orange text-xs mb-2 uppercase">Bestsellers</p>
+          <h2 className="font-display text-3xl font-extrabold text-brand-brown md:text-4xl">From the thela 🔥</h2>
           <div className="mt-8 grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
             {(bestsellers ?? []).map((p) => (
               <div key={p.id} className="card overflow-hidden p-5 transition hover:scale-105">

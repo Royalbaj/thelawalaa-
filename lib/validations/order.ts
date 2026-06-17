@@ -8,6 +8,9 @@ export const orderSchema = z.object({
   payment_method: z.enum(["cash", "qr"]),
   promo_code: z.string().trim().max(30).optional(),
   notes: z.string().max(500).optional(),
+  guest_name: z.string().min(2).max(100).optional(),
+  guest_phone: z.string().regex(/^(\+977)?9[6-8]\d{8}$/, "Must be a valid Nepali mobile number").optional(),
+  guest_address: z.string().max(300).optional(),
   items: z
     .array(
       z.object({

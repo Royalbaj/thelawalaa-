@@ -31,8 +31,13 @@ export default function OrderPage() {
   const [payment, setPayment] = useState<"cash" | "qr">("cash");
   const [busy, setBusy] = useState(false);
 
+  const [isGuest, setIsGuest] = useState(false);
+  const [guestName, setGuestName] = useState("");
+  const [guestPhone, setGuestPhone] = useState("");
+
   useEffect(() => {
     const supabase = createClient();
+    supabase.auth.getUser().then(({ data }) => setIsGuest(!data.user));
     Promise.all([
       supabase.from("products").select("id, name, description, price, category_id, spice_level").order("sort_order"),
       supabase.from("categories").select("id, name").order("sort_order"),
@@ -66,8 +71,18 @@ export default function OrderPage() {
   async function placeOrder() {
     setBusy(true);
     try {
-      const delivery_address_id = type === "delivery" ? await ensureAddress() : undefined;
-      if (type === "delivery" && !delivery_address_id) { toast.error("Add a delivery address"); return; }
+      if (isGuest && (!guestName.trim() || !guestPhone.trim())) {
+        toast.error("Please enter your name and phone number");
+        return;
+      }
+      if (isGuest && guestPhone && !/^(\+977)?9[6-8]\d{8}$/.test(guestPhone.trim())) {
+        toast.error("Please enter a valid Nepali mobile number");
+        return;
+      }
+      
+      const delivery_address_id = (type === "delivery" && !isGuest) ? await ensureAddress() : undefined;
+      if (type === "delivery" && !isGuest && !delivery_address_id) { toast.error("Add a delivery address"); return; }
+      if (type === "delivery" && isGuest && !newAddress.trim()) { toast.error("Add a delivery address"); return; }
       if (type === "pickup" && !branchId) { toast.error("Pick a branch"); return; }
 
       const res = await createOrder({
@@ -76,6 +91,9 @@ export default function OrderPage() {
         delivery_address_id: delivery_address_id ?? undefined,
         payment_method: payment,
         promo_code: promo || undefined,
+        guest_name: isGuest ? guestName.trim() : undefined,
+        guest_phone: isGuest ? guestPhone.trim() : undefined,
+        guest_address: isGuest && type === "delivery" ? newAddress.trim() : undefined,
         items: items.map((i) => ({ product_id: i.product_id, quantity: i.quantity })),
       });
       if ("error" in res && res.error) { toast.error(res.error); return; }
@@ -151,6 +169,18 @@ export default function OrderPage() {
 
         {step === 2 && (
           <div className="mt-6 max-w-xl space-y-5">
+            {isGuest && (
+              <div className="grid sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="label" htmlFor="guestName">Your name</label>
+                  <input id="guestName" className="input" maxLength={100} value={guestName} onChange={(e) => setGuestName(e.target.value)} placeholder="Full name" />
+                </div>
+                <div>
+                  <label className="label" htmlFor="guestPhone">Mobile number</label>
+                  <input id="guestPhone" className="input" maxLength={20} value={guestPhone} onChange={(e) => setGuestPhone(e.target.value)} placeholder="98XXXXXXXX" />
+                </div>
+              </div>
+            )}
             <div className="grid grid-cols-2 gap-4">
               {(["pickup", "delivery"] as const).map((t) => (
                 <button key={t} onClick={() => setType(t)} className={`card p-6 text-center font-display text-lg font-bold ${type === t ? "ring-2 ring-brand-orange" : ""}`}>

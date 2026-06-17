@@ -7,7 +7,6 @@ const ROLE_ROUTES: [string, string[]][] = [
   ["/pos", ["admin", "pos_user"]],
   ["/delivery", ["admin", "delivery_driver"]],
   ["/account", ["admin", "pos_user", "delivery_driver", "customer"]],
-  ["/order", ["customer", "admin"]],
   ["/track", ["customer", "admin", "delivery_driver"]],
 ];
 
