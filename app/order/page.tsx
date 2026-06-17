@@ -200,13 +200,13 @@ export default function OrderPage() {
               )}
             </aside>
             
-            {/* Mobile Floating Checkout Button */}
+            {/* Floating Checkout Bar — always visible on all screens */}
             {items.length > 0 && (
-              <div className="fixed bottom-6 left-4 right-4 z-50 lg:hidden">
-                <button onClick={() => setStep(2)} className="w-full btn-primary shadow-2xl shadow-orange-500/50 flex justify-between items-center py-4 text-lg border-2 border-white/20">
+              <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 w-[calc(100%-2rem)] max-w-xl">
+                <button onClick={() => setStep(2)} className="w-full btn-primary shadow-2xl shadow-orange-500/50 flex justify-between items-center py-4 text-lg border-2 border-white/20 backdrop-blur-sm">
                   <span className="bg-white/20 px-3 py-1 rounded-full text-sm">{items.length} item{items.length > 1 ? 's' : ''}</span>
-                  <span>Checkout →</span>
-                  <span className="font-bold">{npr(subtotal)}</span>
+                  <span className="font-bold">Checkout →</span>
+                  <span className="bg-white/20 px-3 py-1 rounded-full text-sm font-bold">{npr(subtotal)}</span>
                 </button>
               </div>
             )}
