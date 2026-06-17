@@ -54,7 +54,7 @@ export default async function HomePage() {
         </div>
         
         <div className="relative z-10 mt-12">
-          <p className="font-bold tracking-widest text-brand-orange text-xs mb-3">KATHMANDU • PATAN • BHAKTAPUR</p>
+          <p className="font-bold tracking-widest text-brand-orange text-xs mb-3 uppercase">Manigram, Rupandehi</p>
           <h1 className="font-display text-5xl font-extrabold text-brand-brown md:text-7xl max-w-2xl mx-auto leading-tight">
             Street food that<br/>hits different <span aria-hidden>🥘</span>
           </h1>
@@ -63,7 +63,7 @@ export default async function HomePage() {
           </p>
           <div className="mt-8 flex flex-wrap justify-center gap-4">
             <Link href="/order" className="btn-primary text-lg px-8 py-3 rounded-full shadow-lg shadow-orange-500/30">Start an order</Link>
-            <a href="#menu" className="btn-outline text-lg px-8 py-3 rounded-full bg-white border-2 border-brand-orange text-brand-orange">See menu</a>
+            <a href="#menu" className="text-lg px-8 py-3 rounded-full bg-white border-2 border-brand-orange text-brand-orange font-bold transition hover:bg-orange-50">See menu</a>
           </div>
         </div>
       </section>
