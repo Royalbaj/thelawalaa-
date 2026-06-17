@@ -16,7 +16,7 @@ export default async function AdminOrders({ searchParams }: { searchParams: { st
 
   let query = supabaseAdmin
     .from("orders")
-    .select("id, order_number, status, type, total, payment_status, payment_method, created_at, profiles:customer_id(full_name)")
+    .select("id, order_number, status, type, total, payment_status, payment_method, created_at, notes, profiles:customer_id(full_name)")
     .order("created_at", { ascending: false })
     .limit(100);
   if (status && status !== "all") query = query.eq("status", status);
@@ -48,20 +48,31 @@ export default async function AdminOrders({ searchParams }: { searchParams: { st
             </tr>
           </thead>
           <tbody>
-            {(orders ?? []).map((o: any) => (
-              <tr key={o.id} className="border-b border-orange-50 last:border-0">
-                <td className="px-4 py-3 font-mono font-bold">{o.order_number}</td>
-                <td className="px-4 py-3">{o.profiles?.full_name ?? "Walk-in"}</td>
-                <td className="px-4 py-3 capitalize">{o.type.replace("_", " ")}</td>
-                <td className="px-4 py-3 font-bold">{npr(Number(o.total))}</td>
-                <td className="px-4 py-3 text-xs">
-                  <span className="font-bold uppercase">{o.payment_method ?? "—"}</span>{" "}
-                  <MarkPaidButton orderId={o.id} total={Number(o.total)} paid={o.payment_status === "paid"} method={o.payment_method} />
-                </td>
-                <td className="px-4 py-3 text-stone-500">{format(new Date(o.created_at), "d MMM, h:mm a")}</td>
-                <td className="px-4 py-3"><OrderStatusSelect orderId={o.id} status={o.status} /></td>
-              </tr>
-            ))}
+            {(orders ?? []).map((o: any) => {
+              let customerName = o.profiles?.full_name;
+              if (!customerName) {
+                if (o.notes?.includes("[Guest Checkout]")) {
+                  const match = o.notes.match(/Name:\s*([^\n]+)/);
+                  customerName = match ? `${match[1]} (Guest)` : "Walk-in (Guest)";
+                } else {
+                  customerName = "Walk-in";
+                }
+              }
+              return (
+                <tr key={o.id} className="border-b border-orange-50 last:border-0">
+                  <td className="px-4 py-3 font-mono font-bold">{o.order_number}</td>
+                  <td className="px-4 py-3">{customerName}</td>
+                  <td className="px-4 py-3 capitalize">{o.type.replace("_", " ")}</td>
+                  <td className="px-4 py-3 font-bold">{npr(Number(o.total))}</td>
+                  <td className="px-4 py-3 text-xs">
+                    <span className="font-bold uppercase">{o.payment_method ?? "—"}</span>{" "}
+                    <MarkPaidButton orderId={o.id} total={Number(o.total)} paid={o.payment_status === "paid"} method={o.payment_method} />
+                  </td>
+                  <td className="px-4 py-3 text-stone-500">{format(new Date(o.created_at), "d MMM, h:mm a")}</td>
+                  <td className="px-4 py-3"><OrderStatusSelect orderId={o.id} status={o.status} /></td>
+                </tr>
+              );
+            })}
             {(orders ?? []).length === 0 && (
               <tr><td colSpan={7} className="px-4 py-8 text-center text-stone-500">Nothing here.</td></tr>
             )}

@@ -173,92 +173,84 @@ export default function OrderPage() {
         )}
 
         {step === 2 && (
-          <div className="mt-6 max-w-xl space-y-5">
-            {isGuest && (
-              <div className="grid sm:grid-cols-2 gap-4">
-                <div>
-                  <label className="label" htmlFor="guestName">Your name</label>
-                  <input id="guestName" className="input" maxLength={100} value={guestName} onChange={(e) => setGuestName(e.target.value)} placeholder="Full name" />
+          <div className="mt-6 max-w-xl space-y-6">
+            <div className="card p-5">
+              <h2 className="font-display text-xl font-bold border-b pb-2 mb-4">Checkout Details</h2>
+              
+              <div className="space-y-5">
+                {isGuest && (
+                  <div className="grid sm:grid-cols-2 gap-4">
+                    <div>
+                      <label className="label" htmlFor="guestName">Your name</label>
+                      <input id="guestName" className="input" maxLength={100} value={guestName} onChange={(e) => setGuestName(e.target.value)} placeholder="Full name" />
+                    </div>
+                    <div>
+                      <label className="label" htmlFor="guestPhone">Mobile number</label>
+                      <input id="guestPhone" className="input" maxLength={20} value={guestPhone} onChange={(e) => setGuestPhone(e.target.value)} placeholder="98XXXXXXXX" />
+                    </div>
+                  </div>
+                )}
+                
+                <div className="grid grid-cols-2 gap-4">
+                  {(["pickup", "delivery"] as const).map((t) => (
+                    <button key={t} onClick={() => setType(t)} className={`card p-4 text-center font-bold ${type === t ? "ring-2 ring-brand-orange bg-orange-50" : ""}`}>
+                      {t === "pickup" ? "🏪 Pickup" : "🛵 Delivery"}
+                    </button>
+                  ))}
                 </div>
-                <div>
-                  <label className="label" htmlFor="guestPhone">Mobile number</label>
-                  <input id="guestPhone" className="input" maxLength={20} value={guestPhone} onChange={(e) => setGuestPhone(e.target.value)} placeholder="98XXXXXXXX" />
-                </div>
-              </div>
-            )}
-            <div className="grid grid-cols-2 gap-4">
-              {(["pickup", "delivery"] as const).map((t) => (
-                <button key={t} onClick={() => setType(t)} className={`card p-6 text-center font-display text-lg font-bold ${type === t ? "ring-2 ring-brand-orange" : ""}`}>
-                  {t === "pickup" ? "🏪 Pickup" : "🛵 Delivery"}
-                </button>
-              ))}
-            </div>
-            {type === "pickup" ? (
-              <div>
-                <label className="label" htmlFor="branch">Pick a branch</label>
-                <select id="branch" className="input" value={branchId} onChange={(e) => setBranchId(e.target.value)}>
-                  <option value="">Choose…</option>
-                  {branches.map((b) => <option key={b.id} value={b.id}>{b.name} — {b.address}</option>)}
-                </select>
-              </div>
-            ) : (
-              <div className="space-y-3">
-                {addresses.length > 0 && (
+                
+                {type === "pickup" ? (
                   <div>
-                    <label className="label" htmlFor="addr">Saved addresses</label>
-                    <select id="addr" className="input" value={addressId} onChange={(e) => setAddressId(e.target.value)}>
-                      <option value="">Use a new address</option>
-                      {addresses.map((a) => <option key={a.id} value={a.id}>{a.label} — {a.full_address}</option>)}
+                    <label className="label" htmlFor="branch">Pick a branch</label>
+                    <select id="branch" className="input" value={branchId} onChange={(e) => setBranchId(e.target.value)}>
+                      <option value="">Choose…</option>
+                      {branches.map((b) => <option key={b.id} value={b.id}>{b.name} — {b.address}</option>)}
                     </select>
                   </div>
-                )}
-                {!addressId && (
-                  <div>
-                    <label className="label" htmlFor="newaddr">Delivery address</label>
-                    <textarea id="newaddr" className="input" rows={3} maxLength={300} value={newAddress} onChange={(e) => setNewAddress(e.target.value)} placeholder="Flat, building, street, landmark, area, pincode" />
+                ) : (
+                  <div className="space-y-3">
+                    {addresses.length > 0 && (
+                      <div>
+                        <label className="label" htmlFor="addr">Saved addresses</label>
+                        <select id="addr" className="input" value={addressId} onChange={(e) => setAddressId(e.target.value)}>
+                          <option value="">Use a new address</option>
+                          {addresses.map((a) => <option key={a.id} value={a.id}>{a.label} — {a.full_address}</option>)}
+                        </select>
+                      </div>
+                    )}
+                    {!addressId && (
+                      <div>
+                        <label className="label" htmlFor="newaddr">Delivery address</label>
+                        <textarea id="newaddr" className="input" rows={2} maxLength={300} value={newAddress} onChange={(e) => setNewAddress(e.target.value)} placeholder="Flat, building, street, landmark, area" />
+                      </div>
+                    )}
+                    <p className="text-xs font-bold text-brand-green">Home delivery: flat Nrs 20 (within 5km of Manigram)</p>
                   </div>
                 )}
-                <p className="text-sm font-bold text-brand-green">Home delivery: flat Nrs 20 (within 5km of Manigram)</p>
               </div>
-            )}
-            <div className="flex gap-3">
-              <button onClick={() => setStep(1)} className="rounded-full bg-white px-6 py-3 font-bold">← Back</button>
-              <button onClick={() => setStep(3)} className="btn-primary flex-1">Continue →</button>
             </div>
-          </div>
-        )}
 
-        {step === 3 && (
-          <div className="mt-6 max-w-xl space-y-5">
-            <div className="card p-5">
-              <h2 className="font-display text-lg font-bold">Summary</h2>
-              <ul className="mt-2 space-y-1 text-sm">
-                {items.map((i) => <li key={i.product_id} className="flex justify-between"><span>{i.quantity}× {i.name}</span><span>{npr(i.price * i.quantity)}</span></li>)}
-              </ul>
-              <p className="mt-3 flex justify-between border-t pt-2 font-bold"><span>Subtotal</span><span>{npr(subtotal)}</span></p>
-              <p className="mt-1 text-xs text-stone-500">Delivery fee, discounts and final total are calculated securely at checkout.</p>
-            </div>
-            <div>
-              <label className="label" htmlFor="promo">Promo code (optional)</label>
-              <input id="promo" className="input" maxLength={30} value={promo} onChange={(e) => setPromo(e.target.value.toUpperCase())} />
-            </div>
-            <div>
-              <p className="label">Pay with</p>
-              <div className="grid grid-cols-3 gap-3">
-                {([["cash", "💵 Cash"], ["qr", "📱 QR (eSewa / FonePay)"]] as const).map(([v, label]) => (
-                  <button key={v} onClick={() => setPayment(v)} className={`card p-4 font-bold ${payment === v ? "ring-2 ring-brand-orange" : ""}`}>{label}</button>
-                ))}
+            <div className="card p-5 space-y-4">
+              <h2 className="font-display text-xl font-bold border-b pb-2">Payment</h2>
+              
+              <div>
+                <div className="grid grid-cols-2 gap-3">
+                  {([["cash", "💵 Cash"], ["qr", "📱 QR (eSewa/FonePay)"]] as const).map(([v, label]) => (
+                    <button key={v} onClick={() => setPayment(v)} className={`card p-4 font-bold ${payment === v ? "ring-2 ring-brand-orange bg-orange-50" : ""}`}>{label}</button>
+                  ))}
+                </div>
+                <p className="mt-2 text-xs text-stone-500">
+                  {payment === "qr"
+                    ? "Scan our eSewa/FonePay QR when your order arrives."
+                    : "Pay in cash when you collect or receive your order."}
+                </p>
               </div>
-              <p className="mt-2 text-xs text-stone-500">
-                {payment === "qr"
-                  ? "Scan our eSewa / FonePay QR when your order arrives — our team confirms the payment."
-                  : "Pay in cash when you collect or receive your order."}
-              </p>
             </div>
+
             <div className="flex gap-3">
-              <button onClick={() => setStep(2)} className="rounded-full bg-white px-6 py-3 font-bold">← Back</button>
-              <button onClick={placeOrder} disabled={busy || items.length === 0} className="btn-primary flex-1">
-                {busy ? "Placing order…" : "Place order"}
+              <button onClick={() => setStep(1)} className="rounded-full bg-white px-6 py-3 font-bold border border-stone-200">← Back</button>
+              <button onClick={placeOrder} disabled={busy || items.length === 0} className="btn-primary flex-1 shadow-lg shadow-orange-500/30">
+                {busy ? "Placing order…" : `Place order • ${npr(subtotal)}`}
               </button>
             </div>
           </div>
