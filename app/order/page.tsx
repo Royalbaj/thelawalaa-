@@ -133,7 +133,7 @@ export default function OrderPage() {
   }
 
   return (
-    <div className={`min-h-screen bg-brand-cream px-4 py-8 ${items.length > 0 && step === 1 ? 'pb-28' : ''}`}>
+    <div className="min-h-screen bg-brand-cream px-4 py-8 pt-20 lg:pt-8">
       <div className="mx-auto max-w-4xl">
         <h1 className="font-display text-3xl font-bold text-brand-brown">Place Your Order</h1>
         <p className="text-sm text-stone-500 mt-1">Browse menu → Add items → Checkout</p>
@@ -301,20 +301,17 @@ export default function OrderPage() {
         )}
       </div>
 
-      {/* Floating Checkout Bar — placed at root level, outside all containers */}
+      {/* Floating Checkout Button — placed at root level, top right */}
       {step === 1 && items.length > 0 && (
-        <div style={{ position: 'fixed', bottom: '24px', left: '50%', transform: 'translateX(-50%)', zIndex: 9999, width: 'calc(100% - 32px)', maxWidth: '540px' }}>
+        <div style={{ position: 'fixed', top: '24px', right: '24px', zIndex: 9999 }}>
           <button
             onClick={() => setStep(2)}
-            style={{ width: '100%', display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px 24px', backgroundColor: '#F97316', color: 'white', borderRadius: '9999px', fontWeight: 'bold', fontSize: '16px', border: 'none', cursor: 'pointer', boxShadow: '0 20px 40px rgba(249,115,22,0.4)' }}
+            style={{ display: 'flex', gap: '8px', alignItems: 'center', padding: '10px 16px', backgroundColor: '#F97316', color: 'white', borderRadius: '9999px', fontWeight: 'bold', fontSize: '14px', border: 'none', cursor: 'pointer', boxShadow: '0 10px 25px rgba(249,115,22,0.4)' }}
           >
-            <span style={{ background: 'rgba(255,255,255,0.2)', padding: '4px 12px', borderRadius: '9999px', fontSize: '14px' }}>
-              {items.length} item{items.length > 1 ? 's' : ''}
+            <span style={{ background: 'rgba(255,255,255,0.2)', padding: '2px 8px', borderRadius: '9999px', fontSize: '12px' }}>
+              {items.length}
             </span>
             <span>Checkout →</span>
-            <span style={{ background: 'rgba(255,255,255,0.2)', padding: '4px 12px', borderRadius: '9999px', fontSize: '14px' }}>
-              {npr(subtotal)}
-            </span>
           </button>
         </div>
       )}
