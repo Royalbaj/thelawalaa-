@@ -9,7 +9,7 @@ import { createOrder } from "@/app/actions/orders";
 import { npr } from "@/lib/utils";
 import AddToCartButton from "@/components/add-to-cart-button";
 
-type Product = { id: string; name: string; description: string | null; price: number; category_id: string | null; spice_level: number };
+type Product = { id: string; name: string; description: string | null; price: number; category_id: string | null; spice_level: number; image_url?: string | null };
 type Category = { id: string; name: string };
 type Branch = { id: string; name: string; address: string };
 type Address = { id: string; label: string; full_address: string };
@@ -39,7 +39,7 @@ export default function OrderPage() {
     const supabase = createClient();
     supabase.auth.getUser().then(({ data }) => setIsGuest(!data.user));
     Promise.all([
-      supabase.from("products").select("id, name, description, price, category_id, spice_level").order("sort_order"),
+      supabase.from("products").select("id, name, description, price, category_id, spice_level, image_url").order("sort_order"),
       supabase.from("categories").select("id, name").order("sort_order"),
       supabase.from("branches").select("id, name, address"),
       supabase.from("addresses").select("id, label, full_address"),
@@ -129,9 +129,14 @@ export default function OrderPage() {
               </div>
               <div className="mt-4 grid gap-4 sm:grid-cols-2">
                 {visible.map((p) => (
-                  <div key={p.id} className="card p-4">
+                  <div key={p.id} className="card p-4 flex flex-col">
+                    {p.image_url ? (
+                      <img src={p.image_url} alt={p.name} className="h-32 w-full object-cover rounded-lg mb-3" />
+                    ) : (
+                      <div className="h-32 w-full bg-brand-cream rounded-lg mb-3 flex items-center justify-center text-4xl" aria-hidden>🥣</div>
+                    )}
                     <p className="font-bold">{p.name}</p>
-                    <p className="line-clamp-2 text-sm text-stone-600">{p.description}</p>
+                    <p className="line-clamp-2 text-sm text-stone-600 flex-1">{p.description}</p>
                     <div className="mt-2 flex items-center justify-between">
                       <p className="font-display font-bold text-brand-orange">{npr(Number(p.price))}</p>
                       <AddToCartButton product={{ product_id: p.id, name: p.name, price: Number(p.price) }} />

@@ -107,8 +107,12 @@ export default async function HomePage() {
           <div className="mt-8 grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
             {(bestsellers ?? []).map((p) => (
               <div key={p.id} className="card overflow-hidden p-5 transition hover:scale-105">
-                <div className="flex h-28 items-center justify-center rounded-xl bg-brand-cream text-5xl" aria-hidden>
-                  🥣
+                <div className="relative flex h-48 items-center justify-center rounded-xl bg-brand-cream overflow-hidden">
+                  {p.image_url ? (
+                    <img src={p.image_url} alt={p.name} className="absolute inset-0 h-full w-full object-cover transition duration-300 hover:scale-110" />
+                  ) : (
+                    <div className="text-5xl" aria-hidden>🥣</div>
+                  )}
                 </div>
                 <div className="mt-3 flex items-start justify-between gap-2">
                   <p className="font-bold">{p.name}</p>
