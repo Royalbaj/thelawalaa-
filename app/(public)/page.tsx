@@ -56,7 +56,7 @@ export default async function HomePage() {
         <div className="relative z-10 mt-12">
           <p className="font-bold tracking-widest text-brand-orange text-xs mb-3 uppercase">Manigram, Rupandehi</p>
           <h1 className="font-display text-5xl font-extrabold text-brand-brown md:text-7xl max-w-2xl mx-auto leading-tight">
-            Street food that<br/>hits different <span aria-hidden>🥘</span>
+            Hygienic Street Food <span aria-hidden>🥘</span>
           </h1>
           <p className="mx-auto mt-6 max-w-lg text-stone-600">
             Chatpate, pani puri, momo chaat and more — made fresh on the tawa, delivered hot to your tole.
