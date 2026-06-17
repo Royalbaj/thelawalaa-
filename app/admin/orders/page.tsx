@@ -14,9 +14,9 @@ export default async function AdminOrders({ searchParams }: { searchParams: { st
   const status = TABS.includes((searchParams.status ?? "all") as never) ? searchParams.status : "all";
   const q = (searchParams.q ?? "").slice(0, 40);
 
-  let query = supabaseAdmin
+    let query = supabaseAdmin
     .from("orders")
-    .select("id, order_number, status, type, total, payment_status, payment_method, created_at, notes, profiles:customer_id(full_name)")
+    .select("id, order_number, status, type, total, payment_status, payment_method, created_at, notes, discount_amount, promo_codes:promo_code_id(code), profiles:customer_id(full_name)")
     .order("created_at", { ascending: false })
     .limit(100);
   if (status && status !== "all") query = query.eq("status", status);
@@ -63,7 +63,14 @@ export default async function AdminOrders({ searchParams }: { searchParams: { st
                   <td className="px-4 py-3 font-mono font-bold">{o.order_number}</td>
                   <td className="px-4 py-3">{customerName}</td>
                   <td className="px-4 py-3 capitalize">{o.type.replace("_", " ")}</td>
-                  <td className="px-4 py-3 font-bold">{npr(Number(o.total))}</td>
+                  <td className="px-4 py-3">
+                    <div className="font-bold">{npr(Number(o.total))}</div>
+                    {Number(o.discount_amount) > 0 && o.promo_codes?.code && (
+                      <div className="text-[10px] text-brand-green bg-green-50 px-1.5 py-0.5 rounded-full inline-block mt-1 font-bold">
+                        Voucher: {o.promo_codes.code} (-{npr(Number(o.discount_amount))})
+                      </div>
+                    )}
+                  </td>
                   <td className="px-4 py-3 text-xs">
                     <span className="font-bold uppercase">{o.payment_method ?? "—"}</span>{" "}
                     <MarkPaidButton orderId={o.id} total={Number(o.total)} paid={o.payment_status === "paid"} method={o.payment_method} />

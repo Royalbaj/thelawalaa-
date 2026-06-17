@@ -201,3 +201,34 @@ export async function createOrder(input: unknown) {
 
   return { orderId: order.id, orderNumber: order.order_number, total };
 }
+
+export async function validatePromoCode(code: string, subtotal: number) {
+  if (!code) return { error: "Please enter a code" };
+  
+  const { data: promo } = await supabaseAdmin
+    .from("promo_codes")
+    .select("*")
+    .ilike("code", code)
+    .eq("is_active", true)
+    .single();
+
+  if (!promo) return { error: "Invalid promo code" };
+
+  if (promo.expires_at && new Date(promo.expires_at) < new Date()) {
+    return { error: "This promo code has expired" };
+  }
+
+  if (promo.max_uses != null && promo.uses_count >= promo.max_uses) {
+    return { error: "This promo code has reached its usage limit" };
+  }
+
+  if (subtotal < Number(promo.min_order_amount)) {
+    return { error: `Minimum order of Nrs ${promo.min_order_amount} required` };
+  }
+
+  const discount = promo.discount_type === "percent"
+    ? Math.round((subtotal * Number(promo.discount_value)) / 100)
+    : Math.min(Number(promo.discount_value), subtotal);
+
+  return { success: true, discount, type: promo.discount_type, value: promo.discount_value };
+}

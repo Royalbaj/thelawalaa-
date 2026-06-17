@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import toast from "react-hot-toast";
 import { createClient } from "@/lib/supabase/client";
 import { useCart } from "@/lib/store/cart";
-import { createOrder } from "@/app/actions/orders";
+import { createOrder, validatePromoCode } from "@/app/actions/orders";
 import { npr } from "@/lib/utils";
 import AddToCartButton from "@/components/add-to-cart-button";
 
@@ -31,6 +31,10 @@ export default function OrderPage() {
   const [payment, setPayment] = useState<"cash" | "qr">("cash");
   const [busy, setBusy] = useState(false);
 
+  const [promoDiscount, setPromoDiscount] = useState<number>(0);
+  const [promoMessage, setPromoMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
+  const [checkingPromo, setCheckingPromo] = useState(false);
+
   const [isGuest, setIsGuest] = useState(false);
   const [guestName, setGuestName] = useState("");
   const [guestPhone, setGuestPhone] = useState("");
@@ -52,7 +56,29 @@ export default function OrderPage() {
   }, []);
 
   const subtotal = useMemo(() => items.reduce((t, i) => t + i.price * i.quantity, 0), [items]);
+  const deliveryFee = type === "delivery" ? 20 : 0;
+  const finalTotal = Math.max(0, subtotal + deliveryFee - promoDiscount);
+  
   const visible = activeCat ? products.filter((p) => p.category_id === activeCat) : products;
+
+  async function applyPromo() {
+    if (!promo) {
+      setPromoMessage({ type: "error", text: "Please enter a code" });
+      setPromoDiscount(0);
+      return;
+    }
+    setCheckingPromo(true);
+    setPromoMessage(null);
+    const res = await validatePromoCode(promo, subtotal);
+    if (res.error) {
+      setPromoMessage({ type: "error", text: res.error });
+      setPromoDiscount(0);
+    } else if (res.success && res.discount != null) {
+      setPromoMessage({ type: "success", text: `Voucher applied: -${npr(res.discount)}` });
+      setPromoDiscount(res.discount);
+    }
+    setCheckingPromo(false);
+  }
 
   async function ensureAddress(): Promise<string | null> {
     if (addressId) return addressId;
@@ -145,13 +171,16 @@ export default function OrderPage() {
                 ))}
               </div>
             </div>
-            <aside className="card h-fit p-5">
-              <h2 className="font-display text-lg font-bold">Your cart</h2>
+            <aside className="card h-fit p-5 sticky top-20 flex flex-col max-h-[80vh]">
+              <div className="flex justify-between items-center border-b border-orange-50 pb-3 mb-3">
+                <h2 className="font-display text-lg font-bold">Your cart</h2>
+                {items.length > 0 && <button onClick={() => setStep(2)} className="bg-brand-orange text-white text-xs px-3 py-1.5 rounded-full font-bold shadow-sm hover:brightness-110">Checkout →</button>}
+              </div>
               {items.length === 0 ? (
                 <p className="mt-3 text-sm text-stone-500">Cart&apos;s empty — add something crispy!</p>
               ) : (
                 <>
-                  <ul className="mt-3 space-y-3">
+                  <ul className="mt-3 space-y-3 flex-1 overflow-y-auto pr-2">
                     {items.map((i) => (
                       <li key={i.product_id} className="flex items-center justify-between gap-2 text-sm">
                         <span className="font-bold">{i.name}</span>
@@ -232,8 +261,22 @@ export default function OrderPage() {
 
             <div className="card p-5 space-y-4">
               <h2 className="font-display text-xl font-bold border-b pb-2">Payment</h2>
+
+              <div>
+                <label className="label" htmlFor="promo">Voucher / Promo Code (optional)</label>
+                <div className="flex gap-2">
+                  <input id="promo" className="input" maxLength={30} value={promo} onChange={(e) => setPromo(e.target.value.toUpperCase())} placeholder="Enter code" />
+                  <button type="button" onClick={applyPromo} disabled={checkingPromo} className="px-5 py-2 rounded-xl font-bold border-2 border-brand-orange text-brand-orange bg-white hover:bg-orange-50 disabled:opacity-50">
+                    {checkingPromo ? "..." : "Apply"}
+                  </button>
+                </div>
+                {promoMessage && (
+                  <p className={`text-xs font-bold mt-1 ${promoMessage.type === "success" ? "text-brand-green" : "text-brand-red"}`}>{promoMessage.text}</p>
+                )}
+              </div>
               
               <div>
+                <label className="label">Pay with</label>
                 <div className="grid grid-cols-2 gap-3">
                   {([["cash", "💵 Cash"], ["qr", "📱 QR (eSewa/FonePay)"]] as const).map(([v, label]) => (
                     <button key={v} onClick={() => setPayment(v)} className={`card p-4 font-bold ${payment === v ? "ring-2 ring-brand-orange bg-orange-50" : ""}`}>{label}</button>
@@ -250,7 +293,7 @@ export default function OrderPage() {
             <div className="flex gap-3">
               <button onClick={() => setStep(1)} className="rounded-full bg-white px-6 py-3 font-bold border border-stone-200">← Back</button>
               <button onClick={placeOrder} disabled={busy || items.length === 0} className="btn-primary flex-1 shadow-lg shadow-orange-500/30">
-                {busy ? "Placing order…" : `Place order • ${npr(subtotal)}`}
+                {busy ? "Placing order…" : `Place order • ${npr(finalTotal)}`}
               </button>
             </div>
           </div>
