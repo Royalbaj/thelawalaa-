@@ -133,7 +133,7 @@ export default function OrderPage() {
   }
 
   return (
-    <div className="min-h-screen bg-brand-cream px-4 py-8">
+    <div className={`min-h-screen bg-brand-cream px-4 py-8 ${items.length > 0 && step === 1 ? 'pb-28' : ''}`}>
       <div className="mx-auto max-w-4xl">
         <h1 className="font-display text-3xl font-bold text-brand-brown">Place Your Order</h1>
         <p className="text-sm text-stone-500 mt-1">Browse menu → Add items → Checkout</p>
@@ -199,17 +199,6 @@ export default function OrderPage() {
                 </>
               )}
             </aside>
-            
-            {/* Floating Checkout Bar — always visible on all screens */}
-            {items.length > 0 && (
-              <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 w-[calc(100%-2rem)] max-w-xl">
-                <button onClick={() => setStep(2)} className="w-full btn-primary shadow-2xl shadow-orange-500/50 flex justify-between items-center py-4 text-lg border-2 border-white/20 backdrop-blur-sm">
-                  <span className="bg-white/20 px-3 py-1 rounded-full text-sm">{items.length} item{items.length > 1 ? 's' : ''}</span>
-                  <span className="font-bold">Checkout →</span>
-                  <span className="bg-white/20 px-3 py-1 rounded-full text-sm font-bold">{npr(subtotal)}</span>
-                </button>
-              </div>
-            )}
           </div>
         )}
 
@@ -311,6 +300,24 @@ export default function OrderPage() {
           </div>
         )}
       </div>
+
+      {/* Floating Checkout Bar — placed at root level, outside all containers */}
+      {step === 1 && items.length > 0 && (
+        <div style={{ position: 'fixed', bottom: '24px', left: '50%', transform: 'translateX(-50%)', zIndex: 9999, width: 'calc(100% - 32px)', maxWidth: '540px' }}>
+          <button
+            onClick={() => setStep(2)}
+            style={{ width: '100%', display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px 24px', backgroundColor: '#F97316', color: 'white', borderRadius: '9999px', fontWeight: 'bold', fontSize: '16px', border: 'none', cursor: 'pointer', boxShadow: '0 20px 40px rgba(249,115,22,0.4)' }}
+          >
+            <span style={{ background: 'rgba(255,255,255,0.2)', padding: '4px 12px', borderRadius: '9999px', fontSize: '14px' }}>
+              {items.length} item{items.length > 1 ? 's' : ''}
+            </span>
+            <span>Checkout →</span>
+            <span style={{ background: 'rgba(255,255,255,0.2)', padding: '4px 12px', borderRadius: '9999px', fontSize: '14px' }}>
+              {npr(subtotal)}
+            </span>
+          </button>
+        </div>
+      )}
     </div>
   );
 }
