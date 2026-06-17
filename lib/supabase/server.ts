@@ -1,6 +1,6 @@
 // Server-component / server-action client bound to the user's cookies.
 // Still anon key + RLS — acts AS the user, not above them.
-import { createServerClient } from "@supabase/ssr";
+import { createServerClient, type CookieOptions } from "@supabase/ssr";
 import { cookies } from "next/headers";
 
 export function createClient() {
@@ -10,11 +10,11 @@ export function createClient() {
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
       cookies: {
-        get: (name) => cookieStore.get(name)?.value,
-        set: (name, value, options) => {
+        get: (name: string) => cookieStore.get(name)?.value,
+        set: (name: string, value: string, options: CookieOptions) => {
           try { cookieStore.set({ name, value, ...options }); } catch {}
         },
-        remove: (name, options) => {
+        remove: (name: string, options: CookieOptions) => {
           try { cookieStore.set({ name, value: "", ...options }); } catch {}
         },
       },

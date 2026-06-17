@@ -4,6 +4,8 @@ import toast from "react-hot-toast";
 import { markOrderPaid, markOrderUnpaid } from "@/app/actions/staff";
 import { npr } from "@/lib/utils";
 
+type ActionResult = { ok: boolean; error?: string };
+
 /**
  * Shows the admin exactly how much to collect, then confirms the
  * manual cash/QR payment. Paid orders show a green tick that can be
@@ -22,7 +24,7 @@ export default function MarkPaidButton({
         onClick={() => {
           if (!confirm("Undo payment confirmation for this order?")) return;
           start(async () => {
-            const r = await markOrderUnpaid(orderId);
+            const r = await markOrderUnpaid(orderId) as ActionResult;
             r?.error ? toast.error(r.error) : toast.success("Reverted to unpaid");
           });
         }}
@@ -39,7 +41,7 @@ export default function MarkPaidButton({
       onClick={() => {
         if (!confirm(`Collect Rs ${total} (${(method ?? "cash").toUpperCase()}) from the customer, then confirm.`)) return;
         start(async () => {
-          const r = await markOrderPaid(orderId);
+          const r = await markOrderPaid(orderId) as ActionResult;
           r?.error ? toast.error(r.error) : toast.success(`${npr(total)} marked as received`);
         });
       }}
