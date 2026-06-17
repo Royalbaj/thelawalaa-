@@ -2,13 +2,12 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Home, ShoppingCart, BarChart3, Bike } from "lucide-react";
+import { Home, ShoppingCart, Utensils } from "lucide-react";
 
 const NAV_ITEMS = [
-  { id: "site", label: "Site", href: "/", icon: Home },
-  { id: "order", label: "Order", href: "/order", icon: ShoppingCart },
-  { id: "admin", label: "Admin", href: "/admin", icon: BarChart3 },
-  { id: "driver", label: "Driver", href: "/delivery", icon: Bike },
+  { id: "site", label: "Home", href: "/", icon: Home },
+  { id: "menu", label: "Menu", href: "/#menu", icon: Utensils },
+  { id: "order", label: "Order & Collect", href: "/order", icon: ShoppingCart },
 ];
 
 export default function MobileNav() {
