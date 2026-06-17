@@ -133,11 +133,29 @@ export default function OrderPage() {
   }
 
   return (
-    <div className="min-h-screen bg-brand-cream px-4 py-8 pt-20 lg:pt-8">
-      <div className="mx-auto max-w-4xl">
-        <h1 className="font-display text-3xl font-bold text-brand-brown">Place Your Order</h1>
-        <p className="text-sm text-stone-500 mt-1">Browse menu → Add items → Checkout</p>
-        <ol className="mt-4 flex gap-2 text-sm font-bold" aria-label="Order steps">
+    <div className="min-h-screen bg-brand-cream pb-8">
+      {/* Sticky Header with Inline Checkout Button */}
+      <div className="sticky top-0 z-40 bg-brand-cream/95 backdrop-blur-md border-b border-stone-200/50 shadow-sm py-4 px-4 mb-6">
+        <div className="mx-auto max-w-4xl flex items-center justify-between">
+          <div>
+            <h1 className="font-display text-2xl sm:text-3xl font-bold text-brand-brown">Place Your Order</h1>
+            <p className="text-xs sm:text-sm text-stone-500 mt-0.5">Browse menu → Add items → Checkout</p>
+          </div>
+          
+          {step === 1 && items.length > 0 && (
+            <button
+              onClick={() => setStep(2)}
+              className="lg:hidden flex items-center gap-2 rounded-full bg-brand-orange px-4 py-2 font-bold text-white shadow-md shadow-orange-500/30 text-sm hover:brightness-110 transition"
+            >
+              <span className="bg-white/20 px-2 py-0.5 rounded-full text-xs">{items.length}</span>
+              <span>Checkout →</span>
+            </button>
+          )}
+        </div>
+      </div>
+
+      <div className="mx-auto max-w-4xl px-4 sm:px-0">
+        <ol className="flex flex-wrap gap-2 text-sm font-bold" aria-label="Order steps">
           {["Browse Menu", "Checkout & Pay"].map((label, i) => (
             <li key={label} className={`rounded-full px-5 py-2 transition-all ${step === i + 1 ? "bg-brand-orange text-white shadow-sm" : step > i + 1 ? "bg-green-100 text-green-700" : "bg-white text-stone-400 border border-stone-200"}`}>
               {step > i + 1 ? "✓" : i + 1}. {label}
@@ -300,21 +318,6 @@ export default function OrderPage() {
           </div>
         )}
       </div>
-
-      {/* Floating Checkout Button — placed at root level, top right */}
-      {step === 1 && items.length > 0 && (
-        <div style={{ position: 'fixed', top: '24px', right: '24px', zIndex: 9999 }}>
-          <button
-            onClick={() => setStep(2)}
-            style={{ display: 'flex', gap: '8px', alignItems: 'center', padding: '10px 16px', backgroundColor: '#F97316', color: 'white', borderRadius: '9999px', fontWeight: 'bold', fontSize: '14px', border: 'none', cursor: 'pointer', boxShadow: '0 10px 25px rgba(249,115,22,0.4)' }}
-          >
-            <span style={{ background: 'rgba(255,255,255,0.2)', padding: '2px 8px', borderRadius: '9999px', fontSize: '12px' }}>
-              {items.length}
-            </span>
-            <span>Checkout →</span>
-          </button>
-        </div>
-      )}
     </div>
   );
 }
