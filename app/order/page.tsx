@@ -135,11 +135,12 @@ export default function OrderPage() {
   return (
     <div className="min-h-screen bg-brand-cream px-4 py-8">
       <div className="mx-auto max-w-4xl">
-        <h1 className="font-display text-3xl font-bold text-brand-brown">Place your order</h1>
+        <h1 className="font-display text-3xl font-bold text-brand-brown">Place Your Order</h1>
+        <p className="text-sm text-stone-500 mt-1">Browse menu → Add items → Checkout</p>
         <ol className="mt-4 flex gap-2 text-sm font-bold" aria-label="Order steps">
-          {["Cart", "Pickup or delivery", "Payment"].map((label, i) => (
-            <li key={label} className={`rounded-full px-4 py-1.5 ${step === i + 1 ? "bg-brand-orange text-white" : "bg-white text-stone-500"}`}>
-              {i + 1}. {label}
+          {["Browse Menu", "Checkout & Pay"].map((label, i) => (
+            <li key={label} className={`rounded-full px-5 py-2 transition-all ${step === i + 1 ? "bg-brand-orange text-white shadow-sm" : step > i + 1 ? "bg-green-100 text-green-700" : "bg-white text-stone-400 border border-stone-200"}`}>
+              {step > i + 1 ? "✓" : i + 1}. {label}
             </li>
           ))}
         </ol>
