@@ -1,45 +1,67 @@
-"use client";
-import { useEffect, useState } from "react";
+import { getVerifiedUser } from "@/lib/supabase/server";
+import { createClient } from "@/lib/supabase/server";
+import { npr } from "@/lib/utils";
 import Link from "next/link";
-import { format } from "date-fns";
-import { createClient } from "@/lib/supabase/client";
-import { npr, STATUS_COLORS, cn } from "@/lib/utils";
 
-export default function OrdersPage() {
-  const [orders, setOrders] = useState<any[]>([]);
-  const [loaded, setLoaded] = useState(false);
+export const dynamic = "force-dynamic";
 
-  useEffect(() => {
-    createClient().from("orders")
-      .select("id, order_number, status, total, type, created_at")
-      .order("created_at", { ascending: false })
-      .then(({ data }) => { setOrders(data ?? []); setLoaded(true); });
-  }, []);
+export default async function MyOrders() {
+  const { user } = await getVerifiedUser();
+  if (!user) return null;
+
+  const supabase = createClient();
+  const { data: orders } = await supabase
+    .from("orders")
+    .select("id, order_number, status, total, type, payment_status, payment_method, created_at")
+    .order("created_at", { ascending: false })
+    .limit(30);
+
+  const statusColors: Record<string, string> = {
+    pending: "text-amber-600 bg-amber-50",
+    confirmed: "text-blue-600 bg-blue-50",
+    preparing: "text-purple-600 bg-purple-50",
+    ready: "text-green-600 bg-green-50",
+    assigned: "text-cyan-600 bg-cyan-50",
+    picked_up: "text-indigo-600 bg-indigo-50",
+    on_the_way: "text-violet-600 bg-violet-50",
+    delivered: "text-emerald-600 bg-emerald-50",
+    cancelled: "text-red-600 bg-red-50",
+  };
 
   return (
-    <div>
-      <h1 className="font-display text-2xl font-bold text-brand-brown">Your orders</h1>
-      {loaded && orders.length === 0 && (
-        <div className="card mt-6 p-8 text-center">
-          <p className="font-bold">No orders yet — your first panipuri awaits.</p>
-          <Link href="/order" className="btn-primary mt-4">Browse menu</Link>
+    <div className="px-4 py-4 pb-24 space-y-3">
+      <h1 className="font-display text-xl font-bold text-brand-brown">My Orders</h1>
+
+      {(orders ?? []).length === 0 ? (
+        <div className="rounded-2xl bg-white p-8 text-center border border-stone-100">
+          <p className="text-4xl mb-2">📦</p>
+          <p className="font-bold text-stone-500">No orders yet</p>
+          <Link href="/order" className="inline-block mt-3 btn-primary text-sm">Place Your First Order →</Link>
         </div>
+      ) : (
+        (orders ?? []).map((o: any) => (
+          <Link key={o.id} href={`/track/${o.id}`} className="block rounded-2xl bg-white border border-stone-100 p-4 hover:shadow-sm transition">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="font-mono text-sm font-bold text-brand-brown">{o.order_number}</p>
+                <p className="text-[10px] text-stone-400 mt-0.5">{new Date(o.created_at).toLocaleDateString("en-US", { day: "numeric", month: "short", year: "numeric", hour: "numeric", minute: "2-digit" })}</p>
+              </div>
+              <span className={`rounded-full px-2.5 py-1 text-[10px] font-bold capitalize ${statusColors[o.status] ?? "bg-stone-100 text-stone-600"}`}>
+                {o.status.replace(/_/g, " ")}
+              </span>
+            </div>
+            <div className="flex items-center justify-between mt-2 pt-2 border-t border-stone-50">
+              <div className="flex items-center gap-2">
+                <span className="text-[10px] font-bold text-stone-400 capitalize">{o.type === "delivery" ? "🛵 Delivery" : "🏪 Pickup"}</span>
+                <span className={`text-[10px] font-bold ${o.payment_status === "paid" ? "text-green-600" : "text-amber-600"}`}>
+                  {o.payment_status === "paid" ? "✅ Paid" : "⏳ Pending"}
+                </span>
+              </div>
+              <p className="font-bold text-brand-orange">{npr(Number(o.total))}</p>
+            </div>
+          </Link>
+        ))
       )}
-      <ul className="mt-6 space-y-3">
-        {orders.map((o) => (
-          <li key={o.id} className="card flex flex-wrap items-center justify-between gap-3 p-4">
-            <div>
-              <p className="font-mono text-sm font-bold">{o.order_number}</p>
-              <p className="text-xs text-stone-500">{format(new Date(o.created_at), "d MMM, h:mm a")} · {o.type}</p>
-            </div>
-            <div className="flex items-center gap-3">
-              <span className={cn("badge", STATUS_COLORS[o.status])}>{o.status.replace(/_/g, " ")}</span>
-              <span className="font-bold">{npr(Number(o.total))}</span>
-              <Link href={`/track/${o.id}`} className="rounded-full bg-brand-orange px-4 py-1.5 text-sm font-bold text-white">Track</Link>
-            </div>
-          </li>
-        ))}
-      </ul>
     </div>
   );
 }

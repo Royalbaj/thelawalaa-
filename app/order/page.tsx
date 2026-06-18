@@ -39,9 +39,18 @@ export default function OrderPage() {
   const [guestName, setGuestName] = useState("");
   const [guestPhone, setGuestPhone] = useState("");
 
+  const [favorites, setFavorites] = useState<string[]>([]);
+
   useEffect(() => {
     const supabase = createClient();
-    supabase.auth.getUser().then(({ data }) => setIsGuest(!data.user));
+    supabase.auth.getUser().then(({ data }) => {
+      setIsGuest(!data.user);
+      if (data.user) {
+        supabase.from("customer_favorites").select("product_id").eq("customer_id", data.user.id).then((res) => {
+          setFavorites(res.data?.map(f => f.product_id) ?? []);
+        });
+      }
+    });
     Promise.all([
       supabase.from("products").select("id, name, description, price, category_id, spice_level, image_url").order("sort_order"),
       supabase.from("categories").select("id, name").order("sort_order"),
@@ -173,21 +182,39 @@ export default function OrderPage() {
                 ))}
               </div>
               <div className="mt-4 grid gap-4 sm:grid-cols-2">
-                {visible.map((p) => (
-                  <div key={p.id} className="card p-4 flex flex-col">
-                    {p.image_url ? (
-                      <img src={p.image_url} alt={p.name} className="h-32 w-full object-cover rounded-lg mb-3" />
-                    ) : (
-                      <div className="h-32 w-full bg-brand-cream rounded-lg mb-3 flex items-center justify-center text-4xl" aria-hidden>🥣</div>
-                    )}
-                    <p className="font-bold">{p.name}</p>
-                    <p className="line-clamp-2 text-sm text-stone-600 flex-1">{p.description}</p>
-                    <div className="mt-2 flex items-center justify-between">
-                      <p className="font-display font-bold text-brand-orange">{npr(Number(p.price))}</p>
-                      <AddToCartButton product={{ product_id: p.id, name: p.name, price: Number(p.price) }} />
+                {visible.map((p) => {
+                  const isFav = favorites.includes(p.id);
+                  return (
+                    <div key={p.id} className="card p-4 flex flex-col relative group">
+                      {!isGuest && (
+                        <button
+                          onClick={async () => {
+                            const { toggleFavorite } = await import("@/app/actions/customer");
+                            const res = await toggleFavorite(p.id);
+                            if (res.ok) {
+                              setFavorites(prev => res.isFavorite ? [...prev, p.id] : prev.filter(id => id !== p.id));
+                              toast.success(res.isFavorite ? "Added to favorites ❤️" : "Removed from favorites");
+                            }
+                          }}
+                          className={`absolute top-6 right-6 h-8 w-8 rounded-full bg-white/90 backdrop-blur-sm flex items-center justify-center transition shadow-sm ${isFav ? "text-red-500" : "text-stone-300 hover:text-red-400"}`}
+                        >
+                          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill={isFav ? "currentColor" : "none"} stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4"><path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z"/></svg>
+                        </button>
+                      )}
+                      {p.image_url ? (
+                        <img src={p.image_url} alt={p.name} className="h-32 w-full object-cover rounded-lg mb-3" />
+                      ) : (
+                        <div className="h-32 w-full bg-brand-cream rounded-lg mb-3 flex items-center justify-center text-4xl" aria-hidden>🥣</div>
+                      )}
+                      <p className="font-bold pr-8">{p.name}</p>
+                      <p className="line-clamp-2 text-sm text-stone-600 flex-1">{p.description}</p>
+                      <div className="mt-2 flex items-center justify-between">
+                        <p className="font-display font-bold text-brand-orange">{npr(Number(p.price))}</p>
+                        <AddToCartButton product={{ product_id: p.id, name: p.name, price: Number(p.price) }} />
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </div>
             <aside className="card h-fit p-5 sticky top-20 flex flex-col max-h-[80vh]">

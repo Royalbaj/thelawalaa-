@@ -10,7 +10,7 @@ const csp = [
   "script-src 'self' 'unsafe-inline' https://maps.googleapis.com",
   "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
   "font-src 'self' https://fonts.gstatic.com",
-  `img-src 'self' data: blob: https://*.supabase.co https://maps.gstatic.com https://maps.googleapis.com`,
+  `img-src 'self' data: blob: https://*.supabase.co https://maps.gstatic.com https://maps.googleapis.com https://images.unsplash.com`,
   `connect-src 'self' https://${supabaseHost} wss://${supabaseHost} https://maps.googleapis.com`,
   "frame-src https://www.google.com",
   "object-src 'none'",

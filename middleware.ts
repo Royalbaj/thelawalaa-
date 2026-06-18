@@ -3,11 +3,12 @@ import { NextResponse, type NextRequest } from "next/server";
 
 // First-match wins, so list the most specific prefixes first.
 const ROLE_ROUTES: [string, string[]][] = [
-  ["/admin", ["admin"]],
-  ["/pos", ["admin", "pos_user"]],
-  ["/delivery", ["admin", "delivery_driver"]],
-  ["/account", ["admin", "pos_user", "delivery_driver", "customer"]],
-  ["/track", ["customer", "admin", "delivery_driver"]],
+  ["/super-admin", ["super_admin"]],
+  ["/admin", ["super_admin", "admin", "pos_user"]],
+  ["/pos", ["super_admin", "admin", "pos_user"]],
+  ["/delivery", ["super_admin", "delivery_driver"]],
+  ["/account", ["super_admin", "admin", "pos_user", "delivery_driver", "customer"]],
+  ["/track", ["customer", "super_admin", "admin", "delivery_driver"]],
 ];
 
 export async function middleware(request: NextRequest) {
@@ -62,7 +63,7 @@ export async function middleware(request: NextRequest) {
 
 export const config = {
   matcher: [
-    "/admin/:path*", "/pos/:path*", "/delivery/:path*",
+    "/super-admin/:path*", "/admin/:path*", "/pos/:path*", "/delivery/:path*",
     "/account/:path*", "/order/:path*", "/track/:path*",
   ],
 };

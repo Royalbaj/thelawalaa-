@@ -99,6 +99,28 @@ export default function TrackPage() {
               {order.payment_method?.toUpperCase()} · {order.payment_status === "paid" ? "Paid ✓" : order.payment_method === "qr" ? "Scan QR on arrival" : "Pay cash on arrival"}
             </p>
           </div>
+
+          {order.status === "delivered" && (
+            <div className="mt-6 pt-6 border-t border-stone-100">
+              <h2 className="font-display text-lg font-bold text-brand-brown text-center mb-2">How was your food?</h2>
+              <p className="text-xs text-stone-500 text-center mb-4">Rate your order to help us improve!</p>
+              <div className="flex justify-center gap-2">
+                {[1, 2, 3, 4, 5].map((star) => (
+                  <button
+                    key={star}
+                    onClick={async () => {
+                      const { submitOrderRating } = await import("@/app/actions/customer");
+                      const res = await submitOrderRating(order.id, star, null, null);
+                      if (res.ok) alert("Thanks for your rating! ❤️");
+                    }}
+                    className="text-3xl text-stone-300 hover:text-amber-400 hover:scale-110 transition"
+                  >
+                    ★
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </div>
