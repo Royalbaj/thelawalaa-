@@ -129,12 +129,18 @@ export async function createOrder(input: unknown) {
   const total = Math.max(0, subtotal + delivery_fee - discount_amount);
   
   let finalNotes = data.notes ? data.notes.trim() : "";
+  let extractedAddress = "";
+  if (data.type === "delivery" && isSelfCheckout && data.delivery_address_id) {
+    const { data: addr } = await supabaseAdmin.from("addresses").select("full_address").eq("id", data.delivery_address_id).single();
+    if (addr) extractedAddress = addr.full_address;
+  }
+
   if (isStaff) {
     finalNotes = `[POS Order]\nName: ${data.guest_name}\nPhone: ${data.guest_phone && data.guest_phone !== "N/A" ? data.guest_phone : "N/A"}${data.type === 'delivery' ? `\nAddress: ${data.guest_address}` : ""}\n\n${finalNotes}`.trim();
   } else if (isAnonymous) {
     finalNotes = `[Guest Checkout]\nName: ${data.guest_name}\nPhone: ${data.guest_phone}${data.type === 'delivery' ? `\nAddress: ${data.guest_address}` : ""}\n\n${finalNotes}`.trim();
   } else if (isSelfCheckout) {
-    finalNotes = `[Registered User]\nName: ${profile.full_name}\nPhone: ${profile.phone ?? "N/A"}\n\n${finalNotes}`.trim();
+    finalNotes = `[Registered User]\nName: ${profile.full_name}\nPhone: ${profile.phone ?? "N/A"}${data.type === 'delivery' && extractedAddress ? `\nAddress: ${extractedAddress}` : ""}\n\n${finalNotes}`.trim();
   }
 
   // ── Insert order + items ─────────────────────────────────────

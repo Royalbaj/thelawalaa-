@@ -85,23 +85,29 @@ export default function LiveOrdersPanel({ initialOrders, drivers }: { initialOrd
     return match ? match[1] : null;
   }
 
+  function getAddress(o: Order) {
+    if (!o.notes) return null;
+    const match = o.notes.match(/Address:\s*([^\n]+)/);
+    return match ? match[1] : null;
+  }
+
   async function advanceStatus(o: Order) {
     const next = NEXT_STATUS[o.status];
     if (!next) return;
     const res = await adminUpdateOrderStatus(o.id, next);
-    if ("error" in res) return toast.error(res.error);
+    if ("error" in res) { toast.error(res.error as string); return; }
     toast.success(`→ ${next}`);
   }
 
   async function handleAssignDriver(orderId: string, driverId: string) {
     const res = await assignDriver(orderId, driverId);
-    if ("error" in res) return toast.error(res.error);
+    if ("error" in res) { toast.error(res.error as string); return; }
     toast.success("Driver assigned!");
   }
 
   async function handleMarkPaid(orderId: string) {
     const res = await markOrderPaid(orderId);
-    if ("error" in res) return toast.error(res.error);
+    if ("error" in res) { toast.error(res.error as string); return; }
     toast.success("✅ Paid!");
   }
 
@@ -161,7 +167,9 @@ export default function LiveOrdersPanel({ initialOrders, drivers }: { initialOrd
             {expandedId === o.id && (
               <div className="mt-3 pt-2 border-t border-stone-100 space-y-2" onClick={(e) => e.stopPropagation()}>
                 <p className="text-[10px] text-stone-400">{format(new Date(o.created_at), "d MMM, h:mm a")}</p>
-                
+                {o.type === "delivery" && getAddress(o) && (
+                  <p className="text-[11px] font-bold text-stone-600 bg-stone-50 p-1.5 rounded">📍 {getAddress(o)}</p>
+                )}
                 <div className="flex flex-wrap gap-1.5">
                   {NEXT_STATUS[o.status] && (
                     <button onClick={() => advanceStatus(o)} className="rounded-lg bg-brand-orange text-white px-3 py-1.5 text-[11px] font-bold hover:brightness-110 transition">

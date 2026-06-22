@@ -66,7 +66,7 @@ export default function POSGrid({ products, categories }: { products: Product[];
         guest_phone: customerPhone.trim() ? customerPhone : undefined,
         guest_address: orderType === "delivery" ? customerAddress : undefined,
       });
-      if ("error" in res && res.error) return toast.error(res.error);
+      if ("error" in res && res.error) { toast.error(res.error as string); return; }
       const ok = res as { orderId: string; orderNumber: string; total: number };
       toast.success(`✅ Order ${ok.orderNumber} placed — ${npr(ok.total)}`);
       setCart([]);

@@ -27,7 +27,7 @@ export default function OfferControls({ offers }: { offers: Offer[] }) {
     const fd = new FormData(e.currentTarget);
     startTransition(async () => {
       const res = await createOffer(Object.fromEntries(fd));
-      if ("error" in res) return toast.error(res.error);
+      if ("error" in res) { toast.error(res.error as string); return; }
       toast.success("Offer created!");
       setShowForm(false);
       router.refresh();

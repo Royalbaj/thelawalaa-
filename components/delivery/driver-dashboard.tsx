@@ -1,9 +1,10 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useState, useTransition, useEffect } from "react";
 import { format } from "date-fns";
 import toast from "react-hot-toast";
 import { useRouter } from "next/navigation";
+import { createClient } from "@/lib/supabase/client";
 import { npr, cn } from "@/lib/utils";
 import { setDriverOnline, driverAdvanceStatus, verifyDeliveryOtp, getCustomerTelLink } from "@/app/actions/delivery";
 
@@ -57,6 +58,21 @@ export default function DriverDashboard({
   const active = deliveries.filter((d) => !d.otp_verified && d.orders.status !== "delivered" && d.orders.status !== "cancelled");
   const completed = deliveries.filter((d) => d.otp_verified || d.orders.status === "delivered");
 
+  useEffect(() => {
+    const supabase = createClient();
+    const channel = supabase
+      .channel("driver-deliveries")
+      .on("postgres_changes", { event: "*", schema: "public", table: "deliveries" }, () => {
+        toast("🔔 New delivery update!", { icon: "🛵" });
+        router.refresh();
+      })
+      .on("postgres_changes", { event: "*", schema: "public", table: "orders" }, () => {
+        router.refresh();
+      })
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, [router]);
+
   function toggleOnline() {
     startTransition(async () => {
       await setDriverOnline(!online);
@@ -69,7 +85,7 @@ export default function DriverDashboard({
   function advanceOrder(orderId: string) {
     startTransition(async () => {
       const res = await driverAdvanceStatus(orderId);
-      if ("error" in res) return toast.error(res.error);
+      if ("error" in res) { toast.error(res.error as string); return; }
       toast.success(`Status updated!`);
       router.refresh();
     });
@@ -79,7 +95,7 @@ export default function DriverDashboard({
     if (otp.length !== 4) return toast.error("Enter 4-digit OTP");
     startTransition(async () => {
       const res = await verifyDeliveryOtp(orderId, otp);
-      if ("error" in res) return toast.error(res.error);
+      if ("error" in res) { toast.error(res.error as string); return; }
       toast.success("✅ Delivery confirmed!");
       setOtp("");
       setActiveOtp(null);
@@ -89,7 +105,7 @@ export default function DriverDashboard({
 
   async function callCustomer(orderId: string) {
     const res = await getCustomerTelLink(orderId);
-    if ("error" in res) return toast.error(res.error);
+    if ("error" in res) { toast.error(res.error as string); return; }
     window.open(res.tel, "_self");
   }
 
