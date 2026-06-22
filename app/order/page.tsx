@@ -43,9 +43,14 @@ export default function OrderPage() {
 
   useEffect(() => {
     const supabase = createClient();
-    supabase.auth.getUser().then(({ data }) => {
+    supabase.auth.getUser().then(async ({ data }) => {
       setIsGuest(!data.user);
       if (data.user) {
+        const { data: profile } = await supabase.from("profiles").select("full_name, phone").eq("id", data.user.id).single();
+        if (profile) {
+          setGuestName(profile.full_name || "");
+          setGuestPhone(profile.phone || "");
+        }
         supabase.from("customer_favorites").select("product_id").eq("customer_id", data.user.id).then((res) => {
           setFavorites(res.data?.map(f => f.product_id) ?? []);
         });
@@ -106,11 +111,11 @@ export default function OrderPage() {
   async function placeOrder() {
     setBusy(true);
     try {
-      if (isGuest && (!guestName.trim() || !guestPhone.trim())) {
-        toast.error("Please enter your name and phone number");
+      if (!guestName.trim() || !guestPhone.trim()) {
+        toast.error("Please enter your contact name and phone number");
         return;
       }
-      if (isGuest && guestPhone && !/^(\+977)?9[6-8]\d{8}$/.test(guestPhone.trim())) {
+      if (guestPhone && !/^(\+977)?9[6-8]\d{8}$/.test(guestPhone.trim())) {
         toast.error("Please enter a valid Nepali mobile number");
         return;
       }
@@ -126,8 +131,8 @@ export default function OrderPage() {
         delivery_address_id: delivery_address_id ?? undefined,
         payment_method: payment,
         promo_code: promo || undefined,
-        guest_name: isGuest ? guestName.trim() : undefined,
-        guest_phone: isGuest ? guestPhone.trim() : undefined,
+        guest_name: guestName.trim() || undefined,
+        guest_phone: guestPhone.trim() || undefined,
         guest_address: isGuest && type === "delivery" ? newAddress.trim() : undefined,
         items: items.map((i) => ({ product_id: i.product_id, quantity: i.quantity })),
       });
@@ -253,18 +258,16 @@ export default function OrderPage() {
               <h2 className="font-display text-xl font-bold border-b pb-2 mb-4">Checkout Details</h2>
               
               <div className="space-y-5">
-                {isGuest && (
                   <div className="grid sm:grid-cols-2 gap-4">
                     <div>
-                      <label className="label" htmlFor="guestName">Your name</label>
+                      <label className="label" htmlFor="guestName">{isGuest ? "Your name" : "Contact name"}</label>
                       <input id="guestName" className="input" maxLength={100} value={guestName} onChange={(e) => setGuestName(e.target.value)} placeholder="Full name" />
                     </div>
                     <div>
-                      <label className="label" htmlFor="guestPhone">Mobile number</label>
+                      <label className="label" htmlFor="guestPhone">{isGuest ? "Mobile number" : "Contact number"}</label>
                       <input id="guestPhone" className="input" maxLength={20} value={guestPhone} onChange={(e) => setGuestPhone(e.target.value)} placeholder="98XXXXXXXX" />
                     </div>
                   </div>
-                )}
                 
                 <div className="grid grid-cols-2 gap-4">
                   {(["pickup", "delivery"] as const).map((t) => (
