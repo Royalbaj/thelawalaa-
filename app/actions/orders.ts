@@ -35,14 +35,15 @@ export async function createOrder(input: unknown) {
   const data = parsed.data;
 
   const { user, profile } = await getVerifiedUser();
-  // Allow anonymous checkouts OR logged in customers/admins
-  if (user && profile && !["customer", "admin"].includes(profile.role)) {
-    return { error: "Your account is not authorized to place customer orders" };
-  }
+  const isStaff = user && profile && ["admin", "super_admin", "pos_user"].includes(profile.role);
+  const isSelfCheckout = user && profile && profile.role === "customer";
+  const isAnonymous = !user;
 
-  const isGuest = !user;
-  if (isGuest && (!data.guest_name || !data.guest_phone)) {
+  if (isAnonymous && (!data.guest_name || !data.guest_phone)) {
     return { error: "Please provide your name and phone number to order" };
+  }
+  if (isStaff && !data.guest_name) {
+    return { error: "Please provide a customer name" };
   }
 
   // ── Re-price everything server-side ──────────────────────────
@@ -77,14 +78,14 @@ export async function createOrder(input: unknown) {
   });
 
   // Verify the delivery address belongs to THIS customer
-  if (data.type === "delivery" && !isGuest && data.delivery_address_id) {
+  if (data.type === "delivery" && isSelfCheckout && data.delivery_address_id) {
     const { data: addr } = await supabaseAdmin
       .from("addresses")
       .select("id, customer_id")
       .eq("id", data.delivery_address_id)
       .single();
     if (!addr || addr.customer_id !== user?.id) return { error: "Invalid delivery address" };
-  } else if (data.type === "delivery" && isGuest && !data.guest_address) {
+  } else if (data.type === "delivery" && (isAnonymous || isStaff) && !data.guest_address) {
     return { error: "Please provide a delivery address" };
   }
 
@@ -128,9 +129,11 @@ export async function createOrder(input: unknown) {
   const total = Math.max(0, subtotal + delivery_fee - discount_amount);
   
   let finalNotes = data.notes ? data.notes.trim() : "";
-  if (isGuest) {
+  if (isStaff) {
+    finalNotes = `[POS Order]\nName: ${data.guest_name}\nPhone: ${data.guest_phone && data.guest_phone !== "N/A" ? data.guest_phone : "N/A"}${data.type === 'delivery' ? `\nAddress: ${data.guest_address}` : ""}\n\n${finalNotes}`.trim();
+  } else if (isAnonymous) {
     finalNotes = `[Guest Checkout]\nName: ${data.guest_name}\nPhone: ${data.guest_phone}${data.type === 'delivery' ? `\nAddress: ${data.guest_address}` : ""}\n\n${finalNotes}`.trim();
-  } else if (profile) {
+  } else if (isSelfCheckout) {
     finalNotes = `[Registered User]\nName: ${profile.full_name}\nPhone: ${profile.phone ?? "N/A"}\n\n${finalNotes}`.trim();
   }
 
@@ -139,14 +142,15 @@ export async function createOrder(input: unknown) {
     .from("orders")
     .insert({
       order_number: "pending", // replaced by trigger
-      customer_id: user?.id ?? null,
-      branch_id: data.branch_id ?? null,
+      customer_id: isSelfCheckout ? user.id : null,
+      placed_by: isStaff ? user.id : null,
+      branch_id: isStaff ? profile.branch_id : (data.branch_id ?? null),
       type: data.type,
       subtotal,
       delivery_fee,
       discount_amount,
       total,
-      delivery_address_id: !isGuest ? (data.delivery_address_id ?? null) : null,
+      delivery_address_id: isSelfCheckout ? (data.delivery_address_id ?? null) : null,
       pickup_time: data.pickup_time ?? null,
       payment_method: data.payment_method,
       payment_status: "pending", // admin confirms cash/QR manually

@@ -63,7 +63,7 @@ export default function POSGrid({ products, categories }: { products: Product[];
         type: orderType,
         payment_method: payment,
         guest_name: customerName,
-        guest_phone: customerPhone || "N/A",
+        guest_phone: customerPhone.trim() ? customerPhone : undefined,
         guest_address: orderType === "delivery" ? customerAddress : undefined,
       });
       if ("error" in res && res.error) return toast.error(res.error);
