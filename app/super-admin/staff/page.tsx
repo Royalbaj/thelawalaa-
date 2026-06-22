@@ -14,7 +14,8 @@ const ROLE_BADGE: Record<string, string> = {
 };
 
 export default async function StaffPage({ searchParams }: { searchParams: { q?: string } }) {
-  await requireRole(["admin"]);
+  const { profile } = await requireRole(["super_admin", "admin"]);
+  const isSuperAdmin = profile.role === "super_admin";
   const q = (searchParams.q ?? "").slice(0, 60);
 
   let query = supabaseAdmin
@@ -57,7 +58,7 @@ export default async function StaffPage({ searchParams }: { searchParams: { q?: 
               <td className="px-4 py-3 text-stone-500">{format(new Date(p.created_at), "d MMM yyyy")}</td>
               {showActions && (
                 <td className="px-4 py-3">
-                  {p.role === "admin"
+                  {p.role === "admin" && !isSuperAdmin
                     ? <span className="text-xs text-stone-400">Manage in Supabase</span>
                     : <StaffRowActions userId={p.id} isActive={p.is_active} role={p.role} branches={(branches ?? []) as never} />}
                 </td>

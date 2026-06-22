@@ -110,17 +110,21 @@ export default function DriverDashboard({
   }
 
   function getCustomerName(o: DeliveryOrder) {
+    if (o.notes) {
+      const match = o.notes.match(/Name:\s*([^\n]+)/);
+      if (match) return match[1];
+    }
     if (o.customer) return o.customer.full_name;
-    if (!o.notes) return "Customer";
-    const match = o.notes.match(/Name:\s*([^\n]+)/);
-    return match ? match[1] : "Customer";
+    return "Customer";
   }
 
   function getCustomerPhone(o: DeliveryOrder) {
+    if (o.notes) {
+      const match = o.notes.match(/Phone:\s*([^\n]+)/);
+      if (match && match[1] !== "N/A") return match[1];
+    }
     if (o.customer) return o.customer.phone;
-    if (!o.notes) return null;
-    const match = o.notes.match(/Phone:\s*([^\n]+)/);
-    return match ? match[1] : null;
+    return null;
   }
 
   function getAddress(o: DeliveryOrder) {

@@ -72,17 +72,21 @@ export default function LiveOrdersPanel({ initialOrders, drivers }: { initialOrd
     : filter === "all" ? orders : orders.filter((o) => o.status === filter);
 
   function getCustomerName(o: Order) {
+    if (o.notes) {
+      const match = o.notes.match(/Name:\s*([^\n]+)/);
+      if (match) return match[1];
+    }
     if (o.customer) return o.customer.full_name;
-    if (!o.notes) return "Walk-in";
-    const match = o.notes.match(/Name:\s*([^\n]+)/);
-    return match ? match[1] : "Walk-in";
+    return "Walk-in";
   }
 
   function getCustomerPhone(o: Order) {
+    if (o.notes) {
+      const match = o.notes.match(/Phone:\s*([^\n]+)/);
+      if (match && match[1] !== "N/A") return match[1];
+    }
     if (o.customer) return o.customer.phone;
-    if (!o.notes) return null;
-    const match = o.notes.match(/Phone:\s*([^\n]+)/);
-    return match ? match[1] : null;
+    return null;
   }
 
   function getAddress(o: Order) {
