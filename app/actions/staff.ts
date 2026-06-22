@@ -84,8 +84,8 @@ export async function setUserActive(targetId: string, active: boolean) {
 
 export async function changeUserRole(targetId: string, role: string, branchId?: string) {
   const { user } = await requireRole(["super_admin", "admin"]);
-  if (!["customer", "pos_user", "delivery_driver"].includes(role)) {
-    return { error: "That role can't be assigned here" }; // admin promotion: deliberate friction — do it in Supabase dashboard
+  if (!["customer", "pos_user", "delivery_driver", "admin"].includes(role)) {
+    return { error: "That role can't be assigned here" }; 
   }
   if (targetId === user.id) return { error: "You can't change your own role" };
 

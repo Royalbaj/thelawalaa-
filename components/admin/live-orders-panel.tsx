@@ -17,6 +17,7 @@ interface Order {
   payment_method: string | null;
   created_at: string;
   notes: string | null;
+  customer?: { full_name: string; phone: string | null } | null;
 }
 
 interface Driver {
@@ -71,9 +72,17 @@ export default function LiveOrdersPanel({ initialOrders, drivers }: { initialOrd
     : filter === "all" ? orders : orders.filter((o) => o.status === filter);
 
   function getCustomerName(o: Order) {
+    if (o.customer) return o.customer.full_name;
     if (!o.notes) return "Walk-in";
     const match = o.notes.match(/Name:\s*([^\n]+)/);
     return match ? match[1] : "Walk-in";
+  }
+
+  function getCustomerPhone(o: Order) {
+    if (o.customer) return o.customer.phone;
+    if (!o.notes) return null;
+    const match = o.notes.match(/Phone:\s*([^\n]+)/);
+    return match ? match[1] : null;
   }
 
   async function advanceStatus(o: Order) {
@@ -127,7 +136,10 @@ export default function LiveOrdersPanel({ initialOrders, drivers }: { initialOrd
             <div className="flex items-center justify-between gap-2">
               <div>
                 <span className="font-mono text-xs font-bold text-brand-brown">{o.order_number}</span>
-                <span className="ml-2 text-[10px] text-stone-400">{getCustomerName(o)}</span>
+                <span className="ml-2 text-[10px] text-stone-500">
+                  {getCustomerName(o)}
+                  {getCustomerPhone(o) ? ` • ${getCustomerPhone(o)}` : ""}
+                </span>
               </div>
               <span className={cn("rounded-full px-2 py-0.5 text-[10px] font-bold capitalize", STATUS_COLORS[o.status] ?? "bg-stone-100")}>
                 {o.status.replace(/_/g, " ")}

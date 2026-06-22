@@ -16,6 +16,8 @@ interface DeliveryOrder {
   payment_method: string | null;
   created_at: string;
   notes: string | null;
+  customer?: { full_name: string; phone: string | null } | null;
+  address?: { full_address: string } | null;
 }
 
 interface Delivery {
@@ -91,15 +93,24 @@ export default function DriverDashboard({
     window.open(res.tel, "_self");
   }
 
-  function getCustomerName(notes: string | null) {
-    if (!notes) return "Customer";
-    const match = notes.match(/Name:\s*([^\n]+)/);
+  function getCustomerName(o: DeliveryOrder) {
+    if (o.customer) return o.customer.full_name;
+    if (!o.notes) return "Customer";
+    const match = o.notes.match(/Name:\s*([^\n]+)/);
     return match ? match[1] : "Customer";
   }
 
-  function getAddress(notes: string | null) {
-    if (!notes) return null;
-    const match = notes.match(/Address:\s*([^\n]+)/);
+  function getCustomerPhone(o: DeliveryOrder) {
+    if (o.customer) return o.customer.phone;
+    if (!o.notes) return null;
+    const match = o.notes.match(/Phone:\s*([^\n]+)/);
+    return match ? match[1] : null;
+  }
+
+  function getAddress(o: DeliveryOrder) {
+    if (o.address) return o.address.full_address;
+    if (!o.notes) return null;
+    const match = o.notes.match(/Address:\s*([^\n]+)/);
     return match ? match[1] : null;
   }
 
@@ -166,15 +177,16 @@ export default function DriverDashboard({
                     <div className="flex justify-between items-start">
                       <div>
                         <p className="font-mono text-sm font-bold">{o.order_number}</p>
-                        <p className="text-xs text-white/50">{getCustomerName(o.notes)}</p>
+                        <p className="text-xs text-white/50">{getCustomerName(o)}</p>
+                        {getCustomerPhone(o) && <p className="text-[10px] text-white/40">{getCustomerPhone(o)}</p>}
                       </div>
                       <span className="font-bold text-brand-orange">{npr(Number(o.total))}</span>
                     </div>
 
-                    {getAddress(o.notes) && (
+                    {getAddress(o) && (
                       <div className="rounded-lg bg-white/5 p-2.5 border border-white/5">
                         <p className="text-[10px] text-white/40 font-bold mb-0.5">📍 Deliver to:</p>
-                        <p className="text-xs font-bold">{getAddress(o.notes)}</p>
+                        <p className="text-xs font-bold">{getAddress(o)}</p>
                       </div>
                     )}
 

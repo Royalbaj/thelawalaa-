@@ -130,6 +130,8 @@ export async function createOrder(input: unknown) {
   let finalNotes = data.notes ? data.notes.trim() : "";
   if (isGuest) {
     finalNotes = `[Guest Checkout]\nName: ${data.guest_name}\nPhone: ${data.guest_phone}${data.type === 'delivery' ? `\nAddress: ${data.guest_address}` : ""}\n\n${finalNotes}`.trim();
+  } else if (profile) {
+    finalNotes = `[Registered User]\nName: ${profile.full_name}\nPhone: ${profile.phone ?? "N/A"}\n\n${finalNotes}`.trim();
   }
 
   // ── Insert order + items ─────────────────────────────────────

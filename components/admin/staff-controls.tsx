@@ -33,6 +33,7 @@ export function InviteStaffForm({ branches }: { branches: { id: string; name: st
         <select name="role" className="input" value={role} onChange={(e) => setRole(e.target.value)}>
           <option value="pos_user">POS user</option>
           <option value="delivery_driver">Delivery driver</option>
+          <option value="admin">Admin</option>
         </select>
         <select name="branch_id" required className="input">
           {branches.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
@@ -47,10 +48,7 @@ export function InviteStaffForm({ branches }: { branches: { id: string; name: st
         </div>
       )}
       <button disabled={pending} className="btn-primary">{pending ? "Sending…" : "Send invite"}</button>
-      <p className="text-xs text-stone-500">
-        Admin accounts can&apos;t be created here — promote them directly in the Supabase
-        dashboard. That friction is deliberate.
-      </p>
+
     </form>
   );
 }
@@ -77,7 +75,7 @@ export function StaffRowActions({
         <option value="customer">customer</option>
         <option value="pos_user">pos_user</option>
         <option value="delivery_driver">delivery_driver</option>
-        {role === "admin" && <option value="admin" disabled>admin</option>}
+        <option value="admin">admin</option>
       </select>
       <button
         disabled={pending}

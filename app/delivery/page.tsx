@@ -14,7 +14,9 @@ export default async function DeliveryPage() {
       id, assigned_at, picked_up_at, on_the_way_at, delivered_at, otp_verified,
       orders!inner(
         id, order_number, status, type, total, payment_status, payment_method,
-        created_at, notes, delivery_address_id
+        created_at, notes, delivery_address_id,
+        customer:profiles(full_name, phone),
+        address:addresses(full_address)
       )
     `)
     .eq("driver_id", user.id)
