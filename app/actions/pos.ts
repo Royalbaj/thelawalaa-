@@ -2,7 +2,8 @@
 
 import { posOrderSchema } from "@/lib/validations/order";
 import { requireRole } from "@/lib/supabase/server";
-import { supabaseAdmin, audit } from "@/lib/supabase/admin";
+import { supabaseAdmin, audit, awardOrderLoyaltyPoints } from "@/lib/supabase/admin";
+import { applyOpeningPromoPrice } from "@/lib/promo";
 
 /** POS order: branch comes from the operator's OWN profile — never the client. */
 export async function createPosOrder(input: unknown) {
@@ -16,19 +17,20 @@ export async function createPosOrder(input: unknown) {
   }
 
   const ids = d.items.map((i) => i.product_id);
-  const { data: products } = await supabaseAdmin
-    .from("products")
-    .select("id, name, price, is_available")
-    .in("id", ids);
+  const [{ data: products }, { data: settings }] = await Promise.all([
+    supabaseAdmin.from("products").select("id, name, price, is_available, categories(name)").in("id", ids),
+    supabaseAdmin.from("app_settings").select("*").eq("id", 1).single(),
+  ]);
   if (!products || products.length !== new Set(ids).size) return { error: "Unknown items in cart" };
 
   let subtotal = 0;
   const rows = d.items.map((i) => {
     const p = products.find((x) => x.id === i.product_id)!;
     if (!p.is_available) throw new Error("sold out");
-    const line = Number(p.price) * i.quantity;
+    const effectivePrice = applyOpeningPromoPrice(Number(p.price), (p.categories as any)?.name, settings);
+    const line = effectivePrice * i.quantity;
     subtotal += line;
-    return { product_id: p.id, product_name: p.name, product_price: p.price, quantity: i.quantity, line_total: line };
+    return { product_id: p.id, product_name: p.name, product_price: effectivePrice, quantity: i.quantity, line_total: line };
   });
 
   // Optional: attach walk-in customer by phone
@@ -65,6 +67,7 @@ export async function createPosOrder(input: unknown) {
   if (error || !order) return { error: "Order failed" };
 
   await supabaseAdmin.from("order_items").insert(rows.map((r) => ({ ...r, order_id: order.id })));
+  await awardOrderLoyaltyPoints(customer_id, Number(order.total));
   await audit({ actor_id: user.id, action: "POS_ORDER", target_table: "orders", target_id: order.id, new_data: { total: order.total } });
   return { ok: true, orderNumber: order.order_number, dailyNumber: order.daily_number, total: order.total };
 }

@@ -1,18 +1,19 @@
 import { requireRole } from "@/lib/supabase/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { npr } from "@/lib/utils";
-import { BranchForm, PromoForm, ActiveToggle, FeatureFlagsForm } from "@/components/admin/settings-controls";
+import { BranchForm, PromoForm, ActiveToggle, FeatureFlagsForm, OpeningPromoForm, SocialLinksManager } from "@/components/admin/settings-controls";
 
 export const dynamic = "force-dynamic";
 
 export default async function SettingsPage() {
   await requireRole(["super_admin"]);
-  const [{ data: branches }, { data: promos }, { data: settings }] = await Promise.all([
+  const [{ data: branches }, { data: promos }, { data: settings }, { data: socialLinks }] = await Promise.all([
     supabaseAdmin.from("branches").select("id, name, address, phone, is_active").order("name"),
     supabaseAdmin.from("promo_codes")
       .select("id, code, discount_type, discount_value, min_order_amount, max_uses, uses_count, is_active, expires_at")
       .order("created_at", { ascending: false }),
-    supabaseAdmin.from("app_settings").select("esewa_enabled, delivery_enabled").eq("id", 1).single(),
+    supabaseAdmin.from("app_settings").select("*").eq("id", 1).single(),
+    supabaseAdmin.from("social_links").select("id, platform, url, is_active").order("sort_order"),
   ]);
 
   return (
@@ -51,6 +52,13 @@ export default async function SettingsPage() {
       </div>
       <div className="space-y-4">
         <FeatureFlagsForm esewaEnabled={settings?.esewa_enabled ?? false} deliveryEnabled={settings?.delivery_enabled ?? false} />
+        <OpeningPromoForm
+          enabled={settings?.opening_promo_enabled ?? false}
+          momoPrice={Number(settings?.opening_promo_momo_price ?? 11)}
+          startsAt={settings?.opening_promo_starts_at ?? null}
+          endsAt={settings?.opening_promo_ends_at ?? null}
+        />
+        <SocialLinksManager links={(socialLinks ?? []) as never} />
         <BranchForm />
         <PromoForm />
       </div>

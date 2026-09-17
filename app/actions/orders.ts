@@ -5,6 +5,7 @@ import { Resend } from "resend";
 import { orderSchema } from "@/lib/validations/order";
 import { getVerifiedUser } from "@/lib/supabase/server";
 import { supabaseAdmin, audit } from "@/lib/supabase/admin";
+import { applyOpeningPromoPrice } from "@/lib/promo";
 
 const resend = process.env.RESEND_API_KEY ? new Resend(process.env.RESEND_API_KEY) : null;
 
@@ -34,7 +35,7 @@ export async function createOrder(input: unknown) {
   if (!parsed.success) return { error: "Invalid order data" };
   const data = parsed.data;
 
-  const { data: settings } = await supabaseAdmin.from("app_settings").select("esewa_enabled, delivery_enabled").eq("id", 1).single();
+  const { data: settings } = await supabaseAdmin.from("app_settings").select("*").eq("id", 1).single();
   if (data.type === "delivery" && !settings?.delivery_enabled) {
     return { error: "Delivery isn't available right now — please choose pickup" };
   }
@@ -58,7 +59,7 @@ export async function createOrder(input: unknown) {
   const ids = data.items.map((i) => i.product_id);
   const { data: products } = await supabaseAdmin
     .from("products")
-    .select("id, name, price, is_available")
+    .select("id, name, price, is_available, categories(name)")
     .in("id", ids);
 
   if (!products || products.length !== new Set(ids).size) {
@@ -73,12 +74,13 @@ export async function createOrder(input: unknown) {
   let subtotal = 0;
   const itemRows = data.items.map((i) => {
     const p = byId.get(i.product_id)!;
-    const line = Number(p.price) * i.quantity;
+    const effectivePrice = applyOpeningPromoPrice(Number(p.price), (p.categories as any)?.name, settings);
+    const line = effectivePrice * i.quantity;
     subtotal += line;
     return {
       product_id: p.id,
       product_name: p.name,
-      product_price: p.price,
+      product_price: effectivePrice,
       quantity: i.quantity,
       customization_notes: i.customization_notes ?? null,
       line_total: line,
