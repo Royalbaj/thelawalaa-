@@ -1,8 +1,8 @@
 # Thelawalaa.com 🥘
 
-Production-grade multi-role food ordering app for Nepal 🇳🇵 — launching in Butwal–Manigram, built to scale into a franchise brand — Next.js 14 (App Router) + Supabase + Vercel. No payment gateway: cash / QR (eSewa, FonePay) payments are confirmed manually by an admin, who always sees exactly how much to collect.
+Production-grade multi-role food ordering app for Nepal 🇳🇵 — launching in Banepa–Godam Chowk, built to scale into a franchise brand — Next.js 14 (App Router) + Supabase + Vercel. Cash / QR (eSewa, FonePay) payments are confirmed manually by an admin, who always sees exactly how much to collect; eSewa online checkout is also available, gated behind a super-admin toggle.
 
-**Roles:** customer (order, track, account) · admin (full console) · pos_user (counter terminal) · delivery_driver (mobile portal)
+**Roles:** customer (order, track, account) · admin (full console) · super_admin (admin + manage other admins + feature flags) · pos_user (counter terminal) · delivery_driver (mobile portal)
 
 ---
 
@@ -109,17 +109,17 @@ The site ships with professional, technically-complete on-page SEO. What's built
 - **Structured data (JSON-LD)** for `Organization`, `WebSite` (with sitelinks search box), `FoodEstablishment`, each branch as a `Restaurant` with address + geo + hours, the full `Menu`, and an `FAQPage`. This is what earns Google's rich results — the business panel, menu, and the expandable FAQ in search.
 - **`sitemap.xml`** and **`robots.txt`** generated automatically (`app/sitemap.ts`, `app/robots.ts`); private areas (admin, POS, delivery, account, tracking) are kept out of the index.
 - **PWA manifest** + favicon/Apple/maskable icons, `theme-color`, and `display:swap` fonts for fast, app-like mobile behaviour.
-- **Keyword-aligned copy** for the brand, dishes and varieties (Thelawalaa, chatpate + chicken/ramen/mint/sweet-chilly/spicy varieties, panipuri, fulki, momo, street food Butwal/Manigram) written naturally into real headings and body text — never hidden keyword stuffing, which Google penalises.
+- **Keyword-aligned copy** for the brand, dishes and varieties (Thelawalaa, chatpate + classic/gilo/mint/spicy-ramen varieties, veg/chicken/buff momo, street food Banepa/Godam Chowk) written naturally into real headings and body text — never hidden keyword stuffing, which Google penalises.
 
 Edit all business facts (branches, phone, socials, keywords) in one place: `lib/seo.ts`.
 
 ### To actually rank — the off-page work (do this after launch)
 Code gets you a technically perfect site; rankings are earned with real-world signals no code can fake. Honestly, **no one can guarantee a permanent #1 spot** — anyone who promises that is misleading you. To compete for the top legitimately:
 
-1. **Google Business Profile** — create one for the Manigram store with photos, hours, the delivery area, and the website link. This is the single biggest driver of "near me" and local-map rankings.
+1. **Google Business Profile** — create one for the Godam Chowk store with photos, hours, the delivery area, and the website link. This is the single biggest driver of "near me" and local-map rankings.
 2. **Submit the sitemap** in [Google Search Console](https://search.google.com/search-console) and Bing Webmaster Tools, then paste the verification tokens into `NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION` / `NEXT_PUBLIC_BING_SITE_VERIFICATION`.
 3. **Collect genuine reviews** on Google and Facebook — volume and recency of real reviews strongly affect local ranking.
 4. **Get listed** on local directories and food aggregators, and earn links from local blogs/press.
 5. **Stay fresh** — new menu items, announcements and posts signal an active site.
 
-Brand terms ("Thelawalaa", "Thelawala") should rank quickly since the site is the authoritative source. Local terms ("chatpate Butwal", "momo Manigram", "panipuri near me") are very winnable with the Google Business Profile + reviews. As you open new franchise locations, add each as a branch in the admin console and create a Google Business Profile for it — the structured data already supports multiple branches.
+Brand terms ("Thelawalaa", "Thelawala") should rank quickly since the site is the authoritative source. Local terms ("chatpate Banepa", "momo Godam Chowk", "buff momo near me") are very winnable with the Google Business Profile + reviews. As you open new franchise locations, add each as a branch in the admin console and create a Google Business Profile for it — the structured data already supports multiple branches.
