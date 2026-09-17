@@ -13,7 +13,7 @@ export async function GET() {
   }
   const { data } = await supabaseAdmin
     .from("orders")
-    .select("id, order_number, status, type, total, payment_status, payment_method, created_at")
+    .select("id, order_number, daily_number, status, type, total, payment_status, payment_method, created_at")
     .order("created_at", { ascending: false })
     .limit(30);
   return NextResponse.json(data ?? []);

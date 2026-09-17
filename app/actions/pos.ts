@@ -6,7 +6,7 @@ import { supabaseAdmin, audit } from "@/lib/supabase/admin";
 
 /** POS order: branch comes from the operator's OWN profile — never the client. */
 export async function createPosOrder(input: unknown) {
-  const { user, profile } = await requireRole(["pos_user", "admin"]);
+  const { user, profile } = await requireRole(["pos_user", "admin", "super_admin"]);
   const parsed = posOrderSchema.safeParse(input);
   if (!parsed.success) return { error: "Invalid order" };
   const d = parsed.data;
@@ -58,12 +58,13 @@ export async function createPosOrder(input: unknown) {
       total: subtotal,
       payment_method: d.payment_method,
       payment_status: "paid", // POS = paid at counter
+      notes: d.customer_name ? `[POS Order]\nName: ${d.customer_name}` : null,
     })
-    .select("id, order_number, total")
+    .select("id, order_number, daily_number, total")
     .single();
   if (error || !order) return { error: "Order failed" };
 
   await supabaseAdmin.from("order_items").insert(rows.map((r) => ({ ...r, order_id: order.id })));
   await audit({ actor_id: user.id, action: "POS_ORDER", target_table: "orders", target_id: order.id, new_data: { total: order.total } });
-  return { ok: true, orderNumber: order.order_number, total: order.total };
+  return { ok: true, orderNumber: order.order_number, dailyNumber: order.daily_number, total: order.total };
 }

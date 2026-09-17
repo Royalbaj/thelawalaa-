@@ -2,13 +2,16 @@ import { createServerClient, type CookieOptions } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
 // First-match wins, so list the most specific prefixes first.
+// /track is deliberately NOT here — guest checkouts have no account, so
+// order tracking is a public direct-link page (unguessable UUID in the
+// URL = the capability). Access to the actual row is still enforced by
+// orders RLS, not by this middleware.
 const ROLE_ROUTES: [string, string[]][] = [
   ["/super-admin", ["super_admin"]],
   ["/admin", ["super_admin", "admin", "pos_user"]],
   ["/pos", ["super_admin", "admin", "pos_user"]],
   ["/delivery", ["super_admin", "delivery_driver"]],
   ["/account", ["super_admin", "admin", "pos_user", "delivery_driver", "customer"]],
-  ["/track", ["customer", "super_admin", "admin", "delivery_driver"]],
 ];
 
 export async function middleware(request: NextRequest) {

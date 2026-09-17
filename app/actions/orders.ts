@@ -15,7 +15,7 @@ function hashOtp(otp: string, orderId: string) {
     .digest("hex");
 }
 
-// USP: flat Nrs 20 home delivery within 5km of the store (Manigram at launch).
+// USP: flat Nrs 20 home delivery within 5km of the store (Godam Chowk, Banepa at launch).
 const DELIVERY_FEE = 20; // NPR — flat
 
 /**
@@ -33,6 +33,14 @@ export async function createOrder(input: unknown) {
   const parsed = orderSchema.safeParse(input);
   if (!parsed.success) return { error: "Invalid order data" };
   const data = parsed.data;
+
+  const { data: settings } = await supabaseAdmin.from("app_settings").select("esewa_enabled, delivery_enabled").eq("id", 1).single();
+  if (data.type === "delivery" && !settings?.delivery_enabled) {
+    return { error: "Delivery isn't available right now — please choose pickup" };
+  }
+  if (data.payment_method === "esewa" && !settings?.esewa_enabled) {
+    return { error: "eSewa isn't available right now — please choose cash or QR" };
+  }
 
   const { user, profile } = await getVerifiedUser();
   const isStaff = user && profile && ["admin", "super_admin", "pos_user"].includes(profile.role);
@@ -163,7 +171,7 @@ export async function createOrder(input: unknown) {
       promo_code_id,
       notes: finalNotes || null,
     })
-    .select("id, order_number, total")
+    .select("id, order_number, total, daily_number")
     .single();
 
   if (orderErr || !order) return { error: "Could not place the order. Try again." };
@@ -211,7 +219,7 @@ export async function createOrder(input: unknown) {
     } catch { /* email failure must not fail the order */ }
   }
 
-  return { orderId: order.id, orderNumber: order.order_number, total };
+  return { orderId: order.id, orderNumber: order.order_number, dailyNumber: order.daily_number, total };
 }
 
 export async function validatePromoCode(code: string, subtotal: number) {

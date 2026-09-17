@@ -10,7 +10,7 @@ import OrderStatusSelect from "./order-status-select";
 import MarkPaidButton from "./mark-paid-button";
 
 type Row = {
-  id: string; order_number: string; status: string; type: string;
+  id: string; order_number: string; daily_number: number | null; status: string; type: string;
   total: number; payment_status: string; payment_method: string | null; created_at: string;
 };
 
@@ -46,7 +46,12 @@ export default function RealtimeFeed({ initial }: { initial: Row[] }) {
         <tbody>
           {orders.map((o) => (
             <tr key={o.id} className="border-b border-orange-50 last:border-0">
-              <td className="px-4 py-3 font-mono font-bold">{o.order_number}</td>
+              <td className="px-4 py-3 font-mono font-bold">
+                {o.daily_number != null && o.type === "pickup" && (
+                  <span className="mr-1.5 inline-flex items-center rounded-full bg-brand-orange/10 px-2 py-0.5 text-xs font-extrabold text-brand-orange">#{String(o.daily_number).padStart(2, "0")}</span>
+                )}
+                {o.order_number}
+              </td>
               <td className="px-4 py-3 capitalize">{o.type.replace("_", " ")}</td>
               <td className="px-4 py-3 font-bold">{npr(Number(o.total))}</td>
               <td className="px-4 py-3">

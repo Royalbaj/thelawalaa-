@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { useParams } from "next/navigation";
+import { Suspense, useEffect, useState } from "react";
+import { useParams, useSearchParams } from "next/navigation";
 import { format } from "date-fns";
 import { createClient } from "@/lib/supabase/client";
 import { npr, STATUS_COLORS, cn } from "@/lib/utils";
@@ -12,22 +12,39 @@ const LABELS: Record<string, string> = {
   pending: "Order placed", confirmed: "Confirmed", preparing: "Preparing",
   ready: "Ready for pickup", on_the_way: "Out for delivery", delivered: "Done!",
 };
+const TAB_TITLES: Record<string, string> = {
+  pending: "Order received", confirmed: "Order confirmed", preparing: "Preparing your order",
+  ready: "Ready for pickup", on_the_way: "Out for delivery", delivered: "Order complete",
+  cancelled: "Order cancelled",
+};
 
 export default function TrackPage() {
+  return (
+    <Suspense>
+      <TrackContent />
+    </Suspense>
+  );
+}
+
+function TrackContent() {
   const { orderId } = useParams<{ orderId: string }>();
+  const payment = useSearchParams().get("payment");
   const [order, setOrder] = useState<any>(null);
   const [items, setItems] = useState<any[]>([]);
   const [notFound, setNotFound] = useState(false);
+  const [isGuestViewer, setIsGuestViewer] = useState(false);
 
   useEffect(() => {
     const supabase = createClient();
-    // RLS guarantees only the owner / assigned driver can read this row.
+    // RLS guarantees only the owner / assigned driver / a guest order's
+    // holder-of-the-link can read this row.
     supabase.from("orders").select("*").eq("id", orderId).maybeSingle().then(({ data }) => {
       if (!data) setNotFound(true);
       else setOrder(data);
     });
     supabase.from("order_items").select("product_name, quantity, line_total").eq("order_id", orderId)
       .then(({ data }) => setItems(data ?? []));
+    supabase.auth.getUser().then(({ data }) => setIsGuestViewer(!data.user));
 
     const channel = supabase
       .channel(`order-${orderId}`)
@@ -36,6 +53,13 @@ export default function TrackPage() {
       .subscribe();
     return () => { supabase.removeChannel(channel); };
   }, [orderId]);
+
+  useEffect(() => {
+    if (!order) return;
+    const title = TAB_TITLES[order.status];
+    if (title) document.title = `${title} · Thelawalaa`;
+    return () => { document.title = "Thelawalaa"; };
+  }, [order?.status]);
 
   if (notFound)
     return <div className="flex min-h-screen items-center justify-center bg-brand-cream"><p className="font-bold">Order not found, or you don&apos;t have access to it.</p></div>;
@@ -52,6 +76,32 @@ export default function TrackPage() {
   return (
     <div className="min-h-screen bg-brand-cream px-4 py-10">
       <div className="mx-auto max-w-xl">
+        {payment === "success" && (
+          <p className="mb-4 rounded-xl bg-green-50 p-4 text-center font-bold text-brand-green">Payment received via eSewa</p>
+        )}
+        {payment === "failed" && (
+          <p className="mb-4 rounded-xl bg-amber-50 p-4 text-center font-bold text-amber-700">Payment didn&apos;t go through — you can pay cash on arrival, or try eSewa again from support.</p>
+        )}
+        {order.type === "pickup" && order.status !== "cancelled" && (
+          <div className="mb-4 rounded-2xl border-2 border-dashed border-brand-orange bg-orange-50 p-5 text-center">
+            <p className="text-xs font-bold uppercase tracking-wide text-brand-orange">Tell our counter staff this number</p>
+            {order.daily_number != null ? (
+              <p className="mt-1 font-mono text-6xl font-extrabold text-brand-brown tracking-wider">{String(order.daily_number).padStart(2, "0")}</p>
+            ) : (
+              <p className="mt-1 font-mono text-3xl font-extrabold text-brand-brown tracking-wider">{order.order_number}</p>
+            )}
+            <p className="mt-1 text-xs text-stone-500 font-mono">{order.order_number}</p>
+          </div>
+        )}
+        {isGuestViewer && (
+          <div className="mb-4 rounded-2xl bg-gradient-to-br from-brand-orange to-amber-500 p-5 text-center text-white shadow-lg">
+            <p className="font-display font-bold text-lg">Sign up to get great offers</p>
+            <p className="mt-1 text-sm text-white/90">Create a free account to save your addresses, track past orders, and get exclusive deals.</p>
+            <a href="/auth/signup" className="mt-3 inline-block rounded-full bg-white px-6 py-2 text-sm font-bold text-brand-orange hover:bg-orange-50 transition">
+              Sign Up Free
+            </a>
+          </div>
+        )}
         <div className="card p-6">
           <div className="flex items-center justify-between">
             <div>
@@ -96,7 +146,7 @@ export default function TrackPage() {
             </ul>
             <p className="mt-3 flex justify-between border-t pt-2 font-bold"><span>Total</span><span>{npr(Number(order.total))}</span></p>
             <p className="mt-1 text-xs text-stone-500">
-              {order.payment_method?.toUpperCase()} · {order.payment_status === "paid" ? "Paid ✓" : order.payment_method === "qr" ? "Scan QR on arrival" : "Pay cash on arrival"}
+              {order.payment_method?.toUpperCase()} · {order.payment_status === "paid" ? "Paid ✓" : order.payment_method === "qr" ? "Scan QR on arrival" : order.payment_method === "esewa" ? "Payment pending" : "Pay cash on arrival"}
             </p>
           </div>
 
@@ -111,7 +161,7 @@ export default function TrackPage() {
                     onClick={async () => {
                       const { submitOrderRating } = await import("@/app/actions/customer");
                       const res = await submitOrderRating(order.id, star, null, null);
-                      if (res.ok) alert("Thanks for your rating! ❤️");
+                      if (res.ok) alert("Thanks for your rating!");
                     }}
                     className="text-3xl text-stone-300 hover:text-amber-400 hover:scale-110 transition"
                   >
