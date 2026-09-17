@@ -53,6 +53,25 @@ export function InviteStaffForm({ branches }: { branches: { id: string; name: st
   );
 }
 
+export function CustomerRowActions({ userId, isActive }: { userId: string; isActive: boolean }) {
+  const [pending, start] = useTransition();
+  return (
+    <button
+      disabled={pending}
+      onClick={() => {
+        if (isActive && !confirm("Suspend this account? Their sessions end immediately.")) return;
+        start(async () => {
+          const r = await setUserActive(userId, !isActive);
+          r?.error ? toast.error(r.error) : toast.success(isActive ? "Suspended" : "Reactivated");
+        });
+      }}
+      className={isActive ? "text-xs font-bold text-brand-red" : "text-xs font-bold text-brand-green"}
+    >
+      {isActive ? "Suspend" : "Reactivate"}
+    </button>
+  );
+}
+
 export function StaffRowActions({
   userId, isActive, role, branches,
 }: { userId: string; isActive: boolean; role: string; branches: { id: string; name: string }[] }) {

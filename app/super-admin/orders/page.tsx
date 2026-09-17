@@ -17,7 +17,7 @@ export default async function AdminOrders({ searchParams }: { searchParams: { st
 
   let query = supabaseAdmin
     .from("orders")
-    .select("id, order_number, status, type, total, payment_status, payment_method, created_at, notes, discount_amount, promo_codes:promo_code_id(code), profiles:customer_id(full_name)")
+    .select("id, order_number, daily_number, status, type, total, payment_status, payment_method, created_at, notes, discount_amount, promo_codes:promo_code_id(code), profiles:customer_id(full_name)")
     .order("created_at", { ascending: false })
     .limit(100);
   if (status && status !== "all") query = query.eq("status", status);
@@ -40,23 +40,23 @@ export default async function AdminOrders({ searchParams }: { searchParams: { st
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div>
-          <h1 className="font-display text-2xl font-bold text-brand-brown">Order Management</h1>
-          <p className="text-sm text-stone-500 mt-0.5">Track, update, and manage all customer orders</p>
+          <h1 className="font-display text-2xl font-bold text-slate-900">Order Management</h1>
+          <p className="text-sm text-slate-500 mt-0.5">Track, update, and manage all customer orders</p>
         </div>
         <form action="/super-admin/orders" className="flex gap-2">
           <input name="q" defaultValue={q} placeholder="Search order #..." className="input !w-52 !py-2 text-sm" />
-          <button type="submit" className="rounded-xl bg-brand-orange text-white px-4 py-2 text-sm font-bold">Search</button>
+          <button type="submit" className="rounded-xl bg-violet-600 text-white px-4 py-2 text-sm font-bold">Search</button>
         </form>
       </div>
 
       {/* Status Tabs */}
-      <div className="flex flex-wrap items-center gap-2 pb-2 border-b border-stone-200">
+      <div className="flex flex-wrap items-center gap-2 pb-2 border-b border-slate-200">
         {TABS.map((t) => (
-          <a key={t} href={`/admin/orders?status=${t}`}
+          <a key={t} href={`/super-admin/orders?status=${t}`}
              className={cn("rounded-full px-4 py-1.5 text-sm font-bold capitalize transition",
                status === t 
-                 ? "bg-brand-orange text-white shadow-sm" 
-                 : "bg-white text-stone-600 hover:bg-orange-50 border border-stone-200")}>
+                 ? "bg-violet-600 text-white shadow-sm" 
+                 : "bg-white text-slate-600 hover:bg-violet-50 border border-slate-200")}>
             {t.replace(/_/g, " ")}
             {counts[t] ? <span className="ml-1.5 text-[10px] opacity-70">({counts[t]})</span> : null}
           </a>
@@ -64,10 +64,10 @@ export default async function AdminOrders({ searchParams }: { searchParams: { st
       </div>
 
       {/* Orders Table */}
-      <div className="rounded-2xl bg-white shadow-sm border border-stone-100 overflow-x-auto">
+      <div className="rounded-2xl bg-white shadow-sm border border-slate-100 overflow-x-auto">
         <table className="w-full text-sm">
           <thead>
-            <tr className="border-b border-stone-100 text-left text-xs uppercase text-stone-400 bg-stone-50/50">
+            <tr className="border-b border-slate-100 text-left text-xs uppercase text-slate-400 bg-slate-50/50">
               <th className="px-4 py-3.5 font-bold">Order #</th>
               <th className="px-4 py-3.5 font-bold">Customer</th>
               <th className="px-4 py-3.5 font-bold">Type</th>
@@ -81,24 +81,23 @@ export default async function AdminOrders({ searchParams }: { searchParams: { st
             {(orders ?? []).map((o: any) => {
               let customerName = o.profiles?.full_name;
               if (!customerName) {
-                if (o.notes?.includes("[Guest Checkout]")) {
-                  const match = o.notes.match(/Name:\s*([^\n]+)/);
-                  customerName = match ? match[1] : "Guest";
-                } else {
-                  customerName = "Walk-in";
-                }
+                const match = o.notes?.match(/Name:\s*([^\n]+)/);
+                customerName = match ? match[1] : o.notes?.includes("[Guest Checkout]") ? "Guest" : "Walk-in";
               }
               const isGuest = !o.profiles?.full_name;
               
               return (
-                <tr key={o.id} className="border-b border-stone-50 last:border-0 hover:bg-stone-50/50 transition-colors">
+                <tr key={o.id} className="border-b border-slate-100 last:border-0 hover:bg-slate-50/50 transition-colors">
                   <td className="px-4 py-3.5">
-                    <span className="font-mono font-bold text-brand-brown">{o.order_number}</span>
+                    {o.daily_number != null && o.type === "pickup" && (
+                      <span className="mr-1.5 inline-flex items-center rounded-full bg-violet-100 px-2 py-0.5 text-xs font-extrabold text-violet-600">#{String(o.daily_number).padStart(2, "0")}</span>
+                    )}
+                    <span className="font-mono font-bold text-slate-900">{o.order_number}</span>
                   </td>
                   <td className="px-4 py-3.5">
-                    <div className="font-medium text-brand-brown">{customerName}</div>
+                    <div className="font-medium text-slate-900">{customerName}</div>
                     {isGuest && (
-                      <span className="text-[10px] font-bold text-stone-400 bg-stone-100 px-1.5 py-0.5 rounded">GUEST</span>
+                      <span className="text-[10px] font-bold text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded">GUEST</span>
                     )}
                   </td>
                   <td className="px-4 py-3.5">
@@ -110,7 +109,7 @@ export default async function AdminOrders({ searchParams }: { searchParams: { st
                     </span>
                   </td>
                   <td className="px-4 py-3.5">
-                    <div className="font-bold text-brand-brown">{npr(Number(o.total))}</div>
+                    <div className="font-bold text-slate-900">{npr(Number(o.total))}</div>
                     {Number(o.discount_amount) > 0 && o.promo_codes?.code && (
                       <div className="text-[10px] text-brand-green bg-green-50 px-1.5 py-0.5 rounded-full inline-block mt-1 font-bold">
                         🎟️ {o.promo_codes.code} (-{npr(Number(o.discount_amount))})
@@ -119,13 +118,13 @@ export default async function AdminOrders({ searchParams }: { searchParams: { st
                   </td>
                   <td className="px-4 py-3.5">
                     <div className="flex flex-col gap-1">
-                      <span className="text-xs font-bold uppercase text-stone-500">{o.payment_method ?? "—"}</span>
+                      <span className="text-xs font-bold uppercase text-slate-500">{o.payment_method ?? "—"}</span>
                       <MarkPaidButton orderId={o.id} total={Number(o.total)} paid={o.payment_status === "paid"} method={o.payment_method} />
                     </div>
                   </td>
-                  <td className="px-4 py-3.5 text-stone-500 text-xs">
+                  <td className="px-4 py-3.5 text-slate-500 text-xs">
                     <div>{format(new Date(o.created_at), "d MMM yyyy")}</div>
-                    <div className="text-stone-400">{format(new Date(o.created_at), "h:mm a")}</div>
+                    <div className="text-slate-400">{format(new Date(o.created_at), "h:mm a")}</div>
                   </td>
                   <td className="px-4 py-3.5">
                     <OrderStatusSelect orderId={o.id} status={o.status} />
@@ -137,8 +136,8 @@ export default async function AdminOrders({ searchParams }: { searchParams: { st
               <tr>
                 <td colSpan={7} className="px-4 py-12 text-center">
                   <div className="text-3xl mb-2">📋</div>
-                  <p className="font-bold text-stone-500">No orders found</p>
-                  <p className="text-xs text-stone-400 mt-1">Try a different filter or search term</p>
+                  <p className="font-bold text-slate-500">No orders found</p>
+                  <p className="text-xs text-slate-400 mt-1">Try a different filter or search term</p>
                 </td>
               </tr>
             )}

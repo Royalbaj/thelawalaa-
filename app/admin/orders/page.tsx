@@ -17,7 +17,7 @@ export default async function AdminOrders({ searchParams }: { searchParams: { st
 
   let query = supabaseAdmin
     .from("orders")
-    .select("id, order_number, status, type, total, payment_status, payment_method, created_at, notes, discount_amount, promo_codes:promo_code_id(code), profiles:customer_id(full_name)")
+    .select("id, order_number, daily_number, status, type, total, payment_status, payment_method, created_at, notes, discount_amount, promo_codes:promo_code_id(code), profiles:customer_id(full_name)")
     .order("created_at", { ascending: false })
     .limit(100);
   if (status && status !== "all") query = query.eq("status", status);
@@ -81,18 +81,17 @@ export default async function AdminOrders({ searchParams }: { searchParams: { st
             {(orders ?? []).map((o: any) => {
               let customerName = o.profiles?.full_name;
               if (!customerName) {
-                if (o.notes?.includes("[Guest Checkout]")) {
-                  const match = o.notes.match(/Name:\s*([^\n]+)/);
-                  customerName = match ? match[1] : "Guest";
-                } else {
-                  customerName = "Walk-in";
-                }
+                const match = o.notes?.match(/Name:\s*([^\n]+)/);
+                customerName = match ? match[1] : o.notes?.includes("[Guest Checkout]") ? "Guest" : "Walk-in";
               }
               const isGuest = !o.profiles?.full_name;
               
               return (
                 <tr key={o.id} className="border-b border-stone-50 last:border-0 hover:bg-stone-50/50 transition-colors">
                   <td className="px-4 py-3.5">
+                    {o.daily_number != null && o.type === "pickup" && (
+                      <span className="mr-1.5 inline-flex items-center rounded-full bg-brand-orange/10 px-2 py-0.5 text-xs font-extrabold text-brand-orange">#{String(o.daily_number).padStart(2, "0")}</span>
+                    )}
                     <span className="font-mono font-bold text-brand-brown">{o.order_number}</span>
                   </td>
                   <td className="px-4 py-3.5">

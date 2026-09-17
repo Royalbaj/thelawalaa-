@@ -1,7 +1,7 @@
 import { requireRole } from "@/lib/supabase/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { npr } from "@/lib/utils";
-import POSGrid from "@/components/admin/pos-grid";
+import PosTerminal from "@/components/pos/pos-terminal";
 import LiveOrdersPanel from "@/components/admin/live-orders-panel";
 
 export const dynamic = "force-dynamic";
@@ -30,9 +30,9 @@ export default async function AdminDashboard() {
 
   return (
     <div className="grid gap-4 xl:grid-cols-[1fr_400px] h-[calc(100vh-80px)]">
-      {/* LEFT — POS Grid */}
-      <div className="min-h-0 overflow-hidden flex flex-col">
-        <POSGrid
+      {/* LEFT — POS Terminal */}
+      <div className="min-h-0 overflow-hidden rounded-2xl border border-orange-100">
+        <PosTerminal
           products={(products ?? []) as any}
           categories={(categories ?? []) as any}
         />

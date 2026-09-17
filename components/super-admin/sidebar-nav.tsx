@@ -2,17 +2,18 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import {
-  LayoutDashboard, ShoppingBag, UtensilsCrossed, Users,
-  Truck, BarChart3, Megaphone, Settings, LogOut, ExternalLink, Gift, Tag,
+  LayoutDashboard, ShoppingBag, UtensilsCrossed, Users, UserPlus,
+  Truck, BarChart3, Megaphone, Settings, LogOut, ExternalLink, Gift,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { cn } from "@/lib/utils";
 
-const NAV = [
+export const NAV = [
   { href: "/super-admin", label: "Dashboard", icon: LayoutDashboard, section: "main" },
   { href: "/super-admin/orders", label: "Orders", icon: ShoppingBag, section: "main" },
   { href: "/super-admin/menu", label: "Menu Items", icon: UtensilsCrossed, section: "main" },
   { href: "/super-admin/offers", label: "Offers & Deals", icon: Gift, section: "marketing" },
+  { href: "/super-admin/signups", label: "Signups", icon: UserPlus, section: "marketing" },
   { href: "/super-admin/delivery", label: "Deliveries", icon: Truck, section: "operations" },
   { href: "/super-admin/staff", label: "Staff & Users", icon: Users, section: "operations" },
   { href: "/super-admin/reports", label: "Reports", icon: BarChart3, section: "operations" },
@@ -20,7 +21,14 @@ const NAV = [
   { href: "/super-admin/settings", label: "Settings", icon: Settings, section: "settings" },
 ];
 
-export default function SuperAdminSidebar() {
+const sectionLabels: Record<string, string> = {
+  main: "Main",
+  marketing: "Marketing",
+  operations: "Operations",
+  settings: "Configuration",
+};
+
+export default function SuperAdminSidebar({ onNavigate }: { onNavigate?: () => void }) {
   const pathname = usePathname();
   const router = useRouter();
 
@@ -30,18 +38,11 @@ export default function SuperAdminSidebar() {
     sections[item.section].push(item);
   });
 
-  const sectionLabels: Record<string, string> = {
-    main: "Main",
-    marketing: "Marketing",
-    operations: "Operations",
-    settings: "Configuration",
-  };
-
   return (
-    <nav className="flex h-full flex-col gap-1 p-3 overflow-y-auto">
+    <nav className="flex h-full flex-col gap-1 overflow-y-auto p-3">
       {Object.entries(sections).map(([section, items]) => (
         <div key={section}>
-          <p className="hidden md:block px-3 pt-4 pb-1.5 text-[10px] font-bold uppercase tracking-wider text-white/30">
+          <p className="px-3 pt-4 pb-1.5 text-[10px] font-bold uppercase tracking-wider text-slate-500">
             {sectionLabels[section]}
           </p>
           {items.map(({ href, label, icon: Icon }) => {
@@ -50,15 +51,16 @@ export default function SuperAdminSidebar() {
               <Link
                 key={href}
                 href={href}
+                onClick={onNavigate}
                 className={cn(
                   "flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-bold transition-all duration-200",
                   active
-                    ? "bg-amber-500 text-white shadow-sm shadow-amber-500/30"
-                    : "text-white/60 hover:bg-white/10 hover:text-white"
+                    ? "bg-gradient-to-r from-violet-600 to-indigo-600 text-white shadow-lg shadow-violet-900/40"
+                    : "text-slate-400 hover:bg-white/5 hover:text-white"
                 )}
               >
                 <Icon size={18} />
-                <span className="hidden md:inline">{label}</span>
+                <span>{label}</span>
               </Link>
             );
           })}
@@ -69,7 +71,7 @@ export default function SuperAdminSidebar() {
         href="/"
         target="_blank"
         rel="noopener noreferrer"
-        className="mt-4 hidden md:flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-bold text-white/40 hover:bg-white/10 hover:text-white transition-all"
+        className="mt-4 flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-bold text-slate-500 hover:bg-white/5 hover:text-white transition-all"
       >
         <ExternalLink size={18} />
         <span>View Website</span>
@@ -77,10 +79,10 @@ export default function SuperAdminSidebar() {
 
       <button
         onClick={async () => { await createClient().auth.signOut(); router.push("/auth/login"); router.refresh(); }}
-        className="mt-auto flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-bold text-red-400/70 hover:bg-red-500/10 hover:text-red-300 transition-all"
+        className="mt-auto flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-bold text-red-400/80 hover:bg-red-500/10 hover:text-red-300 transition-all"
       >
         <LogOut size={18} />
-        <span className="hidden md:inline">Sign Out</span>
+        <span>Sign Out</span>
       </button>
     </nav>
   );

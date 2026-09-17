@@ -23,7 +23,21 @@ export async function createProduct(input: unknown) {
   const { data, error } = await supabaseAdmin.from("products").insert(parsed.data).select("id").single();
   if (error) return { error: "Couldn't create product" };
   await audit({ actor_id: user.id, action: "CREATE_PRODUCT", target_table: "products", target_id: data.id, new_data: parsed.data });
-  revalidatePath("/admin/menu");
+  revalidatePath("/admin/menu"); revalidatePath("/super-admin/menu"); revalidatePath("/");
+  return { ok: true };
+}
+
+export async function updateProduct(productId: string, input: unknown) {
+  const { user } = await requireRole(["super_admin", "admin"]);
+  if (!z.string().uuid().safeParse(productId).success) return { error: "Bad id" };
+  const parsed = productSchema.safeParse(input);
+  if (!parsed.success) return { error: "Check the product fields" };
+
+  const { data: old } = await supabaseAdmin.from("products").select("name, price").eq("id", productId).single();
+  const { error } = await supabaseAdmin.from("products").update(parsed.data).eq("id", productId);
+  if (error) return { error: "Couldn't update product" };
+  await audit({ actor_id: user.id, action: "UPDATE_PRODUCT", target_table: "products", target_id: productId, old_data: old, new_data: parsed.data });
+  revalidatePath("/admin/menu"); revalidatePath("/super-admin/menu"); revalidatePath("/");
   return { ok: true };
 }
 
@@ -32,7 +46,7 @@ export async function setProductAvailability(productId: string, available: boole
   if (!z.string().uuid().safeParse(productId).success) return { error: "Bad id" };
   await supabaseAdmin.from("products").update({ is_available: available }).eq("id", productId);
   await audit({ actor_id: user.id, action: "TOGGLE_PRODUCT", target_table: "products", target_id: productId, new_data: { available } });
-  revalidatePath("/admin/menu");
+  revalidatePath("/admin/menu"); revalidatePath("/super-admin/menu"); revalidatePath("/");
   return { ok: true };
 }
 
@@ -41,7 +55,7 @@ export async function deleteProduct(productId: string) {
   if (!z.string().uuid().safeParse(productId).success) return { error: "Bad id" };
   await supabaseAdmin.from("products").delete().eq("id", productId);
   await audit({ actor_id: user.id, action: "DELETE_PRODUCT", target_table: "products", target_id: productId });
-  revalidatePath("/admin/menu");
+  revalidatePath("/admin/menu"); revalidatePath("/super-admin/menu"); revalidatePath("/");
   return { ok: true };
 }
 
@@ -52,7 +66,7 @@ export async function createCategory(name: string) {
   const { data, error } = await supabaseAdmin.from("categories").insert({ name: v.data }).select("id").single();
   if (error) return { error: "Couldn't create category" };
   await audit({ actor_id: user.id, action: "CREATE_CATEGORY", target_table: "categories", target_id: data.id });
-  revalidatePath("/admin/menu");
+  revalidatePath("/admin/menu"); revalidatePath("/super-admin/menu"); revalidatePath("/");
   return { ok: true };
 }
 

@@ -7,6 +7,7 @@ import { InviteStaffForm, StaffRowActions } from "@/components/admin/staff-contr
 export const dynamic = "force-dynamic";
 
 const ROLE_BADGE: Record<string, string> = {
+  super_admin: "bg-amber-100 text-amber-700",
   admin: "bg-brand-red/10 text-brand-red",
   pos_user: "bg-blue-100 text-blue-800",
   delivery_driver: "bg-purple-100 text-purple-800",
