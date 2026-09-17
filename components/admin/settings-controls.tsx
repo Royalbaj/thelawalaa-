@@ -1,7 +1,8 @@
 "use client";
-import { useTransition } from "react";
+import { useState, useTransition } from "react";
 import toast from "react-hot-toast";
 import { createBranch, setBranchActive, createPromoCode, setPromoActive } from "@/app/actions/admin-crud";
+import { updateAppSettings } from "@/app/actions/settings";
 
 export function BranchForm() {
   const [pending, start] = useTransition();
@@ -59,6 +60,54 @@ export function PromoForm() {
       <label className="label">Expires (optional)<input name="expires_at" type="datetime-local" className="input mt-1" /></label>
       <button disabled={pending} className="btn-primary">Create promo</button>
     </form>
+  );
+}
+
+export function FeatureFlagsForm({ esewaEnabled, deliveryEnabled }: { esewaEnabled: boolean; deliveryEnabled: boolean }) {
+  const [esewa, setEsewa] = useState(esewaEnabled);
+  const [delivery, setDelivery] = useState(deliveryEnabled);
+  const [pending, start] = useTransition();
+
+  function toggle(next: { esewa_enabled: boolean; delivery_enabled: boolean }) {
+    start(async () => {
+      const r = await updateAppSettings(next);
+      if (r?.error) { toast.error(r.error); return; }
+      setEsewa(next.esewa_enabled);
+      setDelivery(next.delivery_enabled);
+      toast.success("Updated");
+    });
+  }
+
+  return (
+    <div className="card space-y-4 p-5">
+      <h3 className="font-display font-bold text-brand-brown">Feature flags</h3>
+      <div className="flex items-center justify-between gap-3">
+        <div>
+          <p className="font-bold text-sm">Delivery</p>
+          <p className="text-xs text-stone-500">Show delivery as an order type at checkout</p>
+        </div>
+        <button
+          disabled={pending}
+          onClick={() => toggle({ esewa_enabled: esewa, delivery_enabled: !delivery })}
+          className={delivery ? "badge bg-green-100 text-green-800" : "badge bg-stone-200 text-stone-600"}
+        >
+          {delivery ? "Enabled" : "Disabled"}
+        </button>
+      </div>
+      <div className="flex items-center justify-between gap-3">
+        <div>
+          <p className="font-bold text-sm">eSewa online payment</p>
+          <p className="text-xs text-stone-500">Show eSewa as a payment option at checkout</p>
+        </div>
+        <button
+          disabled={pending}
+          onClick={() => toggle({ esewa_enabled: !esewa, delivery_enabled: delivery })}
+          className={esewa ? "badge bg-green-100 text-green-800" : "badge bg-stone-200 text-stone-600"}
+        >
+          {esewa ? "Enabled" : "Disabled"}
+        </button>
+      </div>
+    </div>
   );
 }
 

@@ -15,7 +15,7 @@ const csp = [
   "frame-src https://www.google.com",
   "object-src 'none'",
   "base-uri 'self'",
-  "form-action 'self'",
+  "form-action 'self' https://rc-epay.esewa.com.np https://epay.esewa.com.np",
   "frame-ancestors 'self'",
   "upgrade-insecure-requests",
 ].join("; ");
