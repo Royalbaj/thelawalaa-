@@ -1,10 +1,10 @@
 -- ─────────────────────────────────────────────────────────────
--- Thelawalaa seed data — launch market: Butwal–Manigram, Nepal
+-- Thelawalaa seed data — launch market: Banepa–Godam Chowk, Nepal
 -- ─────────────────────────────────────────────────────────────
 
 -- Branch (single store at launch; more added from the admin console)
 INSERT INTO branches (name, address, phone) VALUES
-  ('Manigram Store', 'Manigram, Tilottama, Butwal, Rupandehi 32907', '+977 9801011111');
+  ('Godam Chowk Store', 'Godam Chowk, Banepa, Kavrepalanchok 45210', '+977 9801011111');
 
 -- Categories
 INSERT INTO categories (name, sort_order) VALUES

@@ -68,7 +68,7 @@ export default function StructuredData({
       description: SITE.description,
       url: SITE.url,
       telephone: SITE.telephone,
-      servesCuisine: ["Street Food", "Chatpate", "Panipuri", "Fulki", "Momo", "Nepali"],
+      servesCuisine: ["Street Food", "Chatpate", "Momo", "Nepali"],
       priceRange: "Rs",
       image: `${SITE.url}/og.png`,
       hasMenu: menu.length
@@ -88,7 +88,7 @@ export default function StructuredData({
           }
         : undefined,
       address: branchNodes.map((b) => b.address),
-      areaServed: ["Butwal", "Manigram", "Tilottama", "Rupandehi"],
+      areaServed: ["Banepa", "Godam Chowk", "Kavrepalanchok"],
       sameAs: [...SITE.social],
     },
     ...branchNodes,

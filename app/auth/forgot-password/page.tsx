@@ -10,7 +10,7 @@ export default function ForgotPasswordPage() {
       <div className="card w-full max-w-md p-8">
         <h1 className="text-center font-display text-2xl font-bold">Reset your password</h1>
         {sent ? (
-          <p className="mt-4 text-center text-stone-600">If that email exists, a reset link is on its way. 📬</p>
+          <p className="mt-4 text-center text-stone-600">If that email exists, a reset link is on its way.</p>
         ) : (
           <form
             className="mt-6 space-y-4"

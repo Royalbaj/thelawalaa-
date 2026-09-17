@@ -39,13 +39,13 @@ export default function Navbar() {
           <span className="font-display text-2xl font-extrabold text-brand-orange">Thelawalaa</span>
         </a>
 
-        <ul className="hidden items-center gap-2 md:flex">
+        <ul className="hidden items-center gap-1 md:flex lg:gap-2">
           {LINKS.map(({ id, label }) => (
             <li key={id}>
               <a
                 href={`/#${id}`}
                 className={cn(
-                  "rounded-full px-5 py-2 text-sm font-bold transition",
+                  "whitespace-nowrap rounded-full px-3 py-2 text-sm font-bold transition lg:px-5",
                   id === "order"
                     ? "bg-brand-orange text-white shadow hover:brightness-110"
                     : active === id
@@ -62,7 +62,7 @@ export default function Navbar() {
         <div className="flex items-center gap-2">
           <Link
             href="/auth/login"
-            className="hidden rounded-full border-2 border-brand-orange px-5 py-2 text-sm font-bold text-brand-orange transition hover:bg-orange-50 md:inline-flex"
+            className="hidden whitespace-nowrap rounded-full border-2 border-brand-orange px-3 py-2 text-sm font-bold text-brand-orange transition hover:bg-orange-50 md:inline-flex lg:px-5"
           >
             Login
           </Link>

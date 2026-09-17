@@ -1,10 +1,10 @@
 import type { Metadata } from "next";
-import { Fredoka, Nunito } from "next/font/google";
+import { Poppins, Nunito } from "next/font/google";
 import { Toaster } from "react-hot-toast";
 import { SITE } from "@/lib/seo";
 import "./globals.css";
 
-const display = Fredoka({ subsets: ["latin"], weight: ["500", "600", "700"], variable: "--font-display", display: "swap" });
+const display = Poppins({ subsets: ["latin"], weight: ["500", "600", "700", "800"], variable: "--font-display", display: "swap" });
 const body = Nunito({ subsets: ["latin"], weight: ["400", "600", "700", "800"], variable: "--font-body", display: "swap" });
 
 export const metadata: Metadata = {
@@ -32,7 +32,7 @@ export const metadata: Metadata = {
     url: SITE.url,
     title: `${SITE.name} — ${SITE.tagline}`,
     description: SITE.description,
-    images: [{ url: "/og.png", width: 1200, height: 630, alt: `${SITE.name} — street food in Butwal` }],
+    images: [{ url: "/og.png", width: 1200, height: 630, alt: `${SITE.name} — street food in Banepa` }],
   },
   twitter: {
     card: "summary_large_image",

@@ -6,13 +6,31 @@ import toast from "react-hot-toast";
 import { createClient } from "@/lib/supabase/client";
 import { useCart } from "@/lib/store/cart";
 import { createOrder, validatePromoCode } from "@/app/actions/orders";
+import { getEsewaPaymentForm } from "@/app/actions/payments";
 import { npr } from "@/lib/utils";
+import { UtensilsCrossed } from "lucide-react";
 import AddToCartButton from "@/components/add-to-cart-button";
 
 type Product = { id: string; name: string; description: string | null; price: number; category_id: string | null; spice_level: number; image_url?: string | null };
 type Category = { id: string; name: string };
 type Branch = { id: string; name: string; address: string };
 type Address = { id: string; label: string; full_address: string };
+
+/** eSewa's integration model is a full-page redirect via POSTed form, not a fetch. */
+function redirectToEsewa(action: string, fields: Record<string, string>) {
+  const form = document.createElement("form");
+  form.method = "POST";
+  form.action = action;
+  for (const [name, value] of Object.entries(fields)) {
+    const input = document.createElement("input");
+    input.type = "hidden";
+    input.name = name;
+    input.value = value;
+    form.appendChild(input);
+  }
+  document.body.appendChild(form);
+  form.submit();
+}
 
 export default function OrderPage() {
   const router = useRouter();
@@ -28,7 +46,7 @@ export default function OrderPage() {
   const [addressId, setAddressId] = useState("");
   const [newAddress, setNewAddress] = useState("");
   const [promo, setPromo] = useState("");
-  const [payment, setPayment] = useState<"cash" | "qr">("cash");
+  const [payment, setPayment] = useState<"cash" | "qr" | "esewa">("cash");
   const [busy, setBusy] = useState(false);
 
   const [promoDiscount, setPromoDiscount] = useState<number>(0);
@@ -40,6 +58,8 @@ export default function OrderPage() {
   const [guestPhone, setGuestPhone] = useState("");
 
   const [favorites, setFavorites] = useState<string[]>([]);
+  const [settings, setSettings] = useState({ esewa_enabled: false, delivery_enabled: false });
+  const [menuLoading, setMenuLoading] = useState(true);
 
   useEffect(() => {
     const supabase = createClient();
@@ -61,19 +81,34 @@ export default function OrderPage() {
       supabase.from("categories").select("id, name").order("sort_order"),
       supabase.from("branches").select("id, name, address"),
       supabase.from("addresses").select("id, label, full_address"),
-    ]).then(([p, c, b, a]) => {
+      supabase.from("app_settings").select("esewa_enabled, delivery_enabled").eq("id", 1).single(),
+    ]).then(([p, c, b, a, s]) => {
       setProducts((p.data as Product[]) ?? []);
       setCategories((c.data as Category[]) ?? []);
       setBranches((b.data as Branch[]) ?? []);
       setAddresses((a.data as Address[]) ?? []);
+      if (s.data) setSettings(s.data);
+      setMenuLoading(false);
     });
   }, []);
 
   const subtotal = useMemo(() => items.reduce((t, i) => t + i.price * i.quantity, 0), [items]);
   const deliveryFee = type === "delivery" ? 20 : 0;
   const finalTotal = Math.max(0, subtotal + deliveryFee - promoDiscount);
-  
+
   const visible = activeCat ? products.filter((p) => p.category_id === activeCat) : products;
+
+  // No QR at pickup — staff take cash directly at the counter. QR stays for delivery.
+  const paymentOptions = useMemo(() => {
+    const opts: ["cash" | "qr" | "esewa", string][] = [["cash", "Cash"]];
+    if (type === "delivery") opts.push(["qr", "Scan QR"]);
+    if (settings.esewa_enabled) opts.push(["esewa", "eSewa"]);
+    return opts;
+  }, [type, settings.esewa_enabled]);
+
+  useEffect(() => {
+    if (!paymentOptions.some(([v]) => v === payment)) setPayment("cash");
+  }, [paymentOptions, payment]);
 
   async function applyPromo() {
     if (!promo) {
@@ -137,8 +172,21 @@ export default function OrderPage() {
         items: items.map((i) => ({ product_id: i.product_id, quantity: i.quantity })),
       });
       if ("error" in res && res.error) { toast.error(res.error); return; }
-      const ok = res as { orderId: string; orderNumber: string; total: number };
-      toast.success(`Order placed! ${payment === "qr" ? "Scan the QR when your order arrives." : `Keep Rs ${ok.total} cash ready.`}`);
+      const ok = res as { orderId: string; orderNumber: string; dailyNumber: number | null; total: number };
+
+      if (payment === "esewa") {
+        const form = await getEsewaPaymentForm({ orderId: ok.orderId });
+        if ("error" in form) { toast.error(form.error); return; }
+        clear();
+        redirectToEsewa(form.action, form.fields); // navigates away — no further code runs
+        return;
+      }
+
+      const collectionNote = type === "pickup" ? ` Your order number is ${ok.dailyNumber ?? ok.orderNumber} — tell this to our counter staff when you arrive.` : "";
+      toast.success(
+        `Order placed!${collectionNote} ${payment === "qr" ? "Scan the QR when your order arrives." : `Keep Rs ${ok.total} cash ready.`}`,
+        { duration: 6000 }
+      );
       clear();
       router.push(`/track/${ok.orderId}`);
     } finally {
@@ -187,7 +235,15 @@ export default function OrderPage() {
                 ))}
               </div>
               <div className="mt-4 grid gap-4 sm:grid-cols-2">
-                {visible.map((p) => {
+                {menuLoading && Array.from({ length: 6 }).map((_, i) => (
+                  <div key={i} className="card p-4 animate-pulse">
+                    <div className="h-32 w-full rounded-lg bg-stone-200" />
+                    <div className="mt-3 h-4 w-2/3 rounded bg-stone-200" />
+                    <div className="mt-2 h-3 w-full rounded bg-stone-100" />
+                    <div className="mt-4 h-8 w-full rounded-full bg-stone-100" />
+                  </div>
+                ))}
+                {!menuLoading && visible.map((p) => {
                   const isFav = favorites.includes(p.id);
                   return (
                     <div key={p.id} className="card p-4 flex flex-col relative group">
@@ -198,7 +254,7 @@ export default function OrderPage() {
                             const res = await toggleFavorite(p.id);
                             if (res.ok) {
                               setFavorites(prev => res.isFavorite ? [...prev, p.id] : prev.filter(id => id !== p.id));
-                              toast.success(res.isFavorite ? "Added to favorites ❤️" : "Removed from favorites");
+                              toast.success(res.isFavorite ? "Added to favorites" : "Removed from favorites");
                             }
                           }}
                           className={`absolute top-6 right-6 h-8 w-8 rounded-full bg-white/90 backdrop-blur-sm flex items-center justify-center transition shadow-sm ${isFav ? "text-red-500" : "text-stone-300 hover:text-red-400"}`}
@@ -209,7 +265,7 @@ export default function OrderPage() {
                       {p.image_url ? (
                         <img src={p.image_url} alt={p.name} className="h-32 w-full object-cover rounded-lg mb-3" />
                       ) : (
-                        <div className="h-32 w-full bg-brand-cream rounded-lg mb-3 flex items-center justify-center text-4xl" aria-hidden>🥣</div>
+                        <div className="h-32 w-full bg-brand-cream rounded-lg mb-3 flex items-center justify-center text-stone-300" aria-hidden><UtensilsCrossed size={32} /></div>
                       )}
                       <p className="font-bold pr-8">{p.name}</p>
                       <p className="line-clamp-2 text-sm text-stone-600 flex-1">{p.description}</p>
@@ -269,10 +325,10 @@ export default function OrderPage() {
                     </div>
                   </div>
                 
-                <div className="grid grid-cols-2 gap-4">
-                  {(["pickup", "delivery"] as const).map((t) => (
+                <div className={settings.delivery_enabled ? "grid grid-cols-2 gap-4" : "grid grid-cols-1 gap-4"}>
+                  {(settings.delivery_enabled ? (["pickup", "delivery"] as const) : (["pickup"] as const)).map((t) => (
                     <button key={t} onClick={() => setType(t)} className={`card p-4 text-center font-bold ${type === t ? "ring-2 ring-brand-orange bg-orange-50" : ""}`}>
-                      {t === "pickup" ? "🏪 Pickup" : "🛵 Delivery"}
+                      {t === "pickup" ? "Pickup" : "Delivery"}
                     </button>
                   ))}
                 </div>
@@ -302,7 +358,7 @@ export default function OrderPage() {
                         <textarea id="newaddr" className="input" rows={2} maxLength={300} value={newAddress} onChange={(e) => setNewAddress(e.target.value)} placeholder="Flat, building, street, landmark, area" />
                       </div>
                     )}
-                    <p className="text-xs font-bold text-brand-green">Home delivery: flat Nrs 20 (within 5km of Manigram)</p>
+                    <p className="text-xs font-bold text-brand-green">Home delivery: flat Nrs 20 (within 5km of Godam Chowk)</p>
                   </div>
                 )}
               </div>
@@ -326,15 +382,19 @@ export default function OrderPage() {
               
               <div>
                 <label className="label">Pay with</label>
-                <div className="grid grid-cols-2 gap-3">
-                  {([["cash", "💵 Cash"], ["qr", "📱 QR (eSewa/FonePay)"]] as const).map(([v, label]) => (
+                <div className={`grid gap-3 ${paymentOptions.length === 1 ? "grid-cols-1" : paymentOptions.length === 2 ? "grid-cols-2" : "grid-cols-3"}`}>
+                  {paymentOptions.map(([v, label]) => (
                     <button key={v} onClick={() => setPayment(v)} className={`card p-4 font-bold ${payment === v ? "ring-2 ring-brand-orange bg-orange-50" : ""}`}>{label}</button>
                   ))}
                 </div>
                 <p className="mt-2 text-xs text-stone-500">
                   {payment === "qr"
                     ? "Scan our eSewa/FonePay QR when your order arrives."
-                    : "Pay in cash when you collect or receive your order."}
+                    : payment === "esewa"
+                    ? "Pay now with your eSewa balance — you'll be redirected to eSewa to complete it."
+                    : type === "pickup"
+                    ? "Pay cash to our counter staff when you collect your order."
+                    : "Pay in cash when your order arrives."}
                 </p>
               </div>
             </div>

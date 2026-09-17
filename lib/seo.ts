@@ -2,12 +2,16 @@
  * Central SEO + business config. Edit business facts here once and they
  * flow into metadata, JSON-LD structured data, the sitemap and manifest.
  *
- * Launch market: Butwal – Manigram, Rupandehi, Nepal.
+ * Launch market: Banepa – Godam Chowk, Kavrepalanchok, Nepal.
  * Vision: build a recognisable street-food brand and franchise it,
- * starting from Butwal and expanding outward.
+ * starting from Banepa and expanding outward.
+ *
+ * TODO before production: verify the exact Godam Chowk store lat/lng
+ * and postal code below — geo.lat/lng and branches[0].lat/lng are
+ * approximate (Banepa town center), and the postal code is unconfirmed.
  *
  * Ranking note: the biggest off-page factors are a Google Business
- * Profile for the Manigram store, real customer reviews, and local
+ * Profile for the Godam Chowk store, real customer reviews, and local
  * links. The code makes the site technically perfect; pair it with
  * those to compete honestly for the top local spots.
  */
@@ -16,8 +20,8 @@ export const SITE = {
   legalName: "Thelawalaa Street Food",
   url: process.env.NEXT_PUBLIC_SITE_URL ?? "https://thelawalaa.com",
   description:
-    "Thelawalaa serves Butwal's most flavourful chatpate, panipuri, fulki and momo — hygienic, freshly made, and delivered hot to your door within 5km of Manigram for just Nrs 20. Chicken, spicy ramen, mint, sweet chilly & spicy chatpate varieties.",
-  tagline: "Butwal's Most Flavourful Chatpate, Panipuri, Fulki & Momo",
+    "Thelawalaa serves Banepa's most flavourful chatpate and momo — hygienic, freshly made, and delivered hot to your door within 5km of Godam Chowk for just Nrs 20. Classic, Gilo, Mint & Spicy Ramen chatpate, plus Veg, Chicken & Buff momo.",
+  tagline: "Banepa's Most Flavourful Chatpate & Momo",
   locale: "en_NP",
   currency: "NPR",
   twitter: "@thelawalaa",
@@ -25,7 +29,7 @@ export const SITE = {
   email: "hello@thelawalaa.com",
   // USP — surfaced in copy and metadata.
   usp: {
-    delivery: "Home delivery within 5km of our Manigram store — flat Nrs 20",
+    delivery: "Home delivery within 5km of our Godam Chowk store — flat Nrs 20",
     pillars: ["Hygiene", "Flavour", "Variety", "Pickup & home delivery"],
     deliveryFee: 20,
     deliveryRadiusKm: 5,
@@ -33,23 +37,21 @@ export const SITE = {
   // Keywords the brand genuinely serves — brand, dishes, varieties, locality.
   keywords: [
     "Thelawalaa", "Thelawala", "thelawalaa",
-    "chatpate", "chatpate Butwal", "chatpate Manigram", "chatpate near me",
-    "chicken chatpate", "spicy ramen chatpate", "ramen chatpate",
-    "mint chatpate", "sweet chilly chatpate", "spicy chatpate",
-    "panipuri", "pani puri", "panipuri Butwal", "panipuri near me",
-    "fulki", "fulki Butwal", "golgappa",
-    "momo", "momo Butwal", "momo Manigram", "momo near me",
-    "street food Butwal", "street food Manigram", "street food Rupandehi",
-    "food delivery Butwal", "home delivery Butwal", "food delivery Manigram",
-    "best chatpate in Butwal", "best momo in Butwal", "best panipuri in Butwal",
+    "chatpate", "chatpate Banepa", "chatpate Godam Chowk", "chatpate near me",
+    "gilo chatpate", "spicy ramen chatpate", "ramen chatpate", "mint chatpate",
+    "momo", "momo Banepa", "momo Godam Chowk", "momo near me",
+    "veg momo", "chicken momo", "buff momo", "buff momo Banepa",
+    "street food Banepa", "street food Godam Chowk", "street food Kavrepalanchok",
+    "food delivery Banepa", "home delivery Banepa", "food delivery Kavre",
+    "best chatpate in Banepa", "best momo in Banepa", "best buff momo in Banepa",
   ],
-  geo: { lat: 27.6727, lng: 83.4655, region: "NP", city: "Butwal" },
+  geo: { lat: 27.6316, lng: 85.5216, region: "NP", city: "Banepa" },
   branches: [
     {
-      name: "Thelawalaa — Manigram", street: "Manigram, Tilottama",
-      city: "Butwal", region: "Rupandehi", postal: "32907",
+      name: "Thelawalaa — Godam Chowk", street: "Godam Chowk",
+      city: "Banepa", region: "Kavrepalanchok", postal: "45210",
       phone: "+977-9801011111",
-      lat: 27.6450, lng: 83.4480,
+      lat: 27.6316, lng: 85.5216,
     },
   ],
   social: [

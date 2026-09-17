@@ -34,7 +34,7 @@ export default function InvitePage() {
   return (
     <div className="flex min-h-screen items-center justify-center bg-brand-dark px-4">
       <div className="card w-full max-w-md p-8">
-        <h1 className="text-center font-display text-2xl font-bold">Welcome to the team! 🎉</h1>
+        <h1 className="text-center font-display text-2xl font-bold">Welcome to the team</h1>
         <p className="mt-2 text-center text-sm text-stone-600">Set a password to activate your staff account.</p>
         <form onSubmit={onSubmit} className="mt-6 space-y-4">
           <div><label className="label" htmlFor="password">New password</label><input id="password" name="password" type="password" required className="input" /></div>

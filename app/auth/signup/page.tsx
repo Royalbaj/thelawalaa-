@@ -2,6 +2,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import toast from "react-hot-toast";
+import { Mail } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { signupSchema } from "@/lib/validations/auth";
 
@@ -48,7 +49,7 @@ export default function SignupPage() {
     return (
       <div className="flex min-h-screen items-center justify-center bg-brand-dark px-4">
         <div className="card max-w-md p-8 text-center">
-          <p className="text-5xl">📬</p>
+          <Mail size={40} className="mx-auto text-brand-orange" />
           <h1 className="mt-3 font-display text-2xl font-bold">Check your email</h1>
           <p className="mt-2 text-stone-600">Tap the verification link we just sent to activate your account.</p>
         </div>
