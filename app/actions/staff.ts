@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { inviteStaffSchema } from "@/lib/validations/staff";
 import { requireRole } from "@/lib/supabase/server";
-import { supabaseAdmin, audit } from "@/lib/supabase/admin";
+import { supabaseAdmin, audit, awardOrderLoyaltyPoints } from "@/lib/supabase/admin";
 
 /**
  * Invite POS / driver staff. The role travels in APP metadata
@@ -147,7 +147,7 @@ export async function markOrderPaid(orderId: string) {
   const { user } = await requireRole(["super_admin", "admin", "pos_user"]);
   const { data: order } = await supabaseAdmin
     .from("orders")
-    .select("id, total, payment_status, status, order_number")
+    .select("id, total, payment_status, status, order_number, customer_id")
     .eq("id", orderId)
     .single();
   if (!order) return { error: "Order not found" };
@@ -163,6 +163,8 @@ export async function markOrderPaid(orderId: string) {
       ...(order.status === "pending" ? { status: "confirmed" } : {}),
     })
     .eq("id", orderId);
+
+  await awardOrderLoyaltyPoints(order.customer_id, Number(order.total));
 
   await audit({
     actor_id: user.id, action: "MARK_ORDER_PAID", target_table: "orders",

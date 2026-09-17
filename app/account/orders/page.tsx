@@ -2,6 +2,7 @@ import { getVerifiedUser } from "@/lib/supabase/server";
 import { createClient } from "@/lib/supabase/server";
 import { npr } from "@/lib/utils";
 import Link from "next/link";
+import { Package, Bike, Store, CheckCircle2, Clock } from "lucide-react";
 
 export const dynamic = "force-dynamic";
 
@@ -34,7 +35,7 @@ export default async function MyOrders() {
 
       {(orders ?? []).length === 0 ? (
         <div className="rounded-2xl bg-white p-8 text-center border border-stone-100">
-          <p className="text-4xl mb-2">📦</p>
+          <Package size={32} className="mx-auto mb-2 text-stone-300" />
           <p className="font-bold text-stone-500">No orders yet</p>
           <Link href="/order" className="inline-block mt-3 btn-primary text-sm">Place Your First Order →</Link>
         </div>
@@ -51,10 +52,12 @@ export default async function MyOrders() {
               </span>
             </div>
             <div className="flex items-center justify-between mt-2 pt-2 border-t border-stone-50">
-              <div className="flex items-center gap-2">
-                <span className="text-[10px] font-bold text-stone-400 capitalize">{o.type === "delivery" ? "🛵 Delivery" : "🏪 Pickup"}</span>
-                <span className={`text-[10px] font-bold ${o.payment_status === "paid" ? "text-green-600" : "text-amber-600"}`}>
-                  {o.payment_status === "paid" ? "✅ Paid" : "⏳ Pending"}
+              <div className="flex items-center gap-3">
+                <span className="flex items-center gap-1 text-[10px] font-bold text-stone-400">
+                  {o.type === "delivery" ? <Bike size={12} /> : <Store size={12} />} {o.type === "delivery" ? "Delivery" : "Pickup"}
+                </span>
+                <span className={`flex items-center gap-1 text-[10px] font-bold ${o.payment_status === "paid" ? "text-green-600" : "text-amber-600"}`}>
+                  {o.payment_status === "paid" ? <CheckCircle2 size={12} /> : <Clock size={12} />} {o.payment_status === "paid" ? "Paid" : "Pending"}
                 </span>
               </div>
               <p className="font-bold text-brand-orange">{npr(Number(o.total))}</p>

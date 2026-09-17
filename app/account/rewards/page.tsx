@@ -1,6 +1,7 @@
 import { getVerifiedUser } from "@/lib/supabase/server";
 import { createClient } from "@/lib/supabase/server";
 import Link from "next/link";
+import { Award, ShoppingBag, TrendingUp, Gift, BarChart3 } from "lucide-react";
 
 export const dynamic = "force-dynamic";
 
@@ -15,10 +16,10 @@ export default async function RewardsPage() {
   ]);
 
   const tiers = [
-    { name: "Bronze", min: 0, color: "from-amber-600 to-yellow-500", icon: "🥉" },
-    { name: "Silver", min: 500, color: "from-stone-400 to-stone-300", icon: "🥈" },
-    { name: "Gold", min: 2000, color: "from-amber-400 to-yellow-300", icon: "🥇" },
-    { name: "Platinum", min: 5000, color: "from-purple-500 to-pink-400", icon: "💎" },
+    { name: "Bronze", min: 0, color: "from-amber-600 to-yellow-500" },
+    { name: "Silver", min: 500, color: "from-stone-400 to-stone-300" },
+    { name: "Gold", min: 2000, color: "from-amber-400 to-yellow-300" },
+    { name: "Platinum", min: 5000, color: "from-purple-500 to-pink-400" },
   ];
 
   const currentTier = tiers.find((t) => t.name.toLowerCase() === (loyalty?.tier ?? "bronze")) ?? tiers[0];
@@ -26,10 +27,10 @@ export default async function RewardsPage() {
   const progress = nextTier ? Math.min(100, ((loyalty?.total_earned ?? 0) / nextTier.min) * 100) : 100;
 
   const reasonLabels: Record<string, string> = {
-    signup: "🎉 Welcome Bonus",
-    order_reward: "🛒 Order Reward",
-    redemption: "🎁 Redeemed",
-    bonus: "⭐ Special Bonus",
+    signup: "Welcome Bonus",
+    order_reward: "Order Reward",
+    redemption: "Redeemed",
+    bonus: "Special Bonus",
   };
 
   return (
@@ -40,7 +41,7 @@ export default async function RewardsPage() {
       <div className={`rounded-2xl bg-gradient-to-r ${currentTier.color} p-5 text-white relative overflow-hidden`}>
         <div className="absolute -top-10 -right-10 w-32 h-32 bg-white/10 rounded-full" />
         <div className="absolute -bottom-5 -left-5 w-20 h-20 bg-white/5 rounded-full" />
-        <p className="text-xs font-bold uppercase tracking-wider text-white/80">{currentTier.icon} {currentTier.name} Member</p>
+        <p className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-white/80"><Award size={14} /> {currentTier.name} Member</p>
         <p className="text-4xl font-bold mt-2">{loyalty?.points ?? 0}</p>
         <p className="text-sm text-white/70">Available Points</p>
         
@@ -62,17 +63,17 @@ export default async function RewardsPage() {
         <h3 className="font-bold text-sm text-brand-brown mb-3">How Rewards Work</h3>
         <div className="grid grid-cols-3 gap-3 text-center">
           <div>
-            <div className="text-2xl mb-1">🛒</div>
+            <ShoppingBag size={22} className="mx-auto mb-1 text-brand-orange" />
             <p className="text-[10px] font-bold text-stone-600">Order food</p>
             <p className="text-[10px] text-stone-400">Earn 1pt per Rs 10</p>
           </div>
           <div>
-            <div className="text-2xl mb-1">📈</div>
+            <TrendingUp size={22} className="mx-auto mb-1 text-brand-orange" />
             <p className="text-[10px] font-bold text-stone-600">Level up</p>
             <p className="text-[10px] text-stone-400">Unlock better rewards</p>
           </div>
           <div>
-            <div className="text-2xl mb-1">🎁</div>
+            <Gift size={22} className="mx-auto mb-1 text-brand-orange" />
             <p className="text-[10px] font-bold text-stone-600">Redeem</p>
             <p className="text-[10px] text-stone-400">Get discounts & free items</p>
           </div>
@@ -84,7 +85,7 @@ export default async function RewardsPage() {
         <h3 className="font-bold text-sm text-brand-brown mb-2">Points History</h3>
         {(transactions ?? []).length === 0 ? (
           <div className="rounded-2xl bg-white p-6 text-center border border-stone-100">
-            <p className="text-3xl mb-2">📊</p>
+            <BarChart3 size={28} className="mx-auto mb-2 text-stone-300" />
             <p className="text-sm text-stone-400">No transactions yet</p>
             <Link href="/order" className="inline-block mt-2 text-xs font-bold text-brand-orange">Order to earn points →</Link>
           </div>

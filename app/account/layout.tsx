@@ -15,7 +15,7 @@ export default async function AccountLayout({ children }: { children: React.Reac
       <header className="sticky top-0 z-30 bg-brand-dark text-white">
         <div className="max-w-lg mx-auto px-4 py-3 flex items-center justify-between">
           <Link href="/account" className="font-display text-lg font-bold brand-gradient-text">
-            🍜 Thelawalaa
+            Thelawalaa
           </Link>
           <div className="flex items-center gap-3">
             <Link href="/order" className="rounded-full bg-brand-orange px-3 py-1.5 text-xs font-bold hover:brightness-110 transition">

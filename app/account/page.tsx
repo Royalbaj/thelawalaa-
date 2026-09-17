@@ -1,8 +1,8 @@
 import { getVerifiedUser } from "@/lib/supabase/server";
-import { supabaseAdmin } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import { npr } from "@/lib/utils";
 import Link from "next/link";
+import { ShoppingBag, Package, Gift, Settings, UtensilsCrossed, Heart } from "lucide-react";
 
 export const dynamic = "force-dynamic";
 
@@ -30,7 +30,7 @@ export default async function AccountHome() {
     <div className="pb-24 space-y-4">
       {/* Welcome Header */}
       <div className="bg-brand-dark text-white px-4 pb-6 pt-2 -mt-0 rounded-b-3xl">
-        <p className="text-lg font-bold">Hey, {profile.full_name.split(" ")[0]}! 👋</p>
+        <p className="text-lg font-bold">Hey, {profile.full_name.split(" ")[0]}</p>
         <p className="text-xs text-white/50 mt-0.5">What are you craving today?</p>
 
         {/* Loyalty Card */}
@@ -50,13 +50,13 @@ export default async function AccountHome() {
       {/* Quick Actions */}
       <div className="px-4 grid grid-cols-4 gap-2">
         {[
-          { href: "/order", icon: "🛒", label: "Order Now", bg: "bg-orange-50" },
-          { href: "/account/orders", icon: "📦", label: "My Orders", bg: "bg-blue-50" },
-          { href: "/account/rewards", icon: "🎁", label: "Rewards", bg: "bg-purple-50" },
-          { href: "/account/profile", icon: "⚙️", label: "Settings", bg: "bg-stone-100" },
+          { href: "/order", icon: ShoppingBag, label: "Order Now", bg: "bg-orange-50" },
+          { href: "/account/orders", icon: Package, label: "My Orders", bg: "bg-blue-50" },
+          { href: "/account/rewards", icon: Gift, label: "Rewards", bg: "bg-purple-50" },
+          { href: "/account/profile", icon: Settings, label: "Settings", bg: "bg-stone-100" },
         ].map((a) => (
           <Link key={a.href} href={a.href} className={`${a.bg} rounded-2xl p-3 text-center hover:shadow-sm transition`}>
-            <p className="text-2xl">{a.icon}</p>
+            <a.icon size={22} className="mx-auto text-brand-brown" />
             <p className="text-[10px] font-bold text-stone-600 mt-1">{a.label}</p>
           </Link>
         ))}
@@ -66,7 +66,7 @@ export default async function AccountHome() {
       {(offers ?? []).length > 0 && (
         <div className="px-4">
           <div className="flex items-center justify-between mb-2">
-            <h2 className="font-display text-lg font-bold text-brand-brown">🔥 Deals For You</h2>
+            <h2 className="font-display text-lg font-bold text-brand-brown">Deals For You</h2>
           </div>
           <div className="flex gap-3 overflow-x-auto pb-2 -mx-4 px-4 snap-x">
             {(offers ?? []).map((offer: any) => (
@@ -75,7 +75,7 @@ export default async function AccountHome() {
                   <img src={offer.image_url} alt={offer.title} className="w-full h-28 object-cover" />
                 ) : (
                   <div className="w-full h-28 bg-gradient-to-br from-brand-orange to-amber-500 flex items-center justify-center">
-                    <span className="text-4xl">🎉</span>
+                    <Gift size={32} className="text-white/80" />
                   </div>
                 )}
                 <div className="p-3">
@@ -96,12 +96,12 @@ export default async function AccountHome() {
       {/* Recent Orders */}
       <div className="px-4">
         <div className="flex items-center justify-between mb-2">
-          <h2 className="font-display text-lg font-bold text-brand-brown">📦 Recent Orders</h2>
+          <h2 className="font-display text-lg font-bold text-brand-brown">Recent Orders</h2>
           <Link href="/account/orders" className="text-xs font-bold text-brand-orange">See all →</Link>
         </div>
         {(recentOrders ?? []).length === 0 ? (
           <div className="rounded-2xl bg-white p-6 text-center border border-stone-100">
-            <p className="text-3xl mb-2">🍜</p>
+            <UtensilsCrossed size={28} className="mx-auto mb-2 text-stone-300" />
             <p className="text-sm font-bold text-stone-500">No orders yet</p>
             <Link href="/order" className="inline-block mt-3 btn-primary text-sm">Start Ordering →</Link>
           </div>
@@ -126,7 +126,7 @@ export default async function AccountHome() {
       {/* Reorder Favorites */}
       {(favorites ?? []).length > 0 && (
         <div className="px-4">
-          <h2 className="font-display text-lg font-bold text-brand-brown mb-2">❤️ Your Favorites</h2>
+          <h2 className="font-display text-lg font-bold text-brand-brown mb-2 flex items-center gap-1.5"><Heart size={16} className="text-brand-red" fill="currentColor" /> Your Favorites</h2>
           <div className="grid grid-cols-2 gap-2">
             {(favorites ?? []).map((f: any) => (
               <div key={f.product_id} className="rounded-2xl bg-white p-3 border border-stone-100">

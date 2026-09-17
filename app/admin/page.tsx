@@ -29,17 +29,17 @@ export default async function AdminDashboard() {
   ]);
 
   return (
-    <div className="grid gap-4 xl:grid-cols-[1fr_400px] h-[calc(100vh-80px)]">
+    <div className="flex h-[calc(100vh-80px)] flex-col gap-4 xl:flex-row">
       {/* LEFT — POS Terminal */}
-      <div className="min-h-0 overflow-hidden rounded-2xl border border-orange-100">
+      <div className="min-h-0 flex-1 overflow-hidden rounded-2xl border border-orange-100">
         <PosTerminal
           products={(products ?? []) as any}
           categories={(categories ?? []) as any}
         />
       </div>
-      
+
       {/* RIGHT — Live Orders */}
-      <div className="min-h-0 overflow-hidden">
+      <div className="min-h-0 flex-1 overflow-hidden xl:w-[400px] xl:flex-none">
         <LiveOrdersPanel
           initialOrders={(recentOrders ?? []) as any}
           drivers={(drivers ?? []) as any}

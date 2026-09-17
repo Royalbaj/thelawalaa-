@@ -11,8 +11,11 @@ export default function AddressesPage() {
   useEffect(() => { load(); }, []);
 
   return (
-    <div className="max-w-lg">
-      <h1 className="font-display text-2xl font-bold text-brand-brown">Saved addresses</h1>
+    <div className="px-4 py-4 pb-24">
+      <h1 className="font-display text-xl font-bold text-brand-brown">Saved addresses</h1>
+      {addresses.length === 0 && (
+        <p className="mt-6 rounded-2xl bg-white border border-stone-100 p-6 text-center text-sm text-stone-400">No saved addresses yet.</p>
+      )}
       <ul className="mt-6 space-y-3">
         {addresses.map((a) => (
           <li key={a.id} className="card flex items-start justify-between gap-3 p-4">

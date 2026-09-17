@@ -1,11 +1,11 @@
 "use client";
 import { useMemo, useState, useTransition } from "react";
 import toast from "react-hot-toast";
-import { Search, X, Trash2, ShoppingCart, ChevronUp } from "lucide-react";
+import { Search, X, Trash2, ShoppingCart, ChevronUp, UtensilsCrossed, CheckCircle2 } from "lucide-react";
 import { createPosOrder } from "@/app/actions/pos";
 import { npr, cn } from "@/lib/utils";
 
-type Product = { id: string; name: string; price: number; is_available: boolean; category_id: string | null };
+type Product = { id: string; name: string; price: number; is_available: boolean; category_id: string | null; image_url?: string | null };
 type Category = { id: string; name: string };
 type Line = { product: Product; qty: number };
 
@@ -139,7 +139,7 @@ export default function PosTerminal({ products, categories }: { products: Produc
   );
 
   return (
-    <div className="flex h-full min-h-0 flex-col lg:flex-row">
+    <div className="relative flex h-full min-h-0 flex-col overflow-hidden lg:flex-row">
       {/* Product grid */}
       <div className="flex min-w-0 flex-1 flex-col">
         <div className="flex items-center gap-2 overflow-x-auto border-b border-orange-100 bg-white p-3">
@@ -160,12 +160,19 @@ export default function PosTerminal({ products, categories }: { products: Produc
             const inCart = cart.find((l) => l.product.id === p.id);
             return (
               <button key={p.id} onClick={() => add(p)} disabled={!p.is_available}
-                className={cn("card relative min-h-[100px] p-4 text-left transition-transform",
+                className={cn("card relative overflow-hidden text-left transition-transform",
                   p.is_available ? "hover:scale-[1.02] active:scale-95" : "opacity-40",
                   inCart && "ring-2 ring-brand-orange")}>
-                <p className="font-bold leading-tight pr-6">{p.name}</p>
-                <p className="mt-2 font-display text-brand-orange">{npr(Number(p.price))}</p>
-                {!p.is_available && <p className="text-xs font-bold text-brand-red">Sold out</p>}
+                {p.image_url ? (
+                  <img src={p.image_url} alt="" className="h-20 w-full object-cover" />
+                ) : (
+                  <div className="flex h-20 w-full items-center justify-center bg-brand-cream text-stone-300"><UtensilsCrossed size={24} /></div>
+                )}
+                <div className="p-3">
+                  <p className="font-bold leading-tight pr-6">{p.name}</p>
+                  <p className="mt-1 font-display text-brand-orange">{npr(Number(p.price))}</p>
+                  {!p.is_available && <p className="text-xs font-bold text-brand-red">Sold out</p>}
+                </div>
                 {inCart && (
                   <span className="absolute right-2 top-2 flex h-6 w-6 items-center justify-center rounded-full bg-brand-orange text-xs font-bold text-white">
                     {inCart.qty}
@@ -184,7 +191,7 @@ export default function PosTerminal({ products, categories }: { products: Produc
       {cart.length > 0 && !cartOpen && (
         <button
           onClick={() => setCartOpen(true)}
-          className="fixed inset-x-3 bottom-3 z-30 flex items-center justify-between rounded-2xl bg-brand-orange px-5 py-3.5 text-white shadow-lg shadow-orange-900/30 lg:hidden"
+          className="absolute inset-x-3 bottom-3 z-30 flex items-center justify-between rounded-2xl bg-brand-orange px-5 py-3.5 text-white shadow-lg shadow-orange-900/30 lg:hidden"
         >
           <span className="flex items-center gap-2 font-bold"><ShoppingCart size={18} /> {itemCount} item{itemCount > 1 ? "s" : ""}</span>
           <span className="flex items-center gap-1.5 font-display font-bold">{npr(subtotal)} <ChevronUp size={18} /></span>
@@ -192,10 +199,10 @@ export default function PosTerminal({ products, categories }: { products: Produc
       )}
 
       {/* Mobile backdrop + slide-up cart */}
-      {cartOpen && <div className="fixed inset-0 z-40 bg-black/40 lg:hidden" onClick={() => setCartOpen(false)} />}
+      {cartOpen && <div className="absolute inset-0 z-40 bg-black/40 lg:hidden" onClick={() => setCartOpen(false)} />}
       <div
         className={cn(
-          "fixed inset-x-0 bottom-0 z-50 flex max-h-[85vh] flex-col rounded-t-3xl bg-white transition-transform duration-300 ease-out lg:static lg:z-auto lg:h-full lg:w-80 lg:max-h-none lg:translate-y-0 lg:rounded-none lg:border-l lg:border-orange-100 xl:w-96",
+          "absolute inset-x-0 bottom-0 z-50 flex max-h-[85%] flex-col rounded-t-3xl bg-white transition-transform duration-300 ease-out lg:static lg:z-auto lg:h-full lg:w-80 lg:max-h-none lg:translate-y-0 lg:rounded-none lg:border-l lg:border-orange-100 xl:w-96",
           cartOpen ? "translate-y-0" : "translate-y-full lg:translate-y-0"
         )}
       >
@@ -204,9 +211,9 @@ export default function PosTerminal({ products, categories }: { products: Produc
 
       {/* Success modal — print:only isolates this from the rest of the app */}
       {done && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 p-4 print:static print:bg-white print:p-0">
+        <div className="absolute inset-0 z-[60] flex items-center justify-center bg-black/50 p-4 print:static print:bg-white print:p-0">
           <div id="pos-receipt" className="card w-full max-w-sm p-6 text-center print:shadow-none print:border-0">
-            <p className="text-4xl">✅</p>
+            <CheckCircle2 size={40} className="mx-auto text-brand-green" />
             <h2 className="mt-2 font-display text-xl font-bold text-brand-brown">Order placed</h2>
             {done.dailyNumber != null && (
               <p className="mt-2 font-mono text-4xl font-extrabold text-brand-orange">#{String(done.dailyNumber).padStart(2, "0")}</p>
