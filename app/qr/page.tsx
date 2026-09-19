@@ -89,37 +89,67 @@ export default function QrSignupPage() {
 
   if (sent)
     return (
-      <div className="flex min-h-screen items-center justify-center bg-brand-dark px-4">
-        <div className="card max-w-md p-8 text-center">
-          <Mail size={40} className="mx-auto text-brand-orange" />
-          <h1 className="mt-3 font-display text-2xl font-bold">Check your email</h1>
-          <p className="mt-2 text-stone-600">Tap the verification link we just sent to activate your account.</p>
-          {socialLinks.length > 0 && (
-            <div className="mt-6 border-t border-stone-100 pt-5">
-              <p className="text-xs font-bold uppercase tracking-wide text-stone-400">Follow us for updates</p>
-              <div className="mt-3">
-                <div className="flex justify-center gap-3">
-                  {socialLinks.map((l) => {
-                    const Icon = platformIcon(l.platform);
-                    return (
-                      <a
-                        key={l.id}
-                        href={l.url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        aria-label={`Thelawalaa on ${l.platform}`}
-                        className="flex h-10 w-10 items-center justify-center rounded-full bg-brand-brown/10 text-brand-brown transition hover:bg-brand-brown/20"
-                      >
-                        <Icon size={18} />
-                      </a>
-                    );
-                  })}
-                </div>
-              </div>
-            </div>
-          )}
+      <div className="flex min-h-screen flex-col items-center justify-center bg-brand-dark px-4 py-10"> 
+  <div className="w-full max-w-md"> 
+    <div className="rounded-2xl bg-gradient-to-br from-brand-red via-brand-orange to-brand-yellow p-6 text-center shadow-xl"> 
+      <p className="font-display text-3xl font-black tracking-tight text-white drop-shadow-sm">Thelawalaa</p> 
+      <p className="mt-2 font-display text-lg font-bold uppercase tracking-wide text-white"> 
+        Opening Day Special 
+      </p> 
+      <p className="mt-1 text-sm font-bold text-white/90"> 
+        Sign up now and follow us to grab exclusive offers first. 
+      </p> 
+      <div className="mt-4"> 
+        <p className="text-xs font-bold uppercase tracking-widest text-white/80">Follow us & get this offer</p> 
+
+        <div className="mt-3 flex items-center justify-center gap-3">
+
+          <!-- Facebook -->
+          <a 
+            href="https://www.facebook.com/share/19i61to1PT/?mibextid=wwXIfr" 
+            target="_blank" 
+            rel="noopener noreferrer"
+            aria-label="Facebook"
+            className="flex h-11 w-11 items-center justify-center rounded-full bg-white text-[#1877F2] shadow-md transition-transform hover:scale-110"
+          >
+            <svg viewBox="0 0 24 24" className="h-6 w-6" fill="currentColor">
+              <path d="M14 8h3V4h-3c-3.31 0-5 1.69-5 5v3H6v4h3v8h4v-8h3l1-4h-4V9c0-.67.33-1 1-1z"/>
+            </svg>
+          </a>
+
+          <!-- Instagram -->
+          <a 
+            href="https://www.instagram.com/officialthelawalaa?stkn=Yzlod3Z0NzE5Z283" 
+            target="_blank" 
+            rel="noopener noreferrer"
+            aria-label="Instagram"
+            className="flex h-11 w-11 items-center justify-center rounded-full bg-white text-[#E4405F] shadow-md transition-transform hover:scale-110"
+          >
+            <svg viewBox="0 0 24 24" className="h-6 w-6" fill="none" stroke="currentColor" stroke-width="2">
+              <rect x="3" y="3" width="18" height="18" rx="5"/>
+              <circle cx="12" cy="12" r="4"/>
+              <circle cx="17.5" cy="6.5" r="1" fill="currentColor" stroke="none"/>
+            </svg>
+          </a>
+
+          <!-- TikTok -->
+          <a 
+            href="https://www.tiktok.com/@officialthelawalaa?_r=1&_t=ZT-99r6zeIKbeA" 
+            target="_blank" 
+            rel="noopener noreferrer"
+            aria-label="TikTok"
+            className="flex h-11 w-11 items-center justify-center rounded-full bg-white text-black shadow-md transition-transform hover:scale-110"
+          >
+            <svg viewBox="0 0 24 24" className="h-6 w-6" fill="currentColor">
+              <path d="M16.6 5.82A4.75 4.75 0 0 1 15.35 3h-3.4v11.2a2.82 2.82 0 1 1-2-2.7V8.05a6.2 6.2 0 1 0 5.4 6.15V8.45a8.1 8.1 0 0 0 4.75 1.52V6.58a4.73 4.73 0 0 1-3.5-.76z"/>
+            </svg>
+          </a>
+
         </div>
-      </div>
+      </div> 
+    </div>
+  </div>
+</div>
     );
 
   return (
