@@ -148,9 +148,37 @@ export default function QrSignupPage() {
           </p>
           <div className="mt-4">
             <p className="text-xs font-bold uppercase tracking-widest text-white/80">Follow us & get this offer</p>
-            <div className="mt-3">
-              <SocialRow links={socialLinks} />
-            </div>
+            <div className="mt-3 flex items-center justify-center gap-3">
+  <a
+    href="https://www.facebook.com/share/19i61to1PT/?mibextid=wwXIfr"
+    target="_blank"
+    rel="noopener noreferrer"
+    aria-label="Facebook"
+    className="flex h-11 w-11 items-center justify-center rounded-full bg-white/15 text-white transition hover:bg-white/25"
+  >
+    <Facebook size={20} />
+  </a>
+
+  <a
+    href="https://www.instagram.com/officialthelawalaa?stkn=Yzlod3Z0NzE5Z283"
+    target="_blank"
+    rel="noopener noreferrer"
+    aria-label="Instagram"
+    className="flex h-11 w-11 items-center justify-center rounded-full bg-white/15 text-white transition hover:bg-white/25"
+  >
+    <Instagram size={20} />
+  </a>
+
+  <a
+    href="https://www.tiktok.com/@officialthelawalaa?_r=1&_t=ZT-99r6zeIKbeA"
+    target="_blank"
+    rel="noopener noreferrer"
+    aria-label="TikTok"
+    className="flex h-11 w-11 items-center justify-center rounded-full bg-white/15 text-white transition hover:bg-white/25"
+  >
+    <TikTokIcon size={20} />
+  </a>
+</div>
           </div>
         </div>
 
