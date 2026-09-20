@@ -1,20 +1,35 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import Link from "next/link";
 import toast from "react-hot-toast";
-import { Mail, Facebook, Instagram, Link2 } from "lucide-react";
-import TikTokIcon from "@/components/icons/tiktok";
+import { Mail } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { signupSchema } from "@/lib/validations/auth";
+import { FacebookLogo, InstagramLogo, TikTokLogo } from "@/components/icons/social-logos";
 
-type SocialLink = { id: string; platform: string; url: string };
+const SOCIALS = [
+  { platform: "Facebook", href: "https://www.facebook.com/share/19i61to1PT/?mibextid=wwXIfr", Icon: FacebookLogo },
+  { platform: "Instagram", href: "https://www.instagram.com/officialthelawalaa?stkn=Yzlod3Z0NzE5Z283", Icon: InstagramLogo },
+  { platform: "TikTok", href: "https://www.tiktok.com/@officialthelawalaa?_r=1&_t=ZT-99r6zeIKbeA", Icon: TikTokLogo },
+];
 
-function platformIcon(platform: string) {
-  const p = platform.toLowerCase();
-  if (p === "facebook") return Facebook;
-  if (p === "instagram") return Instagram;
-  if (p === "tiktok") return TikTokIcon;
-  return Link2;
+function SocialBadges() {
+  return (
+    <div className="flex items-center justify-center gap-3">
+      {SOCIALS.map(({ platform, href, Icon }) => (
+        <a
+          key={platform}
+          href={href}
+          target="_blank"
+          rel="noopener noreferrer"
+          aria-label={platform}
+          className="flex h-11 w-11 items-center justify-center rounded-full bg-white shadow-md transition-transform hover:scale-110"
+        >
+          <Icon size={22} />
+        </a>
+      ))}
+    </div>
+  );
 }
 
 function strength(pw: string) {
@@ -26,44 +41,11 @@ function strength(pw: string) {
   return s;
 }
 
-function SocialRow({ links }: { links: SocialLink[] }) {
-  if (links.length === 0) return null;
-  return (
-    <div className="flex justify-center gap-3">
-      {links.map((l) => {
-        const Icon = platformIcon(l.platform);
-        return (
-          <a
-            key={l.id}
-            href={l.url}
-            target="_blank"
-            rel="noopener noreferrer"
-            aria-label={`Thelawalaa on ${l.platform}`}
-            className="flex h-11 w-11 items-center justify-center rounded-full bg-white/15 text-white transition hover:bg-white/25"
-          >
-            <Icon size={20} />
-          </a>
-        );
-      })}
-    </div>
-  );
-}
-
 export default function QrSignupPage() {
   const [pw, setPw] = useState("");
   const [busy, setBusy] = useState(false);
   const [sent, setSent] = useState(false);
-  const [socialLinks, setSocialLinks] = useState<SocialLink[]>([]);
   const s = strength(pw);
-
-  useEffect(() => {
-    const supabase = createClient();
-    supabase
-      .from("social_links")
-      .select("id, platform, url")
-      .order("sort_order")
-      .then(({ data }) => setSocialLinks((data ?? []) as SocialLink[]));
-  }, []);
 
   async function onSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -89,50 +71,19 @@ export default function QrSignupPage() {
 
   if (sent)
     return (
-      <div className="mt-3 flex items-center justify-center gap-3">
-
-  {/* Facebook */}
-  <a 
-    href="https://www.facebook.com/share/19i61to1PT/?mibextid=wwXIfr" 
-    target="_blank" 
-    rel="noopener noreferrer"
-    aria-label="Facebook"
-    className="flex h-11 w-11 items-center justify-center rounded-full bg-white text-[#1877F2] shadow-md transition-transform hover:scale-110"
-  >
-    <svg viewBox="0 0 24 24" className="h-6 w-6" fill="currentColor">
-      <path d="M14 8h3V4h-3c-3.31 0-5 1.69-5 5v3H6v4h3v8h4v-8h3l1-4h-4V9c0-.67.33-1 1-1z"/>
-    </svg>
-  </a>
-
-  {/* Instagram */}
-  <a 
-    href="https://www.instagram.com/officialthelawalaa?stkn=Yzlod3Z0NzE5Z283" 
-    target="_blank" 
-    rel="noopener noreferrer"
-    aria-label="Instagram"
-    className="flex h-11 w-11 items-center justify-center rounded-full bg-white text-[#E4405F] shadow-md transition-transform hover:scale-110"
-  >
-    <svg viewBox="0 0 24 24" className="h-6 w-6" fill="none" stroke="currentColor" strokeWidth="2">
-      <rect x="3" y="3" width="18" height="18" rx="5"/>
-      <circle cx="12" cy="12" r="4"/>
-      <circle cx="17.5" cy="6.5" r="1" fill="currentColor" stroke="none"/>
-    </svg>
-  </a>
-
-  {/* TikTok */}
-  <a 
-    href="https://www.tiktok.com/@officialthelawalaa?_r=1&_t=ZT-99r6zeIKbeA" 
-    target="_blank" 
-    rel="noopener noreferrer"
-    aria-label="TikTok"
-    className="flex h-11 w-11 items-center justify-center rounded-full bg-white text-black shadow-md transition-transform hover:scale-110"
-  >
-    <svg viewBox="0 0 24 24" className="h-6 w-6" fill="currentColor">
-      <path d="M16.6 5.82A4.75 4.75 0 0 1 15.35 3h-3.4v11.2a2.82 2.82 0 1 1-2-2.7V8.05a6.2 6.2 0 1 0 5.4 6.15V8.45a8.1 8.1 0 0 0 4.75 1.52V6.58a4.73 4.73 0 0 1-3.5-.76z"/>
-    </svg>
-  </a>
-
-</div>
+      <div className="flex min-h-screen items-center justify-center bg-brand-dark px-4">
+        <div className="card max-w-md p-8 text-center">
+          <Mail size={40} className="mx-auto text-brand-orange" />
+          <h1 className="mt-3 font-display text-2xl font-bold">Check your email</h1>
+          <p className="mt-2 text-stone-600">Tap the verification link we just sent to activate your account.</p>
+          <div className="mt-6 border-t border-stone-100 pt-5">
+            <p className="text-xs font-bold uppercase tracking-wide text-stone-400">Follow us for updates</p>
+            <div className="mt-3">
+              <SocialBadges />
+            </div>
+          </div>
+        </div>
+      </div>
     );
 
   return (
@@ -148,37 +99,9 @@ export default function QrSignupPage() {
           </p>
           <div className="mt-4">
             <p className="text-xs font-bold uppercase tracking-widest text-white/80">Follow us & get this offer</p>
-            <div className="mt-3 flex items-center justify-center gap-3">
-  <a
-    href="https://www.facebook.com/share/19i61to1PT/?mibextid=wwXIfr"
-    target="_blank"
-    rel="noopener noreferrer"
-    aria-label="Facebook"
-    className="flex h-11 w-11 items-center justify-center rounded-full bg-white/15 text-white transition hover:bg-white/25"
-  >
-    <Facebook size={20} />
-  </a>
-
-  <a
-    href="https://www.instagram.com/officialthelawalaa?stkn=Yzlod3Z0NzE5Z283"
-    target="_blank"
-    rel="noopener noreferrer"
-    aria-label="Instagram"
-    className="flex h-11 w-11 items-center justify-center rounded-full bg-white/15 text-white transition hover:bg-white/25"
-  >
-    <Instagram size={20} />
-  </a>
-
-  <a
-    href="https://www.tiktok.com/@officialthelawalaa?_r=1&_t=ZT-99r6zeIKbeA"
-    target="_blank"
-    rel="noopener noreferrer"
-    aria-label="TikTok"
-    className="flex h-11 w-11 items-center justify-center rounded-full bg-white/15 text-white transition hover:bg-white/25"
-  >
-    <TikTokIcon size={20} />
-  </a>
-</div>
+            <div className="mt-3">
+              <SocialBadges />
+            </div>
           </div>
         </div>
 
