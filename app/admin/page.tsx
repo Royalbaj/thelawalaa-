@@ -18,7 +18,7 @@ export default async function AdminDashboard() {
     supabaseAdmin.from("categories").select("id, name").order("sort_order"),
     supabaseAdmin
       .from("orders")
-      .select("id, order_number, status, type, total, payment_status, payment_method, created_at, notes, customer:profiles(full_name, phone)")
+      .select("id, order_number, status, type, total, payment_status, payment_method, created_at, notes, customer:profiles!customer_id(full_name, phone)")
       .order("created_at", { ascending: false })
       .limit(50),
     supabaseAdmin

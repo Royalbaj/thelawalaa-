@@ -15,7 +15,7 @@ export default async function DeliveryPage() {
       orders!inner(
         id, order_number, status, type, total, payment_status, payment_method,
         created_at, notes, delivery_address_id,
-        customer:profiles(full_name, phone),
+        customer:profiles!customer_id(full_name, phone),
         address:addresses(full_address)
       )
     `)
