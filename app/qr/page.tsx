@@ -91,12 +91,24 @@ export default function QrSignupPage() {
       <div className="w-full max-w-md">
         <div className="rounded-2xl bg-gradient-to-br from-brand-red via-brand-orange to-brand-yellow p-6 text-center shadow-xl">
           <p className="font-display text-3xl font-black tracking-tight text-white drop-shadow-sm">Thelawalaa</p>
-          <p className="mt-2 font-display text-lg font-bold uppercase tracking-wide text-white">
+          <p className="mt-1 font-display text-sm font-bold uppercase tracking-widest text-white/90">
             Opening Day Special
           </p>
-          <p className="mt-1 text-sm font-bold text-white/90">
-            Sign up now and follow us to grab exclusive offers first.
+
+          <div className="mx-auto mt-4 flex w-fit items-center gap-4 rounded-2xl bg-white px-6 py-4 shadow-lg">
+            <p className="font-display text-5xl font-black leading-none text-brand-red">
+              Rs&nbsp;11
+            </p>
+            <div className="h-11 w-px bg-stone-200" />
+            <p className="text-left font-display text-lg font-black uppercase leading-tight text-brand-brown">
+              1 Plate<br />Momo
+            </p>
+          </div>
+
+          <p className="mx-auto mt-4 max-w-xs font-display text-base font-bold leading-snug text-white drop-shadow-sm">
+            Follow us to unlock this offer — and several more!
           </p>
+
           <div className="mt-4">
             <p className="text-xs font-bold uppercase tracking-widest text-white/80">Follow us & get this offer</p>
             <div className="mt-3">
