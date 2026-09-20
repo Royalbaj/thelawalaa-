@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+import Image from "next/image";
 import toast from "react-hot-toast";
 import { createClient } from "@/lib/supabase/client";
 import { useCart } from "@/lib/store/cart";
@@ -269,7 +270,9 @@ export default function OrderPage() {
                         </button>
                       )}
                       {p.image_url ? (
-                        <img src={p.image_url} alt={p.name} className="h-32 w-full object-cover rounded-lg mb-3" />
+                        <div className="relative mb-3 h-32 w-full overflow-hidden rounded-lg">
+                          <Image src={p.image_url} alt={p.name} fill sizes="(min-width: 640px) 300px, 50vw" className="object-cover" />
+                        </div>
                       ) : (
                         <div className="h-32 w-full bg-brand-cream rounded-lg mb-3 flex items-center justify-center text-stone-300" aria-hidden><UtensilsCrossed size={32} /></div>
                       )}

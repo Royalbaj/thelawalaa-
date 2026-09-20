@@ -1,5 +1,6 @@
 "use client";
 import { useMemo, useState, useTransition } from "react";
+import Image from "next/image";
 import toast from "react-hot-toast";
 import { Search, X, Trash2, ShoppingCart, ChevronUp, UtensilsCrossed, CheckCircle2 } from "lucide-react";
 import { createPosOrder } from "@/app/actions/pos";
@@ -178,7 +179,9 @@ export default function PosTerminal({
                   p.is_available ? "hover:scale-[1.02] active:scale-95" : "opacity-40",
                   inCart && "ring-2 ring-brand-orange")}>
                 {p.image_url ? (
-                  <img src={p.image_url} alt="" className="h-20 w-full object-cover" />
+                  <div className="relative h-20 w-full">
+                    <Image src={p.image_url} alt="" fill sizes="200px" className="object-cover" />
+                  </div>
                 ) : (
                   <div className="flex h-20 w-full items-center justify-center bg-brand-cream text-stone-300"><UtensilsCrossed size={24} /></div>
                 )}

@@ -2,6 +2,7 @@ import { getVerifiedUser } from "@/lib/supabase/server";
 import { createClient } from "@/lib/supabase/server";
 import { npr } from "@/lib/utils";
 import Link from "next/link";
+import Image from "next/image";
 import { ShoppingBag, Package, Gift, Settings, UtensilsCrossed, Heart } from "lucide-react";
 
 export const dynamic = "force-dynamic";
@@ -72,7 +73,9 @@ export default async function AccountHome() {
             {(offers ?? []).map((offer: any) => (
               <div key={offer.id} className="snap-start shrink-0 w-64 rounded-2xl overflow-hidden bg-white shadow-sm border border-stone-100">
                 {offer.image_url ? (
-                  <img src={offer.image_url} alt={offer.title} className="w-full h-28 object-cover" />
+                  <div className="relative h-28 w-full">
+                    <Image src={offer.image_url} alt={offer.title} fill sizes="256px" className="object-cover" />
+                  </div>
                 ) : (
                   <div className="w-full h-28 bg-gradient-to-br from-brand-orange to-amber-500 flex items-center justify-center">
                     <Gift size={32} className="text-white/80" />
@@ -131,7 +134,9 @@ export default async function AccountHome() {
             {(favorites ?? []).map((f: any) => (
               <div key={f.product_id} className="rounded-2xl bg-white p-3 border border-stone-100">
                 {f.products?.image_url && (
-                  <img src={f.products.image_url} alt={f.products?.name} className="w-full h-20 object-cover rounded-xl mb-2" />
+                  <div className="relative mb-2 h-20 w-full">
+                    <Image src={f.products.image_url} alt={f.products?.name} fill sizes="160px" className="rounded-xl object-cover" />
+                  </div>
                 )}
                 <p className="text-xs font-bold text-brand-brown truncate">{f.products?.name}</p>
                 <p className="text-xs font-bold text-brand-orange">{npr(Number(f.products?.price ?? 0))}</p>
