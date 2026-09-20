@@ -2,7 +2,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import toast from "react-hot-toast";
-import { Mail } from "lucide-react";
+import { Mail, ChevronDown } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { signupSchema } from "@/lib/validations/auth";
 import { FacebookLogo, InstagramLogo, TikTokLogo } from "@/components/icons/social-logos";
@@ -78,10 +78,11 @@ export default function QrSignupPage() {
           <p className="mt-2 text-stone-600">Tap the verification link we just sent to activate your account.</p>
           <div className="mt-6 border-t border-stone-100 pt-5">
             <p className="text-xs font-bold uppercase tracking-wide text-stone-400">Follow us for updates</p>
-            <div className="mt-3">
+            <ChevronDown size={18} className="mx-auto mt-1 animate-bounce text-stone-300" aria-hidden />
+            <div className="mt-1">
               <SocialBadges />
             </div>
-            <p className="mt-2 text-xs font-bold text-stone-400">Click a button above to visit our page</p>
+            <p className="mt-2 text-xs font-bold text-stone-400">Tap an icon to open our page</p>
           </div>
         </div>
       </div>
@@ -112,10 +113,11 @@ export default function QrSignupPage() {
 
           <div className="mt-4">
             <p className="text-xs font-bold uppercase tracking-widest text-white/80">Follow us & get this offer</p>
-            <div className="mt-3">
+            <ChevronDown size={20} className="mx-auto mt-1 animate-bounce text-white/80" aria-hidden />
+            <div className="mt-1">
               <SocialBadges />
             </div>
-            <p className="mt-2 text-xs font-bold text-white/70">Click a button above to visit our page</p>
+            <p className="mt-2 text-xs font-bold text-white/70">Tap an icon to open our page</p>
           </div>
         </div>
 
