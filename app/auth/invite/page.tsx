@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import toast from "react-hot-toast";
 import { createClient } from "@/lib/supabase/client";
 import { passwordSchema } from "@/lib/validations/auth";
+import { ROLE_HOME } from "@/lib/role-home";
 
 // Staff land here from the Supabase invite email (already session'd via token).
 export default function InvitePage() {
@@ -26,7 +27,7 @@ export default function InvitePage() {
     if (user) {
       await supabase.from("profiles").update({ invite_accepted_at: new Date().toISOString() }).eq("id", user.id);
       const { data: p } = await supabase.from("profiles").select("role").eq("id", user.id).single();
-      router.push(p?.role === "pos_user" ? "/pos" : p?.role === "delivery_driver" ? "/delivery" : "/account");
+      router.push((p?.role && ROLE_HOME[p.role]) || "/account");
       router.refresh();
     }
   }
