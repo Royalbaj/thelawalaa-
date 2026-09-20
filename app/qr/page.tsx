@@ -81,6 +81,7 @@ export default function QrSignupPage() {
             <div className="mt-3">
               <SocialBadges />
             </div>
+            <p className="mt-2 text-xs font-bold text-stone-400">Click a button above to visit our page</p>
           </div>
         </div>
       </div>
@@ -114,6 +115,7 @@ export default function QrSignupPage() {
             <div className="mt-3">
               <SocialBadges />
             </div>
+            <p className="mt-2 text-xs font-bold text-white/70">Click a button above to visit our page</p>
           </div>
         </div>
 
