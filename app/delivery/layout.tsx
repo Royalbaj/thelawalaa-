@@ -1,4 +1,6 @@
 import { redirect } from "next/navigation";
+import Link from "next/link";
+import { GraduationCap } from "lucide-react";
 import { getVerifiedUser } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
@@ -19,6 +21,9 @@ export default async function DeliveryLayout({ children }: { children: React.Rea
             <p className="text-[10px] text-white/40 font-bold">{profile.full_name}</p>
           </div>
           <div className="flex items-center gap-2">
+            <Link href="/staff" aria-label="Staff Portal" className="flex h-7 w-7 items-center justify-center rounded-full bg-white/10 text-white/70 hover:bg-white/20 hover:text-white transition">
+              <GraduationCap size={15} />
+            </Link>
             <span className="inline-flex items-center gap-1.5 text-[10px] font-bold text-green-400 bg-green-500/10 px-2.5 py-1 rounded-full border border-green-500/20">
               <span className="h-1.5 w-1.5 rounded-full bg-green-400 animate-pulse" />
               Online

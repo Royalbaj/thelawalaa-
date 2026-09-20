@@ -3,7 +3,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import {
   LayoutDashboard, ShoppingBag, UtensilsCrossed, Users, UserPlus,
-  Truck, BarChart3, Megaphone, Settings, LogOut, ExternalLink, Gift,
+  Truck, BarChart3, Megaphone, Settings, LogOut, ExternalLink, Gift, GraduationCap,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { cn } from "@/lib/utils";
@@ -16,6 +16,7 @@ export const NAV = [
   { href: "/super-admin/signups", label: "Signups", icon: UserPlus, section: "marketing" },
   { href: "/super-admin/delivery", label: "Deliveries", icon: Truck, section: "operations" },
   { href: "/super-admin/staff", label: "Staff & Users", icon: Users, section: "operations" },
+  { href: "/super-admin/training", label: "Staff Training", icon: GraduationCap, section: "operations" },
   { href: "/super-admin/reports", label: "Reports", icon: BarChart3, section: "operations" },
   { href: "/super-admin/announcements", label: "Announcements", icon: Megaphone, section: "marketing" },
   { href: "/super-admin/settings", label: "Settings", icon: Settings, section: "settings" },

@@ -11,6 +11,7 @@ const ROLE_ROUTES: [string, string[]][] = [
   ["/admin", ["super_admin", "admin", "pos_user"]],
   ["/pos", ["super_admin", "admin", "pos_user"]],
   ["/delivery", ["super_admin", "delivery_driver"]],
+  ["/staff", ["super_admin", "admin", "pos_user", "delivery_driver"]],
   ["/account", ["super_admin", "admin", "pos_user", "delivery_driver", "customer"]],
 ];
 
@@ -66,7 +67,7 @@ export async function middleware(request: NextRequest) {
 
 export const config = {
   matcher: [
-    "/super-admin/:path*", "/admin/:path*", "/pos/:path*", "/delivery/:path*",
+    "/super-admin/:path*", "/admin/:path*", "/pos/:path*", "/delivery/:path*", "/staff/:path*",
     "/account/:path*", "/order/:path*", "/track/:path*",
   ],
 };

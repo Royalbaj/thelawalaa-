@@ -2,7 +2,7 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import {
-  LayoutDashboard, ShoppingBag, Truck, LogOut, ExternalLink,
+  LayoutDashboard, ShoppingBag, Truck, LogOut, ExternalLink, GraduationCap,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { cn } from "@/lib/utils";
@@ -11,6 +11,7 @@ const NAV = [
   { href: "/admin", label: "POS Terminal", icon: LayoutDashboard },
   { href: "/admin/orders", label: "All Orders", icon: ShoppingBag },
   { href: "/admin/delivery", label: "Deliveries", icon: Truck },
+  { href: "/staff", label: "Training", icon: GraduationCap },
 ];
 
 export default function SidebarNav() {
