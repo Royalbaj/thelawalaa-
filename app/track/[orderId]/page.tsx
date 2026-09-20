@@ -36,22 +36,24 @@ function TrackContent() {
 
   useEffect(() => {
     const supabase = createClient();
-    // RLS guarantees only the owner / assigned driver / a guest order's
-    // holder-of-the-link can read this row.
-    supabase.from("orders").select("*").eq("id", orderId).maybeSingle().then(({ data }) => {
-      if (!data) setNotFound(true);
-      else setOrder(data);
-    });
-    supabase.from("order_items").select("product_name, quantity, line_total").eq("order_id", orderId)
-      .then(({ data }) => setItems(data ?? []));
     supabase.auth.getUser().then(({ data }) => setIsGuestViewer(!data.user));
 
-    const channel = supabase
-      .channel(`order-${orderId}`)
-      .on("postgres_changes", { event: "UPDATE", schema: "public", table: "orders", filter: `id=eq.${orderId}` },
-        (payload) => setOrder(payload.new))
-      .subscribe();
-    return () => { supabase.removeChannel(channel); };
+    // The order id (an unguessable UUID) is the intended access model —
+    // fetched via a server route that only ever looks up by exact id,
+    // never a listable RLS policy. Polled instead of a realtime
+    // subscription so this page needs no RLS grant on orders at all.
+    let cancelled = false;
+    async function load() {
+      const res = await fetch(`/api/track/${orderId}`, { cache: "no-store" });
+      if (cancelled) return;
+      if (!res.ok) { setNotFound(true); return; }
+      const { order, items } = await res.json();
+      setOrder(order);
+      setItems(items);
+    }
+    load();
+    const interval = setInterval(load, 8000);
+    return () => { cancelled = true; clearInterval(interval); };
   }, [orderId]);
 
   useEffect(() => {

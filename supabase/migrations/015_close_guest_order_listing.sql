@@ -1,0 +1,13 @@
+-- The guest-order RLS policy allowed listing/enumerating EVERY guest order
+-- (name, phone, delivery address embedded in notes, total) with nothing
+-- more than the public anon key — no login, no order id needed. RLS grants
+-- row visibility, not "only if queried by exact id", so "the id is
+-- unguessable" never actually held: anyone could run
+-- `select * from orders where customer_id is null` directly against the
+-- Supabase REST API and get every guest order in the system.
+--
+-- Guest tracking now goes through app/api/track/[orderId]/route.ts, which
+-- uses the service-role client and only ever fetches by exact id — the
+-- capability model the comment on the old policy intended, enforced in
+-- code instead of an RLS policy that couldn't actually express it.
+DROP POLICY IF EXISTS "guest orders readable by id" ON orders;
