@@ -5,7 +5,6 @@ import { createClient } from "@/lib/supabase/server";
 import { npr } from "@/lib/utils";
 import { SITE } from "@/lib/seo";
 import { applyOpeningPromoPrice, isOpeningPromoActive } from "@/lib/promo";
-import { FAQS } from "@/lib/faqs";
 import ContactForm from "@/components/contact-form";
 import Faq from "@/components/faq";
 import AddToCartButton from "@/components/add-to-cart-button";
@@ -22,7 +21,7 @@ export const metadata: Metadata = {
 
 export default async function HomePage() {
   const supabase = createClient();
-  const [{ data: bestsellers }, { data: menuItems }, { data: announcement }, { data: settings }] = await Promise.all([
+  const [{ data: bestsellers }, { data: menuItems }, { data: announcement }, { data: settings }, { data: faqRows }] = await Promise.all([
     supabase
       .from("products")
       .select("id, name, description, price, spice_level, is_veg, image_url, categories(name)")
@@ -42,7 +41,9 @@ export default async function HomePage() {
       .limit(1)
       .maybeSingle(),
     supabase.from("app_settings").select("delivery_enabled, opening_promo_enabled, opening_promo_momo_price, opening_promo_starts_at, opening_promo_ends_at").eq("id", 1).single(),
+    supabase.from("faqs").select("question, answer").eq("is_active", true).order("sort_order"),
   ]);
+  const faqs = (faqRows ?? []).map((f) => ({ q: f.question, a: f.answer }));
   const deliveryEnabled = settings?.delivery_enabled ?? false;
   const promoActive = isOpeningPromoActive(settings);
   const priceOf = (p: { price: number; categories?: { name: string } | { name: string }[] | null }) => {
@@ -52,7 +53,7 @@ export default async function HomePage() {
 
   return (
     <>
-      <StructuredData faqs={FAQS} menu={(menuItems ?? []).map((m) => ({ name: m.name, description: m.description, price: Number(m.price) }))} />
+      <StructuredData faqs={faqs} menu={(menuItems ?? []).map((m) => ({ name: m.name, description: m.description, price: Number(m.price) }))} />
       
       {/* HERO */}
       <section id="home" className="relative flex min-h-[85vh] flex-col items-center justify-center bg-brand-cream px-4 text-center overflow-hidden">
@@ -65,10 +66,6 @@ export default async function HomePage() {
         </div>
         
         <div className="relative z-10 mt-12">
-          <div className="inline-flex items-center gap-2 rounded-full bg-white/80 px-4 py-1.5 text-xs font-bold text-brand-brown shadow-sm backdrop-blur mb-6">
-            <span className="inline-block h-2 w-2 rounded-full bg-brand-green animate-pulse" />
-            Serving Banepa, Kavrepalanchok
-          </div>
           <h1 className="font-display text-5xl font-extrabold text-brand-brown md:text-7xl max-w-3xl mx-auto leading-tight">
             Hygienic Street Food,
             <span className="brand-gradient-text"> Bold Flavour</span>
@@ -221,7 +218,7 @@ export default async function HomePage() {
             <p className="font-bold tracking-widest text-brand-orange text-xs mb-2 uppercase">Got Questions?</p>
             <h2 className="font-display text-4xl font-bold text-brand-brown">Frequently Asked Questions</h2>
           </div>
-          <Faq />
+          <Faq faqs={faqs} />
         </div>
       </section>
 

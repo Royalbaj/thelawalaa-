@@ -88,6 +88,8 @@ export default function OrderPage() {
       setProducts((p.data as Product[]) ?? []);
       setCategories((c.data as Category[]) ?? []);
       setBranches((b.data as Branch[]) ?? []);
+      // Auto-select the branch — there's only one store, no reason to make anyone pick it.
+      if (b.data && b.data.length > 0) setBranchId(b.data[0].id);
       setAddresses((a.data as Address[]) ?? []);
       // Default to the customer's saved address instead of an empty "new address" box.
       if (a.data && a.data.length > 0) setAddressId(a.data[0].id);
@@ -354,13 +356,21 @@ export default function OrderPage() {
                 </div>
                 
                 {type === "pickup" ? (
-                  <div>
-                    <label className="label" htmlFor="branch">Pick a branch</label>
-                    <select id="branch" className="input" value={branchId} onChange={(e) => setBranchId(e.target.value)}>
-                      <option value="">Choose…</option>
-                      {branches.map((b) => <option key={b.id} value={b.id}>{b.name} — {b.address}</option>)}
-                    </select>
-                  </div>
+                  branches.length > 1 ? (
+                    <div>
+                      <label className="label" htmlFor="branch">Pick a branch</label>
+                      <select id="branch" className="input" value={branchId} onChange={(e) => setBranchId(e.target.value)}>
+                        <option value="">Choose…</option>
+                        {branches.map((b) => <option key={b.id} value={b.id}>{b.name} — {b.address}</option>)}
+                      </select>
+                    </div>
+                  ) : branches.length === 1 ? (
+                    <div className="rounded-xl bg-orange-50 px-4 py-3">
+                      <p className="text-xs font-bold uppercase tracking-wide text-brand-orange">Pickup from</p>
+                      <p className="mt-0.5 font-bold text-brand-brown">{branches[0].name}</p>
+                      <p className="text-sm text-stone-500">{branches[0].address}</p>
+                    </div>
+                  ) : null
                 ) : (
                   <div className="space-y-3">
                     {addresses.length > 0 && (

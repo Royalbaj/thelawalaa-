@@ -2,8 +2,9 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { Menu, X } from "lucide-react";
+import { Menu, X, ShoppingCart } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useCart } from "@/lib/store/cart";
 
 const LINKS = [
   { id: "home", label: "Home" },
@@ -17,6 +18,7 @@ const LINKS = [
 export default function Navbar() {
   const [open, setOpen] = useState(false);
   const [active, setActive] = useState("home");
+  const itemCount = useCart((s) => s.items.reduce((n, i) => n + i.quantity, 0));
 
   useEffect(() => {
     const observer = new IntersectionObserver(
@@ -60,6 +62,18 @@ export default function Navbar() {
         </ul>
 
         <div className="flex items-center gap-2">
+          <Link
+            href="/order"
+            aria-label={`Your cart${itemCount > 0 ? `, ${itemCount} item${itemCount > 1 ? "s" : ""}` : ""}`}
+            className="relative flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-stone-600 transition hover:bg-orange-50 hover:text-brand-orange"
+          >
+            <ShoppingCart size={20} />
+            {itemCount > 0 && (
+              <span className="absolute -right-0.5 -top-0.5 flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-brand-orange px-1 text-[10px] font-bold text-white">
+                {itemCount > 9 ? "9+" : itemCount}
+              </span>
+            )}
+          </Link>
           <Link
             href="/auth/login"
             className="hidden whitespace-nowrap rounded-full border-2 border-brand-orange px-3 py-2 text-sm font-bold text-brand-orange transition hover:bg-orange-50 md:inline-flex lg:px-5"

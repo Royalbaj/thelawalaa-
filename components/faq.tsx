@@ -2,13 +2,12 @@
 import { useState } from "react";
 import { ChevronDown } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { FAQS } from "@/lib/faqs";
 
-export default function Faq() {
+export default function Faq({ faqs }: { faqs: { q: string; a: string }[] }) {
   const [open, setOpen] = useState<number | null>(0);
   return (
     <div className="mt-8 space-y-3">
-      {FAQS.map(({ q, a }, i) => (
+      {faqs.map(({ q, a }, i) => (
         <div key={q} className="card overflow-hidden">
           <button
             className="flex w-full items-center justify-between px-5 py-4 text-left font-bold"
