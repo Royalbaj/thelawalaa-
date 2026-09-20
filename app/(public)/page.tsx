@@ -3,6 +3,7 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { npr } from "@/lib/utils";
 import { SITE } from "@/lib/seo";
+import { applyOpeningPromoPrice, isOpeningPromoActive } from "@/lib/promo";
 import { FAQS } from "@/lib/faqs";
 import ContactForm from "@/components/contact-form";
 import Faq from "@/components/faq";
@@ -23,7 +24,7 @@ export default async function HomePage() {
   const [{ data: bestsellers }, { data: menuItems }, { data: announcement }, { data: settings }] = await Promise.all([
     supabase
       .from("products")
-      .select("id, name, description, price, spice_level, is_veg, image_url")
+      .select("id, name, description, price, spice_level, is_veg, image_url, categories(name)")
       .eq("is_bestseller", true)
       .order("sort_order")
       .limit(4),
@@ -39,9 +40,14 @@ export default async function HomePage() {
       .order("created_at", { ascending: false })
       .limit(1)
       .maybeSingle(),
-    supabase.from("app_settings").select("delivery_enabled").eq("id", 1).single(),
+    supabase.from("app_settings").select("delivery_enabled, opening_promo_enabled, opening_promo_momo_price, opening_promo_starts_at, opening_promo_ends_at").eq("id", 1).single(),
   ]);
   const deliveryEnabled = settings?.delivery_enabled ?? false;
+  const promoActive = isOpeningPromoActive(settings);
+  const priceOf = (p: { price: number; categories?: { name: string } | { name: string }[] | null }) => {
+    const catName = Array.isArray(p.categories) ? p.categories[0]?.name : p.categories?.name;
+    return applyOpeningPromoPrice(Number(p.price), catName ?? null, settings);
+  };
 
   return (
     <>
@@ -144,6 +150,9 @@ export default async function HomePage() {
                   <span className={`absolute top-3 right-3 badge shadow-sm ${p.is_veg ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"}`}>
                     {p.is_veg ? "Veg" : "Non-Veg"}
                   </span>
+                  {promoActive && priceOf(p) !== Number(p.price) && (
+                    <span className="absolute top-3 left-3 badge shadow-sm bg-brand-green text-white">Opening offer</span>
+                  )}
                 </div>
                 <div className="p-5">
                   <p className="font-display font-bold text-brand-brown">{p.name}</p>
@@ -152,8 +161,15 @@ export default async function HomePage() {
                     {"🌶".repeat(p.spice_level) || "Mild"}
                   </p>
                   <div className="mt-3 flex items-center justify-between border-t border-orange-50 pt-3">
-                    <p className="font-display text-xl font-bold text-brand-orange">{npr(Number(p.price))}</p>
-                    <AddToCartButton product={{ product_id: p.id, name: p.name, price: Number(p.price) }} />
+                    {promoActive && priceOf(p) !== Number(p.price) ? (
+                      <p className="font-display text-xl font-bold text-brand-orange flex items-center gap-1.5">
+                        {npr(priceOf(p))}
+                        <span className="text-xs font-normal text-stone-400 line-through">{npr(Number(p.price))}</span>
+                      </p>
+                    ) : (
+                      <p className="font-display text-xl font-bold text-brand-orange">{npr(Number(p.price))}</p>
+                    )}
+                    <AddToCartButton product={{ product_id: p.id, name: p.name, price: priceOf(p) }} />
                   </div>
                 </div>
               </div>

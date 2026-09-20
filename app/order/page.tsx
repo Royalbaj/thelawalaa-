@@ -10,6 +10,7 @@ import { getEsewaPaymentForm } from "@/app/actions/payments";
 import { npr } from "@/lib/utils";
 import { UtensilsCrossed } from "lucide-react";
 import AddToCartButton from "@/components/add-to-cart-button";
+import { applyOpeningPromoPrice, isOpeningPromoActive, type OpeningPromoSettings } from "@/lib/promo";
 
 type Product = { id: string; name: string; description: string | null; price: number; category_id: string | null; spice_level: number; image_url?: string | null };
 type Category = { id: string; name: string };
@@ -59,6 +60,7 @@ export default function OrderPage() {
 
   const [favorites, setFavorites] = useState<string[]>([]);
   const [settings, setSettings] = useState({ esewa_enabled: false, delivery_enabled: false });
+  const [openingPromo, setOpeningPromo] = useState<OpeningPromoSettings | null>(null);
   const [menuLoading, setMenuLoading] = useState(true);
 
   useEffect(() => {
@@ -81,16 +83,20 @@ export default function OrderPage() {
       supabase.from("categories").select("id, name").order("sort_order"),
       supabase.from("branches").select("id, name, address"),
       supabase.from("addresses").select("id, label, full_address"),
-      supabase.from("app_settings").select("esewa_enabled, delivery_enabled").eq("id", 1).single(),
+      supabase.from("app_settings").select("esewa_enabled, delivery_enabled, opening_promo_enabled, opening_promo_momo_price, opening_promo_starts_at, opening_promo_ends_at").eq("id", 1).single(),
     ]).then(([p, c, b, a, s]) => {
       setProducts((p.data as Product[]) ?? []);
       setCategories((c.data as Category[]) ?? []);
       setBranches((b.data as Branch[]) ?? []);
       setAddresses((a.data as Address[]) ?? []);
-      if (s.data) setSettings(s.data);
+      if (s.data) { setSettings(s.data); setOpeningPromo(s.data); }
       setMenuLoading(false);
     });
   }, []);
+
+  const categoryNameById = useMemo(() => new Map(categories.map((c) => [c.id, c.name])), [categories]);
+  const priceOf = (p: Product) => applyOpeningPromoPrice(Number(p.price), categoryNameById.get(p.category_id ?? "") ?? null, openingPromo);
+  const isDiscounted = (p: Product) => isOpeningPromoActive(openingPromo) && priceOf(p) !== Number(p.price);
 
   const subtotal = useMemo(() => items.reduce((t, i) => t + i.price * i.quantity, 0), [items]);
   const deliveryFee = type === "delivery" ? 20 : 0;
@@ -267,11 +273,21 @@ export default function OrderPage() {
                       ) : (
                         <div className="h-32 w-full bg-brand-cream rounded-lg mb-3 flex items-center justify-center text-stone-300" aria-hidden><UtensilsCrossed size={32} /></div>
                       )}
+                      {isDiscounted(p) && (
+                        <span className="absolute left-6 top-6 rounded-full bg-brand-green px-2.5 py-1 text-[10px] font-bold text-white shadow">Opening offer</span>
+                      )}
                       <p className="font-bold pr-8">{p.name}</p>
                       <p className="line-clamp-2 text-sm text-stone-600 flex-1">{p.description}</p>
                       <div className="mt-2 flex items-center justify-between">
-                        <p className="font-display font-bold text-brand-orange">{npr(Number(p.price))}</p>
-                        <AddToCartButton product={{ product_id: p.id, name: p.name, price: Number(p.price) }} />
+                        {isDiscounted(p) ? (
+                          <p className="font-display font-bold text-brand-orange flex items-center gap-1.5">
+                            {npr(priceOf(p))}
+                            <span className="text-xs font-normal text-stone-400 line-through">{npr(Number(p.price))}</span>
+                          </p>
+                        ) : (
+                          <p className="font-display font-bold text-brand-orange">{npr(Number(p.price))}</p>
+                        )}
+                        <AddToCartButton product={{ product_id: p.id, name: p.name, price: priceOf(p) }} />
                       </div>
                     </div>
                   );
