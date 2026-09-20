@@ -7,9 +7,9 @@ import { supabaseAdmin, audit } from "@/lib/supabase/admin";
 
 const schema = z.object({ esewa_enabled: z.boolean(), delivery_enabled: z.boolean() });
 
-/** Site-wide feature flags — super_admin only, see app_settings migration. */
+/** Site-wide feature flags — admin only, see app_settings migration. */
 export async function updateAppSettings(input: unknown) {
-  const { user } = await requireRole(["super_admin"]);
+  const { user } = await requireRole(["admin"]);
   const parsed = schema.safeParse(input);
   if (!parsed.success) return { error: "Invalid settings" };
 
@@ -20,7 +20,7 @@ export async function updateAppSettings(input: unknown) {
   if (error) return { error: "Could not update settings" };
 
   await audit({ actor_id: user.id, action: "UPDATE_APP_SETTINGS", target_table: "app_settings", target_id: "1", new_data: parsed.data });
-  revalidatePath("/super-admin/settings");
+  revalidatePath("/admin/settings");
   revalidatePath("/order");
   revalidatePath("/");
   return { ok: true };
@@ -40,7 +40,7 @@ const openingPromoSchema = z.object({
 });
 
 export async function updateOpeningPromo(input: unknown) {
-  const { user } = await requireRole(["super_admin"]);
+  const { user } = await requireRole(["admin"]);
   const parsed = openingPromoSchema.safeParse(input);
   if (!parsed.success) return { error: "Check the promo fields" };
 
@@ -57,7 +57,7 @@ export async function updateOpeningPromo(input: unknown) {
   if (error) return { error: "Could not update promo" };
 
   await audit({ actor_id: user.id, action: "UPDATE_OPENING_PROMO", target_table: "app_settings", target_id: "1", new_data: parsed.data });
-  revalidatePath("/super-admin/settings");
+  revalidatePath("/admin/settings");
   revalidatePath("/order");
   revalidatePath("/pos");
   revalidatePath("/admin");
@@ -71,7 +71,7 @@ const socialLinkSchema = z.object({
 });
 
 export async function addSocialLink(input: unknown) {
-  const { user } = await requireRole(["super_admin"]);
+  const { user } = await requireRole(["admin"]);
   const parsed = socialLinkSchema.safeParse(input);
   if (!parsed.success) return { error: "Enter a platform name and a valid URL" };
 
@@ -79,24 +79,24 @@ export async function addSocialLink(input: unknown) {
   if (error) return { error: "Could not add link" };
 
   await audit({ actor_id: user.id, action: "ADD_SOCIAL_LINK", target_table: "social_links", target_id: data.id, new_data: parsed.data });
-  revalidatePath("/super-admin/settings"); revalidatePath("/"); revalidatePath("/qr");
+  revalidatePath("/admin/settings"); revalidatePath("/"); revalidatePath("/qr");
   return { ok: true };
 }
 
 export async function setSocialLinkActive(id: string, active: boolean) {
-  const { user } = await requireRole(["super_admin"]);
+  const { user } = await requireRole(["admin"]);
   if (!z.string().uuid().safeParse(id).success) return { error: "Bad id" };
   await supabaseAdmin.from("social_links").update({ is_active: active }).eq("id", id);
   await audit({ actor_id: user.id, action: "TOGGLE_SOCIAL_LINK", target_table: "social_links", target_id: id, new_data: { active } });
-  revalidatePath("/super-admin/settings"); revalidatePath("/"); revalidatePath("/qr");
+  revalidatePath("/admin/settings"); revalidatePath("/"); revalidatePath("/qr");
   return { ok: true };
 }
 
 export async function deleteSocialLink(id: string) {
-  const { user } = await requireRole(["super_admin"]);
+  const { user } = await requireRole(["admin"]);
   if (!z.string().uuid().safeParse(id).success) return { error: "Bad id" };
   await supabaseAdmin.from("social_links").delete().eq("id", id);
   await audit({ actor_id: user.id, action: "DELETE_SOCIAL_LINK", target_table: "social_links", target_id: id });
-  revalidatePath("/super-admin/settings"); revalidatePath("/"); revalidatePath("/qr");
+  revalidatePath("/admin/settings"); revalidatePath("/"); revalidatePath("/qr");
   return { ok: true };
 }

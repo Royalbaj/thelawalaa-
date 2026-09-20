@@ -36,12 +36,12 @@ export default function MobileNav() {
     checkRole();
   }, []);
 
-  // Hide mobile nav entirely in admin/driver portals
-  if (pathname.startsWith("/admin") || pathname.startsWith("/super-admin") || pathname.startsWith("/pos") || pathname.startsWith("/delivery")) {
+  // Hide mobile nav entirely in staff-facing portals
+  if (pathname.startsWith("/admin") || pathname.startsWith("/pos") || pathname.startsWith("/delivery") || pathname.startsWith("/staff")) {
     return null;
   }
 
-  const isCustomer = role === "customer" || role === "super_admin";
+  const isCustomer = role === "customer" || role === "admin";
   const navItems = isCustomer ? CUSTOMER_NAV : PUBLIC_NAV;
   
   const active = navItems.find((item) => {

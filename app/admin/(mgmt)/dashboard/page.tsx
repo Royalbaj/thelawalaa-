@@ -8,8 +8,8 @@ import { Package, Wallet, Clock, Bell, Bike, XCircle, ClipboardList, UtensilsCro
 
 export const dynamic = "force-dynamic";
 
-export default async function AdminDashboard() {
-  await requireRole(["super_admin"]);
+export default async function DashboardPage() {
+  await requireRole(["admin"]);
   const today = startOfDay(new Date()).toISOString();
 
   const [{ data: todays }, { count: activeDeliveries }, { count: pendingCount }] = await Promise.all([
@@ -31,17 +31,17 @@ export default async function AdminDashboard() {
 
   const { data: recent } = await supabaseAdmin
     .from("orders")
-    .select("id, order_number, status, type, total, payment_status, payment_method, created_at")
+    .select("id, order_number, daily_number, status, type, total, payment_status, payment_method, created_at")
     .order("created_at", { ascending: false })
     .limit(30);
 
   const stats: { label: string; value: string; icon: typeof Package; iconBg: string; highlight?: boolean }[] = [
-    { label: "Today's Orders", value: String(todays?.length ?? 0), icon: Package, iconBg: "bg-indigo-100 text-indigo-600" },
-    { label: "Revenue (Confirmed)", value: npr(revenue), icon: Wallet, iconBg: "bg-emerald-100 text-emerald-600" },
+    { label: "Today's Orders", value: String(todays?.length ?? 0), icon: Package, iconBg: "bg-blue-100 text-blue-600" },
+    { label: "Revenue (Confirmed)", value: npr(revenue), icon: Wallet, iconBg: "bg-green-100 text-brand-green" },
     { label: "To Collect (Unpaid)", value: npr(toCollect), icon: Clock, iconBg: "bg-amber-100 text-amber-600", highlight: toCollect > 0 },
-    { label: "Pending Orders", value: String(pendingCount ?? 0), icon: Bell, iconBg: "bg-rose-100 text-rose-600", highlight: (pendingCount ?? 0) > 0 },
-    { label: "Active Deliveries", value: String(activeDeliveries ?? 0), icon: Bike, iconBg: "bg-violet-100 text-violet-600" },
-    { label: "Cancelled Today", value: String(cancelledToday), icon: XCircle, iconBg: "bg-slate-200 text-slate-600" },
+    { label: "Pending Orders", value: String(pendingCount ?? 0), icon: Bell, iconBg: "bg-red-100 text-brand-red", highlight: (pendingCount ?? 0) > 0 },
+    { label: "Active Deliveries", value: String(activeDeliveries ?? 0), icon: Bike, iconBg: "bg-purple-100 text-purple-600" },
+    { label: "Cancelled Today", value: String(cancelledToday), icon: XCircle, iconBg: "bg-stone-200 text-stone-600" },
   ];
 
   return (
@@ -51,26 +51,26 @@ export default async function AdminDashboard() {
         {stats.map((s) => (
           <div
             key={s.label}
-            className={`rounded-2xl bg-white p-5 shadow-sm border transition hover:shadow-md ${s.highlight ? "border-amber-300 ring-2 ring-amber-200/60" : "border-slate-200"}`}
+            className={`rounded-2xl bg-white p-5 shadow-sm border transition hover:shadow-md ${s.highlight ? "border-amber-300 ring-2 ring-amber-200/60" : "border-orange-100"}`}
           >
             <div className={`flex h-10 w-10 items-center justify-center rounded-xl ${s.iconBg}`}>
               <s.icon size={19} strokeWidth={2.3} />
             </div>
-            <p className="mt-3 text-xs font-bold uppercase tracking-wide text-slate-400">{s.label}</p>
-            <p className="mt-1 font-display text-2xl font-bold text-slate-900">{s.value}</p>
+            <p className="mt-3 text-xs font-bold uppercase tracking-wide text-stone-400">{s.label}</p>
+            <p className="mt-1 font-display text-2xl font-bold text-brand-brown">{s.value}</p>
           </div>
         ))}
       </div>
 
       {/* Quick Actions */}
       <div className="flex flex-wrap gap-3">
-        <Link href="/super-admin/orders" className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-violet-600 to-indigo-600 text-white px-4 py-2.5 text-sm font-bold shadow-lg shadow-violet-900/20 hover:brightness-110 transition">
+        <Link href="/admin/orders" className="inline-flex items-center gap-2 rounded-xl bg-brand-orange text-white px-4 py-2.5 text-sm font-bold shadow-warm hover:brightness-110 transition">
           <ClipboardList size={16} /> View All Orders
         </Link>
-        <Link href="/super-admin/menu" className="inline-flex items-center gap-2 rounded-xl bg-white text-slate-700 px-4 py-2.5 text-sm font-bold shadow-sm border border-slate-200 hover:bg-slate-50 transition">
+        <Link href="/admin/menu" className="inline-flex items-center gap-2 rounded-xl bg-white text-brand-brown px-4 py-2.5 text-sm font-bold shadow-sm border border-orange-100 hover:bg-orange-50 transition">
           <UtensilsCrossed size={16} /> Manage Menu
         </Link>
-        <Link href="/super-admin/announcements" className="inline-flex items-center gap-2 rounded-xl bg-white text-slate-700 px-4 py-2.5 text-sm font-bold shadow-sm border border-slate-200 hover:bg-slate-50 transition">
+        <Link href="/admin/announcements" className="inline-flex items-center gap-2 rounded-xl bg-white text-brand-brown px-4 py-2.5 text-sm font-bold shadow-sm border border-orange-100 hover:bg-orange-50 transition">
           <Megaphone size={16} /> Announcements
         </Link>
       </div>
@@ -78,11 +78,11 @@ export default async function AdminDashboard() {
       {/* Live Orders */}
       <div>
         <div className="flex items-center justify-between mb-4">
-          <h2 className="font-display text-lg font-bold text-slate-900 flex items-center gap-2">
-            <span className="inline-block h-2.5 w-2.5 rounded-full bg-emerald-500 animate-pulse" />
+          <h2 className="font-display text-lg font-bold text-brand-brown flex items-center gap-2">
+            <span className="inline-block h-2.5 w-2.5 rounded-full bg-brand-green animate-pulse" />
             Live Orders
           </h2>
-          <Link href="/super-admin/orders" className="text-sm font-bold text-violet-600 hover:underline">
+          <Link href="/admin/orders" className="text-sm font-bold text-brand-orange hover:underline">
             See all →
           </Link>
         </div>

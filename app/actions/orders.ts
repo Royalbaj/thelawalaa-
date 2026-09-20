@@ -44,7 +44,7 @@ export async function createOrder(input: unknown) {
   }
 
   const { user, profile } = await getVerifiedUser();
-  const isStaff = user && profile && ["admin", "super_admin", "pos_user"].includes(profile.role);
+  const isStaff = user && profile && ["admin", "pos_user"].includes(profile.role);
   const isSelfCheckout = user && profile && profile.role === "customer";
   const isAnonymous = !user;
 

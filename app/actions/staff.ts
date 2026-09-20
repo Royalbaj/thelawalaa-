@@ -11,7 +11,7 @@ import { supabaseAdmin, audit, awardOrderLoyaltyPoints } from "@/lib/supabase/ad
  * can trust it. A self-registering customer can never reach this path.
  */
 export async function inviteStaff(input: unknown) {
-  const { user } = await requireRole(["super_admin", "admin"]);
+  const { user } = await requireRole(["admin"]);
   const parsed = inviteStaffSchema.safeParse(input);
   if (!parsed.success) return { error: "Check the form fields" };
   const d = parsed.data;
@@ -61,7 +61,7 @@ export async function inviteStaff(input: unknown) {
 }
 
 export async function setUserActive(targetId: string, active: boolean) {
-  const { user } = await requireRole(["super_admin", "admin"]);
+  const { user } = await requireRole(["admin"]);
   if (targetId === user.id) return { error: "You can't suspend your own account" };
 
   const { data: old } = await supabaseAdmin.from("profiles").select("is_active, role").eq("id", targetId).single();
@@ -83,7 +83,7 @@ export async function setUserActive(targetId: string, active: boolean) {
 }
 
 export async function changeUserRole(targetId: string, role: string, branchId?: string) {
-  const { user } = await requireRole(["super_admin", "admin"]);
+  const { user } = await requireRole(["admin"]);
   if (!["customer", "pos_user", "delivery_driver", "admin"].includes(role)) {
     return { error: "That role can't be assigned here" }; 
   }
@@ -112,7 +112,7 @@ const ALLOWED_STATUSES = [
 ];
 
 export async function adminUpdateOrderStatus(orderId: string, status: string) {
-  const { user } = await requireRole(["admin", "pos_user", "super_admin"]);
+  const { user } = await requireRole(["admin", "pos_user"]);
   if (!ALLOWED_STATUSES.includes(status)) return { error: "Invalid status" };
   await supabaseAdmin.from("orders").update({ status }).eq("id", orderId);
   await audit({ actor_id: user.id, action: "UPDATE_ORDER_STATUS", target_table: "orders", target_id: orderId, new_data: { status } });
@@ -121,7 +121,7 @@ export async function adminUpdateOrderStatus(orderId: string, status: string) {
 }
 
 export async function assignDriver(orderId: string, driverId: string) {
-  const { user } = await requireRole(["super_admin", "admin", "pos_user"]);
+  const { user } = await requireRole(["admin", "pos_user"]);
   const { data: driver } = await supabaseAdmin
     .from("profiles")
     .select("id, role, is_active, full_name")
@@ -144,7 +144,7 @@ export async function assignDriver(orderId: string, driverId: string) {
 // payment_status NEVER changes from any client path — only an admin
 // can flip it here, and every change is audit-logged with who/when.
 export async function markOrderPaid(orderId: string) {
-  const { user } = await requireRole(["super_admin", "admin", "pos_user"]);
+  const { user } = await requireRole(["admin", "pos_user"]);
   const { data: order } = await supabaseAdmin
     .from("orders")
     .select("id, total, payment_status, status, order_number, customer_id")
@@ -177,7 +177,7 @@ export async function markOrderPaid(orderId: string) {
 
 /** Undo an accidental confirmation — admin only, audited. */
 export async function markOrderUnpaid(orderId: string) {
-  const { user } = await requireRole(["super_admin", "admin", "pos_user"]);
+  const { user } = await requireRole(["admin", "pos_user"]);
   await supabaseAdmin
     .from("orders")
     .update({ payment_status: "pending", paid_confirmed_by: null, paid_confirmed_at: null })

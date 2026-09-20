@@ -7,16 +7,23 @@ import { NextResponse, type NextRequest } from "next/server";
 // URL = the capability). Access to the actual row is still enforced by
 // orders RLS, not by this middleware.
 const ROLE_ROUTES: [string, string[]][] = [
-  ["/super-admin", ["super_admin"]],
-  ["/admin", ["super_admin", "admin", "pos_user"]],
-  ["/pos", ["super_admin", "admin", "pos_user"]],
-  ["/delivery", ["super_admin", "delivery_driver"]],
-  ["/staff", ["super_admin", "admin", "pos_user", "delivery_driver"]],
-  ["/account", ["super_admin", "admin", "pos_user", "delivery_driver", "customer"]],
+  ["/admin", ["admin", "pos_user"]],
+  ["/pos", ["admin", "pos_user"]],
+  ["/delivery", ["admin", "delivery_driver"]],
+  ["/staff", ["admin", "pos_user", "delivery_driver"]],
+  ["/account", ["admin", "pos_user", "delivery_driver", "customer"]],
 ];
 
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
+
+  // Super Admin and Admin are one tier now — keep old /super-admin links working.
+  if (pathname === "/super-admin" || pathname.startsWith("/super-admin/")) {
+    const target = new URL(pathname.replace(/^\/super-admin/, "/admin") || "/admin", request.url);
+    target.search = request.nextUrl.search;
+    return NextResponse.redirect(target);
+  }
+
   const response = NextResponse.next({ request: { headers: request.headers } });
 
   const supabase = createServerClient(
@@ -71,3 +78,4 @@ export const config = {
     "/account/:path*", "/order/:path*", "/track/:path*",
   ],
 };
+

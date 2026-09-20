@@ -3,6 +3,7 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import toast from "react-hot-toast";
+import { Gift } from "lucide-react";
 import { createOffer, setOfferActive, deleteOffer } from "@/app/actions/offers";
 
 interface Offer {
@@ -36,12 +37,12 @@ export default function OfferControls({ offers }: { offers: Offer[] }) {
 
   return (
     <div className="space-y-4">
-      <button onClick={() => setShowForm(!showForm)} className="rounded-xl bg-amber-500 text-white px-4 py-2.5 text-sm font-bold hover:brightness-110 transition">
+      <button onClick={() => setShowForm(!showForm)} className="rounded-xl bg-brand-orange text-white px-4 py-2.5 text-sm font-bold hover:brightness-110 transition">
         {showForm ? "Cancel" : "+ Create New Offer"}
       </button>
 
       {showForm && (
-        <form onSubmit={handleSubmit} className="rounded-2xl bg-white border border-stone-200 p-5 space-y-3">
+        <form onSubmit={handleSubmit} className="rounded-2xl bg-white border border-orange-100 p-5 space-y-3">
           <div>
             <label className="label">Title *</label>
             <input name="title" required className="input" placeholder="e.g. Buy 1 Get 1 Free Chatpate!" />
@@ -86,7 +87,7 @@ export default function OfferControls({ offers }: { offers: Offer[] }) {
       {/* Offers List */}
       <div className="space-y-3">
         {offers.map((o) => (
-          <div key={o.id} className={`rounded-2xl border p-4 flex items-center justify-between ${o.is_active ? "bg-white border-stone-200" : "bg-stone-50 border-stone-100 opacity-60"}`}>
+          <div key={o.id} className={`rounded-2xl border p-4 flex items-center justify-between ${o.is_active ? "bg-white border-orange-100" : "bg-stone-50 border-stone-100 opacity-60"}`}>
             <div>
               <div className="flex items-center gap-2">
                 <p className="font-bold text-brand-brown">{o.title}</p>
@@ -117,9 +118,9 @@ export default function OfferControls({ offers }: { offers: Offer[] }) {
           </div>
         ))}
         {offers.length === 0 && (
-          <div className="rounded-2xl bg-white border border-stone-200 p-8 text-center">
-            <p className="text-3xl mb-2">🎁</p>
-            <p className="text-sm font-bold text-stone-500">No offers yet</p>
+          <div className="rounded-2xl bg-white border border-orange-100 p-8 text-center">
+            <Gift size={28} className="mx-auto text-stone-300" />
+            <p className="mt-2 text-sm font-bold text-stone-500">No offers yet</p>
             <p className="text-xs text-stone-400 mt-1">Create your first offer to attract customers!</p>
           </div>
         )}

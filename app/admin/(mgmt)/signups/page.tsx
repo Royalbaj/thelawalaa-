@@ -11,7 +11,7 @@ const SOURCE_LABEL: Record<string, string> = {
 };
 
 export default async function SignupsPage({ searchParams }: { searchParams: { q?: string; source?: string } }) {
-  await requireRole(["super_admin"]);
+  await requireRole(["admin"]);
   const q = (searchParams.q ?? "").slice(0, 60);
   const source = searchParams.source ?? "all";
 
@@ -33,35 +33,35 @@ export default async function SignupsPage({ searchParams }: { searchParams: { q?
   return (
     <div className="space-y-6">
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
-        <div className="rounded-2xl bg-white p-5 shadow-sm border border-slate-200">
-          <p className="text-xs font-bold uppercase tracking-wide text-slate-400">Total Customers</p>
-          <p className="mt-1 font-display text-2xl font-bold text-slate-900">{totalCustomers ?? 0}</p>
+        <div className="rounded-2xl bg-white p-5 shadow-sm border border-orange-100">
+          <p className="text-xs font-bold uppercase tracking-wide text-stone-400">Total Customers</p>
+          <p className="mt-1 font-display text-2xl font-bold text-brand-brown">{totalCustomers ?? 0}</p>
         </div>
-        <div className="rounded-2xl bg-white p-5 shadow-sm border border-slate-200">
-          <p className="text-xs font-bold uppercase tracking-wide text-slate-400">Via QR Poster</p>
-          <p className="mt-1 font-display text-2xl font-bold text-slate-900">{qrCustomers ?? 0}</p>
+        <div className="rounded-2xl bg-white p-5 shadow-sm border border-orange-100">
+          <p className="text-xs font-bold uppercase tracking-wide text-stone-400">Via QR Poster</p>
+          <p className="mt-1 font-display text-2xl font-bold text-brand-brown">{qrCustomers ?? 0}</p>
         </div>
       </div>
 
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <form action="/super-admin/signups" className="flex gap-2">
+        <form action="/admin/signups" className="flex gap-2">
           <input type="hidden" name="source" value={source} />
           <input name="q" defaultValue={q} placeholder="Search by name…" className="input !w-56" />
         </form>
         <div className="flex gap-2">
           {(["all", "web", "qr_poster"] as const).map((s) => (
-            <a key={s} href={`/super-admin/signups?source=${s}${q ? `&q=${encodeURIComponent(q)}` : ""}`}
-              className={`rounded-full px-4 py-1.5 text-sm font-bold transition ${source === s ? "bg-violet-600 text-white" : "bg-white text-slate-600 border border-slate-200 hover:bg-violet-50"}`}>
+            <a key={s} href={`/admin/signups?source=${s}${q ? `&q=${encodeURIComponent(q)}` : ""}`}
+              className={`rounded-full px-4 py-1.5 text-sm font-bold transition ${source === s ? "bg-brand-orange text-white" : "bg-white text-stone-600 border border-orange-100 hover:bg-orange-50"}`}>
               {s === "all" ? "All" : SOURCE_LABEL[s]}
             </a>
           ))}
         </div>
       </div>
 
-      <div className="rounded-2xl bg-white shadow-sm border border-slate-200 overflow-x-auto">
+      <div className="rounded-2xl bg-white shadow-sm border border-orange-100 overflow-x-auto">
         <table className="w-full text-sm">
           <thead>
-            <tr className="border-b border-slate-100 text-left text-xs uppercase text-slate-400 bg-slate-50/50">
+            <tr className="border-b border-orange-100 text-left text-xs uppercase text-stone-400 bg-orange-50/50">
               <th className="px-4 py-3.5 font-bold">Name</th>
               <th className="px-4 py-3.5 font-bold">Phone</th>
               <th className="px-4 py-3.5 font-bold">Source</th>
@@ -72,15 +72,15 @@ export default async function SignupsPage({ searchParams }: { searchParams: { q?
           </thead>
           <tbody>
             {(customers ?? []).map((c) => (
-              <tr key={c.id} className="border-b border-slate-100 last:border-0 hover:bg-slate-50/50 transition-colors">
-                <td className="px-4 py-3.5 font-medium text-slate-900">{c.full_name}</td>
-                <td className="px-4 py-3.5 text-slate-500">{c.phone ?? "—"}</td>
+              <tr key={c.id} className="border-b border-orange-50 last:border-0 hover:bg-orange-50/40 transition-colors">
+                <td className="px-4 py-3.5 font-medium text-brand-brown">{c.full_name}</td>
+                <td className="px-4 py-3.5 text-stone-500">{c.phone ?? "—"}</td>
                 <td className="px-4 py-3.5">
-                  <span className={`badge ${c.signup_source === "qr_poster" ? "bg-violet-100 text-violet-700" : "bg-slate-100 text-slate-600"}`}>
+                  <span className={`badge ${c.signup_source === "qr_poster" ? "bg-orange-100 text-brand-orange" : "bg-stone-100 text-stone-600"}`}>
                     {SOURCE_LABEL[c.signup_source] ?? c.signup_source}
                   </span>
                 </td>
-                <td className="px-4 py-3.5 text-slate-500 text-xs">{format(new Date(c.created_at), "d MMM yyyy")}</td>
+                <td className="px-4 py-3.5 text-stone-500 text-xs">{format(new Date(c.created_at), "d MMM yyyy")}</td>
                 <td className="px-4 py-3.5">
                   {c.is_active ? <span className="badge bg-green-100 text-green-800">Active</span> : <span className="badge bg-red-100 text-red-800">Suspended</span>}
                 </td>
@@ -88,7 +88,7 @@ export default async function SignupsPage({ searchParams }: { searchParams: { q?
               </tr>
             ))}
             {(customers ?? []).length === 0 && (
-              <tr><td colSpan={6} className="px-4 py-12 text-center text-slate-500">No signups found.</td></tr>
+              <tr><td colSpan={6} className="px-4 py-12 text-center text-stone-500">No signups found.</td></tr>
             )}
           </tbody>
         </table>
