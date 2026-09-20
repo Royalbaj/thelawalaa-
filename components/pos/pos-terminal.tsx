@@ -40,8 +40,8 @@ export default function PosTerminal({
       p.name.toLowerCase().includes(q.toLowerCase())),
     [products, cat, q]
   );
-  const subtotal = cart.reduce((s, l) => s + priceOf(l.product) * l.qty, 0);
-  const itemCount = cart.reduce((s, l) => s + l.qty, 0);
+  const subtotal = useMemo(() => cart.reduce((s, l) => s + priceOf(l.product) * l.qty, 0), [cart, openingPromo]);
+  const itemCount = useMemo(() => cart.reduce((s, l) => s + l.qty, 0), [cart]);
   const received = Number(cashReceived) || 0;
   const change = method === "cash" && received > subtotal ? received - subtotal : 0;
 
@@ -77,11 +77,11 @@ export default function PosTerminal({
         <p className="font-display font-bold text-brand-brown lg:hidden">Cart</p>
         <div className="flex items-center gap-3 lg:hidden">
           {cart.length > 0 && (
-            <button onClick={clearCart} className="flex items-center gap-1 text-xs font-bold text-brand-red">
+            <button onClick={clearCart} className="flex touch-manipulation items-center gap-1 p-1 text-xs font-bold text-brand-red">
               <Trash2 size={13} /> Clear
             </button>
           )}
-          <button onClick={() => setCartOpen(false)} className="rounded-full bg-orange-50 p-1.5"><X size={18} /></button>
+          <button onClick={() => setCartOpen(false)} className="touch-manipulation rounded-full bg-orange-50 p-2"><X size={18} /></button>
         </div>
       </div>
       <div className="flex-1 overflow-y-auto p-4">
@@ -96,10 +96,10 @@ export default function PosTerminal({
               </p>
             </div>
             <div className="flex items-center gap-1.5">
-              <button onClick={() => bump(l.product.id, -1)} className="h-9 w-9 shrink-0 rounded-full bg-orange-50 text-lg font-bold active:scale-90 transition">−</button>
+              <button onClick={() => bump(l.product.id, -1)} className="h-11 w-11 shrink-0 touch-manipulation rounded-full bg-orange-50 text-lg font-bold active:scale-90 transition">−</button>
               <span className="w-6 text-center font-bold">{l.qty}</span>
-              <button onClick={() => bump(l.product.id, 1)} className="h-9 w-9 shrink-0 rounded-full bg-orange-50 text-lg font-bold active:scale-90 transition">+</button>
-              <button onClick={() => removeLine(l.product.id)} className="ml-1 h-9 w-9 shrink-0 rounded-full text-stone-400 hover:bg-red-50 hover:text-brand-red transition flex items-center justify-center">
+              <button onClick={() => bump(l.product.id, 1)} className="h-11 w-11 shrink-0 touch-manipulation rounded-full bg-orange-50 text-lg font-bold active:scale-90 transition">+</button>
+              <button onClick={() => removeLine(l.product.id)} className="ml-1 h-11 w-11 shrink-0 touch-manipulation rounded-full text-stone-400 hover:bg-red-50 hover:text-brand-red transition flex items-center justify-center">
                 <Trash2 size={15} />
               </button>
             </div>
@@ -110,7 +110,7 @@ export default function PosTerminal({
         <div className="flex gap-2">
           {(["dine_in", "pickup"] as const).map((t) => (
             <button key={t} onClick={() => setType(t)}
-              className={cn("flex-1 rounded-xl py-2.5 text-sm font-bold capitalize",
+              className={cn("flex-1 touch-manipulation rounded-xl py-3 text-sm font-bold capitalize",
                 type === t ? "bg-brand-orange text-white" : "bg-orange-50 text-stone-600")}>
               {t.replace("_", "-")}
             </button>
@@ -125,7 +125,7 @@ export default function PosTerminal({
         <div className="flex gap-2">
           {([["cash", "Cash"], ["qr", "QR"], ["card", "Card"]] as const).map(([v, label]) => (
             <button key={v} onClick={() => setMethod(v)}
-              className={cn("flex-1 rounded-xl py-2.5 text-sm font-bold",
+              className={cn("flex-1 touch-manipulation rounded-xl py-3 text-sm font-bold",
                 method === v ? "bg-brand-green text-white" : "bg-orange-50 text-stone-600")}>
               {label}
             </button>
@@ -146,7 +146,7 @@ export default function PosTerminal({
           <span>Total ({itemCount})</span><span>{npr(subtotal)}</span>
         </div>
         <button onClick={placeOrder} disabled={pending || cart.length === 0}
-          className="btn-primary w-full !py-3.5 text-base disabled:opacity-50">
+          className="btn-primary w-full touch-manipulation !py-4 text-base disabled:opacity-50">
           {pending ? "Placing…" : "Place order"}
         </button>
       </div>
@@ -164,19 +164,19 @@ export default function PosTerminal({
           </div>
           {[{ id: "all", name: "All" }, ...categories].map((c) => (
             <button key={c.id} onClick={() => setCat(c.id)}
-              className={cn("shrink-0 rounded-full px-4 py-1.5 text-sm font-bold",
+              className={cn("shrink-0 touch-manipulation rounded-full px-4 py-2 text-sm font-bold",
                 cat === c.id ? "bg-brand-orange text-white" : "bg-orange-50 text-stone-600")}>
               {c.name}
             </button>
           ))}
         </div>
-        <div className="grid flex-1 auto-rows-min grid-cols-2 gap-3 overflow-y-auto bg-brand-cream p-4 pb-24 sm:grid-cols-3 xl:grid-cols-4 lg:pb-4">
+        <div className="grid flex-1 auto-rows-min grid-cols-2 gap-3 overflow-y-auto bg-brand-cream p-4 pb-24 sm:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 lg:pb-4">
           {visible.map((p) => {
             const inCart = cart.find((l) => l.product.id === p.id);
             return (
               <button key={p.id} onClick={() => add(p)} disabled={!p.is_available}
-                className={cn("card relative overflow-hidden text-left transition-transform",
-                  p.is_available ? "hover:scale-[1.02] active:scale-95" : "opacity-40",
+                className={cn("card relative touch-manipulation overflow-hidden text-left transition-transform",
+                  p.is_available ? "active:scale-95" : "opacity-40",
                   inCart && "ring-2 ring-brand-orange")}>
                 {p.image_url ? (
                   <div className="relative h-20 w-full">
@@ -218,7 +218,7 @@ export default function PosTerminal({
       {cart.length > 0 && !cartOpen && (
         <button
           onClick={() => setCartOpen(true)}
-          className="absolute inset-x-3 bottom-3 z-30 flex items-center justify-between rounded-2xl bg-brand-orange px-5 py-3.5 text-white shadow-lg shadow-orange-900/30 lg:hidden"
+          className="absolute inset-x-3 bottom-3 z-30 flex touch-manipulation items-center justify-between rounded-2xl bg-brand-orange px-5 py-3.5 text-white shadow-lg shadow-orange-900/30 lg:hidden"
         >
           <span className="flex items-center gap-2 font-bold"><ShoppingCart size={18} /> {itemCount} item{itemCount > 1 ? "s" : ""}</span>
           <span className="flex items-center gap-1.5 font-display font-bold">{npr(subtotal)} <ChevronUp size={18} /></span>
@@ -248,8 +248,8 @@ export default function PosTerminal({
             <p className="mt-1 font-mono text-sm text-stone-500">{done.orderNumber}</p>
             <p className="mt-1 font-bold">{npr(done.total)} · paid</p>
             <div className="mt-4 flex gap-2 print:hidden">
-              <button onClick={() => window.print()} className="btn-outline flex-1 !border-stone-300 !text-brand-brown hover:!bg-stone-100">Print</button>
-              <button onClick={() => setDone(null)} className="btn-primary flex-1">New order</button>
+              <button onClick={() => window.print()} className="btn-outline flex-1 touch-manipulation !border-stone-300 !text-brand-brown hover:!bg-stone-100">Print</button>
+              <button onClick={() => setDone(null)} className="btn-primary flex-1 touch-manipulation">New order</button>
             </div>
           </div>
         </div>

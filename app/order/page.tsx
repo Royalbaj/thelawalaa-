@@ -69,11 +69,10 @@ export default function OrderPage() {
     supabase.auth.getUser().then(async ({ data }) => {
       setIsGuest(!data.user);
       if (data.user) {
-        const { data: profile } = await supabase.from("profiles").select("full_name, phone").eq("id", data.user.id).single();
-        if (profile) {
-          setGuestName(profile.full_name || "");
-          setGuestPhone(profile.phone || "");
-        }
+        // Contact name is left blank on purpose — the account holder often
+        // isn't who's actually picking up or receiving the order.
+        const { data: profile } = await supabase.from("profiles").select("phone").eq("id", data.user.id).single();
+        if (profile) setGuestPhone(profile.phone || "");
         supabase.from("customer_favorites").select("product_id").eq("customer_id", data.user.id).then((res) => {
           setFavorites(res.data?.map(f => f.product_id) ?? []);
         });
@@ -90,6 +89,8 @@ export default function OrderPage() {
       setCategories((c.data as Category[]) ?? []);
       setBranches((b.data as Branch[]) ?? []);
       setAddresses((a.data as Address[]) ?? []);
+      // Default to the customer's saved address instead of an empty "new address" box.
+      if (a.data && a.data.length > 0) setAddressId(a.data[0].id);
       if (s.data) { setSettings(s.data); setOpeningPromo(s.data); }
       setMenuLoading(false);
     });

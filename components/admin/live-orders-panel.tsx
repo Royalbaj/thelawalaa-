@@ -128,7 +128,7 @@ export default function LiveOrdersPanel({ initialOrders, drivers }: { initialOrd
         </div>
         <div className="flex gap-1">
           {["active", "pending", "preparing", "ready", "all"].map((f) => (
-            <button key={f} onClick={() => setFilter(f)} className={cn("rounded-full px-2.5 py-1 text-[10px] font-bold capitalize transition", filter === f ? "bg-brand-orange text-white" : "bg-stone-100 text-stone-500")}>{f}</button>
+            <button key={f} onClick={() => setFilter(f)} className={cn("touch-manipulation rounded-full px-2.5 py-1.5 text-[10px] font-bold capitalize transition", filter === f ? "bg-brand-orange text-white" : "bg-stone-100 text-stone-500")}>{f}</button>
           ))}
         </div>
       </div>
@@ -142,7 +142,7 @@ export default function LiveOrdersPanel({ initialOrders, drivers }: { initialOrd
           </div>
         )}
         {filtered.map((o) => (
-          <div key={o.id} className={cn("rounded-xl border p-3 transition-all cursor-pointer", o.status === "pending" ? "border-amber-300 bg-amber-50/50 ring-1 ring-amber-200" : "border-stone-100 hover:border-stone-200")} onClick={() => setExpandedId(expandedId === o.id ? null : o.id)}>
+          <div key={o.id} className={cn("touch-manipulation rounded-xl border p-3 transition-all cursor-pointer", o.status === "pending" ? "border-amber-300 bg-amber-50/50 ring-1 ring-amber-200" : "border-stone-100 hover:border-stone-200")} onClick={() => setExpandedId(expandedId === o.id ? null : o.id)}>
             <div className="flex items-center justify-between gap-2">
               <div>
                 <span className="font-mono text-xs font-bold text-brand-brown">{o.order_number}</span>
@@ -176,18 +176,18 @@ export default function LiveOrdersPanel({ initialOrders, drivers }: { initialOrd
                 )}
                 <div className="flex flex-wrap gap-1.5">
                   {NEXT_STATUS[o.status] && (
-                    <button onClick={() => advanceStatus(o)} className="rounded-lg bg-brand-orange text-white px-3 py-1.5 text-[11px] font-bold hover:brightness-110 transition">
+                    <button onClick={() => advanceStatus(o)} className="touch-manipulation rounded-lg bg-brand-orange text-white px-3 py-2 text-[11px] font-bold hover:brightness-110 transition">
                       → {NEXT_STATUS[o.status].replace(/_/g, " ")}
                     </button>
                   )}
                   {o.payment_status !== "paid" && (
-                    <button onClick={() => handleMarkPaid(o.id)} className="rounded-lg bg-green-600 text-white px-3 py-1.5 text-[11px] font-bold hover:brightness-110 transition">
-                      💵 Mark Paid
+                    <button onClick={() => handleMarkPaid(o.id)} className="touch-manipulation rounded-lg bg-green-600 text-white px-3 py-2 text-[11px] font-bold hover:brightness-110 transition">
+                      Mark Paid
                     </button>
                   )}
                   {o.status === "cancelled" ? null : (
-                    <button onClick={() => { adminUpdateOrderStatus(o.id, "cancelled"); toast.success("Cancelled"); }} className="rounded-lg bg-red-100 text-red-600 px-3 py-1.5 text-[11px] font-bold hover:bg-red-200 transition">
-                      ✕ Cancel
+                    <button onClick={() => { adminUpdateOrderStatus(o.id, "cancelled"); toast.success("Cancelled"); }} className="touch-manipulation rounded-lg bg-red-100 text-red-600 px-3 py-2 text-[11px] font-bold hover:bg-red-200 transition">
+                      Cancel
                     </button>
                   )}
                 </div>
@@ -198,8 +198,8 @@ export default function LiveOrdersPanel({ initialOrders, drivers }: { initialOrd
                     <p className="text-[10px] font-bold text-stone-500 mb-1">Assign Driver:</p>
                     <div className="flex flex-wrap gap-1">
                       {drivers.filter((d) => d.is_online).map((d) => (
-                        <button key={d.id} onClick={() => handleAssignDriver(o.id, d.id)} className="rounded-lg bg-cyan-50 text-cyan-700 px-2.5 py-1 text-[10px] font-bold hover:bg-cyan-100 transition border border-cyan-200">
-                          🛵 {d.full_name}
+                        <button key={d.id} onClick={() => handleAssignDriver(o.id, d.id)} className="touch-manipulation rounded-lg bg-cyan-50 text-cyan-700 px-2.5 py-1.5 text-[10px] font-bold hover:bg-cyan-100 transition border border-cyan-200">
+                          {d.full_name}
                         </button>
                       ))}
                       {drivers.filter((d) => d.is_online).length === 0 && (
