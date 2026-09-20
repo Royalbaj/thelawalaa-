@@ -60,7 +60,7 @@ export async function createPosOrder(input: unknown) {
       total: subtotal,
       payment_method: d.payment_method,
       payment_status: "paid", // POS = paid at counter
-      notes: d.customer_name ? `[POS Order]\nName: ${d.customer_name}` : null,
+      notes: d.customer_name ? `[POS Order]\nName: ${d.customer_name}\nPhone: ${d.customer_phone || "N/A"}` : null,
     })
     .select("id, order_number, daily_number, total")
     .single();

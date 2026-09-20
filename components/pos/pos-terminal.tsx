@@ -4,12 +4,15 @@ import toast from "react-hot-toast";
 import { Search, X, Trash2, ShoppingCart, ChevronUp, UtensilsCrossed, CheckCircle2 } from "lucide-react";
 import { createPosOrder } from "@/app/actions/pos";
 import { npr, cn } from "@/lib/utils";
+import { applyOpeningPromoPrice, isOpeningPromoActive, type OpeningPromoSettings } from "@/lib/promo";
 
 type Product = { id: string; name: string; price: number; is_available: boolean; category_id: string | null; image_url?: string | null };
 type Category = { id: string; name: string };
 type Line = { product: Product; qty: number };
 
-export default function PosTerminal({ products, categories }: { products: Product[]; categories: Category[] }) {
+export default function PosTerminal({
+  products, categories, openingPromo,
+}: { products: Product[]; categories: Category[]; openingPromo?: OpeningPromoSettings | null }) {
   const [cat, setCat] = useState<string>("all");
   const [q, setQ] = useState("");
   const [cart, setCart] = useState<Line[]>([]);
@@ -22,13 +25,21 @@ export default function PosTerminal({ products, categories }: { products: Produc
   const [done, setDone] = useState<{ orderNumber: string; dailyNumber: number | null; total: number } | null>(null);
   const [pending, start] = useTransition();
 
+  const promoActive = isOpeningPromoActive(openingPromo);
+  const categoryName = useMemo(() => {
+    const m = new Map(categories.map((c) => [c.id, c.name]));
+    return (p: Product) => m.get(p.category_id ?? "") ?? null;
+  }, [categories]);
+  const priceOf = (p: Product) => applyOpeningPromoPrice(Number(p.price), categoryName(p), openingPromo);
+  const isDiscounted = (p: Product) => promoActive && priceOf(p) !== Number(p.price);
+
   const visible = useMemo(
     () => products.filter((p) =>
       (cat === "all" || p.category_id === cat) &&
       p.name.toLowerCase().includes(q.toLowerCase())),
     [products, cat, q]
   );
-  const subtotal = cart.reduce((s, l) => s + Number(l.product.price) * l.qty, 0);
+  const subtotal = cart.reduce((s, l) => s + priceOf(l.product) * l.qty, 0);
   const itemCount = cart.reduce((s, l) => s + l.qty, 0);
   const received = Number(cashReceived) || 0;
   const change = method === "cash" && received > subtotal ? received - subtotal : 0;
@@ -78,7 +89,10 @@ export default function PosTerminal({ products, categories }: { products: Produc
           <div key={l.product.id} className="mb-3 flex items-center justify-between gap-2">
             <div className="min-w-0 flex-1">
               <p className="truncate text-sm font-bold">{l.product.name}</p>
-              <p className="text-xs text-stone-500">{npr(Number(l.product.price) * l.qty)}</p>
+              <p className="text-xs text-stone-500">
+                {npr(priceOf(l.product) * l.qty)}
+                {isDiscounted(l.product) && <span className="ml-1 font-bold text-brand-green">Opening offer</span>}
+              </p>
             </div>
             <div className="flex items-center gap-1.5">
               <button onClick={() => bump(l.product.id, -1)} className="h-9 w-9 shrink-0 rounded-full bg-orange-50 text-lg font-bold active:scale-90 transition">−</button>
@@ -168,9 +182,19 @@ export default function PosTerminal({ products, categories }: { products: Produc
                 ) : (
                   <div className="flex h-20 w-full items-center justify-center bg-brand-cream text-stone-300"><UtensilsCrossed size={24} /></div>
                 )}
+                {isDiscounted(p) && (
+                  <span className="absolute left-2 top-2 rounded-full bg-brand-green px-2 py-0.5 text-[10px] font-bold text-white shadow">Opening offer</span>
+                )}
                 <div className="p-3">
                   <p className="font-bold leading-tight pr-6">{p.name}</p>
-                  <p className="mt-1 font-display text-brand-orange">{npr(Number(p.price))}</p>
+                  {isDiscounted(p) ? (
+                    <p className="mt-1 flex items-center gap-1.5 font-display">
+                      <span className="text-brand-orange">{npr(priceOf(p))}</span>
+                      <span className="text-xs font-normal text-stone-400 line-through">{npr(Number(p.price))}</span>
+                    </p>
+                  ) : (
+                    <p className="mt-1 font-display text-brand-orange">{npr(Number(p.price))}</p>
+                  )}
                   {!p.is_available && <p className="text-xs font-bold text-brand-red">Sold out</p>}
                 </div>
                 {inCart && (

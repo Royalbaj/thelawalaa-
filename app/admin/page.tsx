@@ -9,7 +9,7 @@ export const dynamic = "force-dynamic";
 export default async function AdminDashboard() {
   await requireRole(["super_admin", "admin", "pos_user"]);
 
-  const [{ data: products }, { data: categories }, { data: recentOrders }, { data: drivers }] = await Promise.all([
+  const [{ data: products }, { data: categories }, { data: recentOrders }, { data: drivers }, { data: settings }] = await Promise.all([
     supabaseAdmin
       .from("products")
       .select("id, name, price, image_url, category_id, is_available, is_veg")
@@ -26,6 +26,11 @@ export default async function AdminDashboard() {
       .select("id, full_name, is_online")
       .eq("role", "delivery_driver")
       .eq("is_active", true),
+    supabaseAdmin
+      .from("app_settings")
+      .select("opening_promo_enabled, opening_promo_momo_price, opening_promo_starts_at, opening_promo_ends_at")
+      .eq("id", 1)
+      .single(),
   ]);
 
   return (
@@ -35,6 +40,7 @@ export default async function AdminDashboard() {
         <PosTerminal
           products={(products ?? []) as any}
           categories={(categories ?? []) as any}
+          openingPromo={settings ?? null}
         />
       </div>
 
