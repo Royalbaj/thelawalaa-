@@ -7,7 +7,7 @@ import ResetSalesData from "@/components/admin/reset-sales-data";
 export const dynamic = "force-dynamic";
 
 export default async function SettingsPage() {
-  await requireRole(["admin"]);
+  await requireRole(["super_admin"]);
   const [{ data: branches }, { data: promos }, { data: settings }, { data: socialLinks }] = await Promise.all([
     supabaseAdmin.from("branches").select("id, name, address, phone, is_active").order("name"),
     supabaseAdmin.from("promo_codes")

@@ -22,7 +22,7 @@ function LoginForm() {
     if (error || !data.user) { setBusy(false); return toast.error("Wrong email or password"); }
 
     const { data: profile } = await supabase.from("profiles").select("role, is_active").eq("id", data.user.id).single();
-    if (!profile?.is_active || !["admin", "accountant"].includes(profile.role)) {
+    if (!profile?.is_active || !["super_admin", "accountant"].includes(profile.role)) {
       await supabase.auth.signOut();
       setBusy(false);
       return toast.error("This account can't access Accounts");

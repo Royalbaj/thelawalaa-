@@ -15,7 +15,7 @@ const offerSchema = z.object({
 });
 
 export async function createOffer(input: unknown) {
-  const { user } = await requireRole(["admin"]);
+  const { user } = await requireRole(["super_admin"]);
   const parsed = offerSchema.safeParse(input);
   if (!parsed.success) return { error: "Check the offer fields" };
 
@@ -36,7 +36,7 @@ export async function createOffer(input: unknown) {
 }
 
 export async function setOfferActive(id: string, active: boolean) {
-  const { user } = await requireRole(["admin"]);
+  const { user } = await requireRole(["super_admin"]);
   if (!z.string().uuid().safeParse(id).success) return { error: "Bad id" };
   await supabaseAdmin.from("offers").update({ is_active: active }).eq("id", id);
   await audit({ actor_id: user.id, action: "TOGGLE_OFFER", target_table: "offers", target_id: id, new_data: { active } });
@@ -45,7 +45,7 @@ export async function setOfferActive(id: string, active: boolean) {
 }
 
 export async function deleteOffer(id: string) {
-  const { user } = await requireRole(["admin"]);
+  const { user } = await requireRole(["super_admin"]);
   if (!z.string().uuid().safeParse(id).success) return { error: "Bad id" };
   await supabaseAdmin.from("offers").delete().eq("id", id);
   await audit({ actor_id: user.id, action: "DELETE_OFFER", target_table: "offers", target_id: id });

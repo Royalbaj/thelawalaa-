@@ -7,7 +7,7 @@ import AssignDriver from "@/components/admin/assign-driver";
 export const dynamic = "force-dynamic";
 
 export default async function DeliveryPage() {
-  await requireRole(["admin"]);
+  await requireRole(["super_admin"]);
 
   const [{ data: drivers }, { data: unassigned }, { data: active }] = await Promise.all([
     supabaseAdmin.from("profiles")

@@ -6,7 +6,7 @@ import { npr } from "@/lib/utils";
 export const dynamic = "force-dynamic";
 
 export default async function ReportsPage() {
-  await requireRole(["admin"]);
+  await requireRole(["super_admin"]);
   const since = startOfDay(subDays(new Date(), 29)).toISOString();
 
   const [{ data: orders }, { data: items }] = await Promise.all([

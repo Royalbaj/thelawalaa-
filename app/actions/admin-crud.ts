@@ -17,7 +17,7 @@ const productSchema = z.object({
 });
 
 export async function createProduct(input: unknown) {
-  const { user } = await requireRole(["admin"]);
+  const { user } = await requireRole(["super_admin"]);
   const parsed = productSchema.safeParse(input);
   if (!parsed.success) return { error: "Check the product fields" };
   const { data, error } = await supabaseAdmin.from("products").insert(parsed.data).select("id").single();
@@ -28,7 +28,7 @@ export async function createProduct(input: unknown) {
 }
 
 export async function updateProduct(productId: string, input: unknown) {
-  const { user } = await requireRole(["admin"]);
+  const { user } = await requireRole(["super_admin"]);
   if (!z.string().uuid().safeParse(productId).success) return { error: "Bad id" };
   const parsed = productSchema.safeParse(input);
   if (!parsed.success) return { error: "Check the product fields" };
@@ -42,7 +42,7 @@ export async function updateProduct(productId: string, input: unknown) {
 }
 
 export async function setProductAvailability(productId: string, available: boolean) {
-  const { user } = await requireRole(["admin"]);
+  const { user } = await requireRole(["super_admin"]);
   if (!z.string().uuid().safeParse(productId).success) return { error: "Bad id" };
   await supabaseAdmin.from("products").update({ is_available: available }).eq("id", productId);
   await audit({ actor_id: user.id, action: "TOGGLE_PRODUCT", target_table: "products", target_id: productId, new_data: { available } });
@@ -51,7 +51,7 @@ export async function setProductAvailability(productId: string, available: boole
 }
 
 export async function deleteProduct(productId: string) {
-  const { user } = await requireRole(["admin"]);
+  const { user } = await requireRole(["super_admin"]);
   if (!z.string().uuid().safeParse(productId).success) return { error: "Bad id" };
   await supabaseAdmin.from("products").delete().eq("id", productId);
   await audit({ actor_id: user.id, action: "DELETE_PRODUCT", target_table: "products", target_id: productId });
@@ -60,7 +60,7 @@ export async function deleteProduct(productId: string) {
 }
 
 export async function createCategory(name: string) {
-  const { user } = await requireRole(["admin"]);
+  const { user } = await requireRole(["super_admin"]);
   const v = z.string().min(2).max(60).safeParse(name);
   if (!v.success) return { error: "Category name 2–60 chars" };
   const { data, error } = await supabaseAdmin.from("categories").insert({ name: v.data }).select("id").single();
@@ -78,7 +78,7 @@ const announcementSchema = z.object({
 });
 
 export async function createAnnouncement(input: unknown) {
-  const { user } = await requireRole(["admin"]);
+  const { user } = await requireRole(["super_admin"]);
   const parsed = announcementSchema.safeParse(input);
   if (!parsed.success) return { error: "Check the announcement fields" };
   const { data, error } = await supabaseAdmin.from("announcements").insert({
@@ -94,7 +94,7 @@ export async function createAnnouncement(input: unknown) {
 }
 
 export async function setAnnouncementActive(id: string, active: boolean) {
-  const { user } = await requireRole(["admin"]);
+  const { user } = await requireRole(["super_admin"]);
   if (!z.string().uuid().safeParse(id).success) return { error: "Bad id" };
   await supabaseAdmin.from("announcements").update({ is_active: active }).eq("id", id);
   await audit({ actor_id: user.id, action: "TOGGLE_ANNOUNCEMENT", target_table: "announcements", target_id: id, new_data: { active } });
@@ -113,7 +113,7 @@ const promoSchema = z.object({
 });
 
 export async function createPromoCode(input: unknown) {
-  const { user } = await requireRole(["admin"]);
+  const { user } = await requireRole(["super_admin"]);
   const parsed = promoSchema.safeParse(input);
   if (!parsed.success) return { error: parsed.error.errors[0]?.message ?? "Check the promo fields" };
   if (parsed.data.discount_type === "percent" && parsed.data.discount_value > 90) {
@@ -134,7 +134,7 @@ export async function createPromoCode(input: unknown) {
 }
 
 export async function setPromoActive(id: string, active: boolean) {
-  const { user } = await requireRole(["admin"]);
+  const { user } = await requireRole(["super_admin"]);
   if (!z.string().uuid().safeParse(id).success) return { error: "Bad id" };
   await supabaseAdmin.from("promo_codes").update({ is_active: active }).eq("id", id);
   await audit({ actor_id: user.id, action: "TOGGLE_PROMO", target_table: "promo_codes", target_id: id, new_data: { active } });
@@ -150,7 +150,7 @@ const branchSchema = z.object({
 });
 
 export async function createBranch(input: unknown) {
-  const { user } = await requireRole(["admin"]);
+  const { user } = await requireRole(["super_admin"]);
   const parsed = branchSchema.safeParse(input);
   if (!parsed.success) return { error: "Check the branch fields" };
   const { data, error } = await supabaseAdmin.from("branches").insert({
@@ -163,7 +163,7 @@ export async function createBranch(input: unknown) {
 }
 
 export async function setBranchActive(id: string, active: boolean) {
-  const { user } = await requireRole(["admin"]);
+  const { user } = await requireRole(["super_admin"]);
   if (!z.string().uuid().safeParse(id).success) return { error: "Bad id" };
   await supabaseAdmin.from("branches").update({ is_active: active }).eq("id", id);
   await audit({ actor_id: user.id, action: "TOGGLE_BRANCH", target_table: "branches", target_id: id, new_data: { active } });

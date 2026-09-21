@@ -9,7 +9,7 @@ const schema = z.object({ esewa_enabled: z.boolean(), delivery_enabled: z.boolea
 
 /** Site-wide feature flags — admin only, see app_settings migration. */
 export async function updateAppSettings(input: unknown) {
-  const { user } = await requireRole(["admin"]);
+  const { user } = await requireRole(["super_admin"]);
   const parsed = schema.safeParse(input);
   if (!parsed.success) return { error: "Invalid settings" };
 
@@ -40,7 +40,7 @@ const openingPromoSchema = z.object({
 });
 
 export async function updateOpeningPromo(input: unknown) {
-  const { user } = await requireRole(["admin"]);
+  const { user } = await requireRole(["super_admin"]);
   const parsed = openingPromoSchema.safeParse(input);
   if (!parsed.success) return { error: "Check the promo fields" };
 
@@ -71,7 +71,7 @@ const socialLinkSchema = z.object({
 });
 
 export async function addSocialLink(input: unknown) {
-  const { user } = await requireRole(["admin"]);
+  const { user } = await requireRole(["super_admin"]);
   const parsed = socialLinkSchema.safeParse(input);
   if (!parsed.success) return { error: "Enter a platform name and a valid URL" };
 
@@ -84,7 +84,7 @@ export async function addSocialLink(input: unknown) {
 }
 
 export async function setSocialLinkActive(id: string, active: boolean) {
-  const { user } = await requireRole(["admin"]);
+  const { user } = await requireRole(["super_admin"]);
   if (!z.string().uuid().safeParse(id).success) return { error: "Bad id" };
   await supabaseAdmin.from("social_links").update({ is_active: active }).eq("id", id);
   await audit({ actor_id: user.id, action: "TOGGLE_SOCIAL_LINK", target_table: "social_links", target_id: id, new_data: { active } });
@@ -93,7 +93,7 @@ export async function setSocialLinkActive(id: string, active: boolean) {
 }
 
 export async function deleteSocialLink(id: string) {
-  const { user } = await requireRole(["admin"]);
+  const { user } = await requireRole(["super_admin"]);
   if (!z.string().uuid().safeParse(id).success) return { error: "Bad id" };
   await supabaseAdmin.from("social_links").delete().eq("id", id);
   await audit({ actor_id: user.id, action: "DELETE_SOCIAL_LINK", target_table: "social_links", target_id: id });

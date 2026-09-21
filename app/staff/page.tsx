@@ -5,7 +5,7 @@ import { Megaphone, MessageCircle, GraduationCap } from "lucide-react";
 
 export const dynamic = "force-dynamic";
 
-const STAFF_ROLES = ["pos_user", "delivery_driver", "admin"];
+const STAFF_ROLES = ["pos_user", "delivery_driver", "super_admin"];
 
 export default async function StaffPortalPage() {
   const { user, profile } = await requireRole(STAFF_ROLES);

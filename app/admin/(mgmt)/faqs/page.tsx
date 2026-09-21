@@ -5,7 +5,7 @@ import FaqControls from "@/components/admin/faq-controls";
 export const dynamic = "force-dynamic";
 
 export default async function FaqsPage() {
-  await requireRole(["admin"]);
+  await requireRole(["super_admin"]);
   const { data: faqs } = await supabaseAdmin
     .from("faqs")
     .select("id, question, answer, is_active")

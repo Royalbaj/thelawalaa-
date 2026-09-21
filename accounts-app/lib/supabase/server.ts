@@ -3,7 +3,7 @@
 import { createServerClient, type CookieOptions } from "@supabase/ssr";
 import { cookies } from "next/headers";
 
-const ALLOWED_ROLES = ["admin", "accountant"];
+const ALLOWED_ROLES = ["super_admin", "accountant"];
 
 export function createClient() {
   const cookieStore = cookies();

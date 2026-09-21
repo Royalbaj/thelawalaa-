@@ -11,7 +11,7 @@ const SOURCE_LABEL: Record<string, string> = {
 };
 
 export default async function SignupsPage({ searchParams }: { searchParams: { q?: string; source?: string } }) {
-  await requireRole(["admin"]);
+  await requireRole(["super_admin"]);
   const q = (searchParams.q ?? "").slice(0, 60);
   const source = searchParams.source ?? "all";
 

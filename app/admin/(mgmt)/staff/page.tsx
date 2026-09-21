@@ -7,13 +7,13 @@ import { InviteStaffForm, StaffRowActions } from "@/components/admin/staff-contr
 export const dynamic = "force-dynamic";
 
 const ROLE_BADGE: Record<string, string> = {
-  admin: "bg-brand-red/10 text-brand-red",
+  super_admin: "bg-brand-red/10 text-brand-red",
   pos_user: "bg-blue-100 text-blue-800",
   delivery_driver: "bg-purple-100 text-purple-800",
 };
 
 export default async function StaffPage({ searchParams }: { searchParams: { q?: string } }) {
-  await requireRole(["admin"]);
+  await requireRole(["super_admin"]);
   const q = (searchParams.q ?? "").slice(0, 60);
 
   let query = supabaseAdmin
@@ -58,7 +58,7 @@ export default async function StaffPage({ searchParams }: { searchParams: { q?: 
                     </td>
                     <td className="px-4 py-3 text-stone-500">{format(new Date(p.created_at), "d MMM yyyy")}</td>
                     <td className="px-4 py-3">
-                      <StaffRowActions userId={p.id} isActive={p.is_active} role={p.role} branches={(branches ?? []) as never} />
+                      <StaffRowActions userId={p.id} isActive={p.is_active} role={p.role} branches={(branches ?? []) as never} inviteAccepted={!!p.invite_accepted_at} />
                     </td>
                   </tr>
                 ))}

@@ -11,7 +11,7 @@ const faqSchema = z.object({
 });
 
 export async function addFaq(input: unknown) {
-  const { user } = await requireRole(["admin"]);
+  const { user } = await requireRole(["super_admin"]);
   const parsed = faqSchema.safeParse(input);
   if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Check the form fields" };
 
@@ -25,7 +25,7 @@ export async function addFaq(input: unknown) {
 }
 
 export async function updateFaq(id: string, input: unknown) {
-  const { user } = await requireRole(["admin"]);
+  const { user } = await requireRole(["super_admin"]);
   if (!z.string().uuid().safeParse(id).success) return { error: "Bad id" };
   const parsed = faqSchema.safeParse(input);
   if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Check the form fields" };
@@ -40,7 +40,7 @@ export async function updateFaq(id: string, input: unknown) {
 }
 
 export async function setFaqActive(id: string, active: boolean) {
-  const { user } = await requireRole(["admin"]);
+  const { user } = await requireRole(["super_admin"]);
   if (!z.string().uuid().safeParse(id).success) return { error: "Bad id" };
   await supabaseAdmin.from("faqs").update({ is_active: active }).eq("id", id);
   await audit({ actor_id: user.id, action: "TOGGLE_FAQ", target_table: "faqs", target_id: id, new_data: { active } });
@@ -50,7 +50,7 @@ export async function setFaqActive(id: string, active: boolean) {
 }
 
 export async function deleteFaq(id: string) {
-  const { user } = await requireRole(["admin"]);
+  const { user } = await requireRole(["super_admin"]);
   if (!z.string().uuid().safeParse(id).success) return { error: "Bad id" };
   await supabaseAdmin.from("faqs").delete().eq("id", id);
   await audit({ actor_id: user.id, action: "DELETE_FAQ", target_table: "faqs", target_id: id });

@@ -1,7 +1,7 @@
 "use client";
 import { useState, useTransition } from "react";
 import toast from "react-hot-toast";
-import { inviteStaff, setUserActive, changeUserRole } from "@/app/actions/staff";
+import { inviteStaff, setUserActive, changeUserRole, resendStaffInvite } from "@/app/actions/staff";
 
 export function InviteStaffForm({ branches }: { branches: { id: string; name: string }[] }) {
   const [role, setRole] = useState("pos_user");
@@ -33,7 +33,7 @@ export function InviteStaffForm({ branches }: { branches: { id: string; name: st
         <select name="role" className="input" value={role} onChange={(e) => setRole(e.target.value)}>
           <option value="pos_user">POS user</option>
           <option value="delivery_driver">Delivery driver</option>
-          <option value="admin">Admin</option>
+          <option value="super_admin">Super admin</option>
         </select>
         <select name="branch_id" required className="input">
           {branches.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
@@ -73,8 +73,8 @@ export function CustomerRowActions({ userId, isActive }: { userId: string; isAct
 }
 
 export function StaffRowActions({
-  userId, isActive, role, branches,
-}: { userId: string; isActive: boolean; role: string; branches: { id: string; name: string }[] }) {
+  userId, isActive, role, branches, inviteAccepted,
+}: { userId: string; isActive: boolean; role: string; branches: { id: string; name: string }[]; inviteAccepted: boolean }) {
   const [pending, start] = useTransition();
   return (
     <div className="flex items-center gap-2">
@@ -94,8 +94,22 @@ export function StaffRowActions({
         <option value="customer">customer</option>
         <option value="pos_user">pos_user</option>
         <option value="delivery_driver">delivery_driver</option>
-        <option value="admin">admin</option>
+        <option value="super_admin">super_admin</option>
       </select>
+      {!inviteAccepted && isActive && (
+        <button
+          disabled={pending}
+          onClick={() => {
+            start(async () => {
+              const r = await resendStaffInvite(userId);
+              r?.error ? toast.error(r.error) : toast.success("Invite resent");
+            });
+          }}
+          className="text-xs font-bold text-brand-orange"
+        >
+          Resend invite
+        </button>
+      )}
       <button
         disabled={pending}
         onClick={() => {

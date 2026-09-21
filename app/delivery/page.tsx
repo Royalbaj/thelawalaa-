@@ -5,7 +5,7 @@ import DriverDashboard from "@/components/delivery/driver-dashboard";
 export const dynamic = "force-dynamic";
 
 export default async function DeliveryPage() {
-  const { user, profile } = await requireRole(["delivery_driver", "admin"]);
+  const { user, profile } = await requireRole(["delivery_driver", "super_admin"]);
 
   // Fetch assigned deliveries
   const { data: myDeliveries } = await supabaseAdmin

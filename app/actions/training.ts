@@ -6,7 +6,7 @@ import { requireRole } from "@/lib/supabase/server";
 import { supabaseAdmin, audit } from "@/lib/supabase/admin";
 import { extractYouTubeId } from "@/lib/youtube";
 
-const STAFF_ROLES = ["pos_user", "delivery_driver", "admin"];
+const STAFF_ROLES = ["pos_user", "delivery_driver", "super_admin"];
 
 const trainingVideoSchema = z.object({
   title: z.string().trim().min(2).max(100),
@@ -14,7 +14,7 @@ const trainingVideoSchema = z.object({
 });
 
 export async function addTrainingVideo(input: unknown) {
-  const { user } = await requireRole(["admin"]);
+  const { user } = await requireRole(["super_admin"]);
   const parsed = trainingVideoSchema.safeParse(input);
   if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Check the form fields" };
 
@@ -32,7 +32,7 @@ export async function addTrainingVideo(input: unknown) {
 }
 
 export async function setTrainingVideoActive(id: string, active: boolean) {
-  const { user } = await requireRole(["admin"]);
+  const { user } = await requireRole(["super_admin"]);
   if (!z.string().uuid().safeParse(id).success) return { error: "Bad id" };
   await supabaseAdmin.from("training_videos").update({ is_active: active }).eq("id", id);
   await audit({ actor_id: user.id, action: "TOGGLE_TRAINING_VIDEO", target_table: "training_videos", target_id: id, new_data: { active } });
@@ -42,7 +42,7 @@ export async function setTrainingVideoActive(id: string, active: boolean) {
 }
 
 export async function deleteTrainingVideo(id: string) {
-  const { user } = await requireRole(["admin"]);
+  const { user } = await requireRole(["super_admin"]);
   if (!z.string().uuid().safeParse(id).success) return { error: "Bad id" };
   await supabaseAdmin.from("training_videos").delete().eq("id", id);
   await audit({ actor_id: user.id, action: "DELETE_TRAINING_VIDEO", target_table: "training_videos", target_id: id });

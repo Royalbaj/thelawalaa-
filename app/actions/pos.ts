@@ -7,7 +7,7 @@ import { applyOpeningPromoPrice } from "@/lib/promo";
 
 /** POS order: branch comes from the operator's OWN profile — never the client. */
 export async function createPosOrder(input: unknown) {
-  const { user, profile } = await requireRole(["pos_user", "admin"]);
+  const { user, profile } = await requireRole(["pos_user", "super_admin"]);
   const parsed = posOrderSchema.safeParse(input);
   if (!parsed.success) return { error: "Invalid order" };
   const d = parsed.data;
