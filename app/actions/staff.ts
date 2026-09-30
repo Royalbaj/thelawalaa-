@@ -5,6 +5,7 @@ import { Resend } from "resend";
 import { inviteStaffSchema } from "@/lib/validations/staff";
 import { requireRole } from "@/lib/supabase/server";
 import { supabaseAdmin, audit, awardOrderLoyaltyPoints } from "@/lib/supabase/admin";
+import { fetchLiveOrders } from "@/lib/live-orders";
 
 const resend = process.env.RESEND_API_KEY ? new Resend(process.env.RESEND_API_KEY) : null;
 
@@ -189,6 +190,12 @@ export async function adminUpdateOrderStatus(orderId: string, status: string) {
   await audit({ actor_id: user.id, action: "UPDATE_ORDER_STATUS", target_table: "orders", target_id: orderId, new_data: { status } });
   revalidatePath("/admin/orders");
   return { ok: true };
+}
+
+/** The Live Orders list again — the panel re-syncs with it in case Realtime dropped an event. */
+export async function getLiveOrders() {
+  await requireRole(["super_admin", "pos_user"]);
+  return fetchLiveOrders();
 }
 
 /** An order's lines, for orders the POS Live Orders panel only learns about over Realtime. */

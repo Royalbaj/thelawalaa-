@@ -1,5 +1,6 @@
 import { requireRole } from "@/lib/supabase/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
+import { fetchLiveOrders } from "@/lib/live-orders";
 import { npr } from "@/lib/utils";
 import PosTerminal from "@/components/pos/pos-terminal";
 import LiveOrdersPanel from "@/components/admin/live-orders-panel";
@@ -18,11 +19,7 @@ export default async function AdminDashboard() {
       .eq("is_available", true)
       .order("sort_order"),
     supabaseAdmin.from("categories").select("id, name").order("sort_order"),
-    supabaseAdmin
-      .from("orders")
-      .select("id, order_number, daily_number, status, type, total, payment_status, payment_method, created_at, notes, customer:profiles!customer_id(full_name, phone), items:order_items(product_name, quantity)")
-      .order("created_at", { ascending: false })
-      .limit(50),
+    fetchLiveOrders().then((data) => ({ data })),
     supabaseAdmin
       .from("profiles")
       .select("id, full_name, is_online")

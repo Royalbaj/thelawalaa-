@@ -1,12 +1,12 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { format, formatDistanceToNowStrict } from "date-fns";
 import toast from "react-hot-toast";
 import { createClient } from "@/lib/supabase/client";
 import { npr, cn, STATUS_COLORS } from "@/lib/utils";
 import { orderStatusLabel, nextCounterAction, STATUS_FILTERS } from "@/lib/order-status";
-import { adminUpdateOrderStatus, assignDriver, markOrderPaid, getOrderLines } from "@/app/actions/staff";
+import { adminUpdateOrderStatus, assignDriver, markOrderPaid, getOrderLines, getLiveOrders } from "@/app/actions/staff";
 
 interface Line { product_name: string; quantity: number }
 
@@ -75,6 +75,17 @@ export default function LiveOrdersPanel({ initialOrders, drivers }: { initialOrd
   const [busyId, setBusyId] = useState<string | null>(null);
   const [lingering, setLingering] = useState<string[]>([]);
   const [, setTick] = useState(0);
+  const busyRef = useRef<string | null>(null);
+  const known = useRef(new Set(initialOrders.map((o) => o.id)));
+
+  const setBusy = (id: string | null) => { busyRef.current = id; setBusyId(id); };
+
+  // Counter orders start confirmed — only a new online order needs someone's attention.
+  const announce = (o: Order) => {
+    if (known.current.has(o.id)) return;
+    known.current.add(o.id);
+    if (o.status === "pending") { chime(); toast("New online order!", { icon: "🔔" }); }
+  };
 
   // A card that's just been closed stays put (dimmed) for a moment instead of
   // vanishing — so the next card never slides under a quick second tap.
@@ -96,23 +107,49 @@ export default function LiveOrdersPanel({ initialOrders, drivers }: { initialOrd
       .catch(() => {});
 
   useEffect(() => {
+    // Safety net: Realtime can silently drop on a flaky connection or a tablet
+    // that slept, so re-sync the whole list every 20s while the POS is on
+    // screen, and straight away when it comes back into view or reconnects.
+    const sync = () => {
+      if (document.visibilityState !== "visible" || busyRef.current) return;
+      getLiveOrders()
+        .then((data) => {
+          if (busyRef.current) return; // never stomp a tap that's still in flight
+          const fresh = data as unknown as Order[];
+          fresh.forEach(announce);
+          setOrders(fresh);
+        })
+        .catch(() => {});
+    };
+
     const supabase = createClient();
     const channel = supabase
       .channel("admin-orders")
       .on("postgres_changes", { event: "*", schema: "public", table: "orders" }, (payload) => {
         if (payload.eventType === "INSERT") {
           const o = payload.new as Order;
-          setOrders((prev) => [o, ...prev].slice(0, 50));
+          setOrders((prev) => [o, ...prev.filter((x) => x.id !== o.id)].slice(0, 50));
           loadLines(o.id);
-          // Counter orders start confirmed — only online orders need someone's attention.
-          if (o.status === "pending") { chime(); toast("New online order!", { icon: "🔔" }); }
+          announce(o);
         } else if (payload.eventType === "UPDATE") {
           patch(payload.new.id, payload.new as Partial<Order>);
+        } else if (payload.eventType === "DELETE") {
+          setOrders((prev) => prev.filter((x) => x.id !== payload.old.id)); // e.g. the opening-day reset
         }
       })
-      .subscribe();
+      .subscribe((status) => { if (status === "SUBSCRIBED") sync(); });
+
+    const poll = setInterval(sync, 20_000);
     const clock = setInterval(() => setTick((n) => n + 1), 30_000); // keeps "5 min ago" current
-    return () => { supabase.removeChannel(channel); clearInterval(clock); };
+    document.addEventListener("visibilitychange", sync);
+    window.addEventListener("focus", sync);
+    return () => {
+      supabase.removeChannel(channel);
+      clearInterval(poll);
+      clearInterval(clock);
+      document.removeEventListener("visibilitychange", sync);
+      window.removeEventListener("focus", sync);
+    };
   }, []);
 
   const counts = useMemo(() => {
@@ -137,20 +174,20 @@ export default function LiveOrdersPanel({ initialOrders, drivers }: { initialOrd
   const offline = () => ({ error: "Couldn't reach the server — check the connection and try again" });
 
   async function move(o: Order, status: string) {
-    setBusyId(o.id);
+    setBusy(o.id);
     if (CLOSED.includes(status)) linger(o.id);
     patch(o.id, { status });
     const r = await adminUpdateOrderStatus(o.id, status).catch(offline);
-    setBusyId(null);
+    setBusy(null);
     if (r?.error) { patch(o.id, { status: o.status }); toast.error(r.error); return false; }
     return true;
   }
 
   async function markPaid(o: Order) {
-    setBusyId(o.id);
+    setBusy(o.id);
     patch(o.id, { payment_status: "paid" });
     const r = await markOrderPaid(o.id).catch(offline);
-    setBusyId(null);
+    setBusy(null);
     if (r?.error) { patch(o.id, { payment_status: o.payment_status }); toast.error(r.error); return false; }
     return true;
   }
