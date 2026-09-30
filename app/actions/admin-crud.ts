@@ -50,6 +50,46 @@ export async function setProductAvailability(productId: string, available: boole
   return { ok: true };
 }
 
+// ── Menu photos ──────────────────────────────────────────────────
+// The browser uploads straight to the public `products` Storage bucket with
+// a one-time signed URL (a phone photo would blow past the server-action
+// body limit), then the product row is pointed at it.
+const PHOTO_BUCKET = "products";
+
+export async function createProductPhotoUpload(productId: string) {
+  await requireRole(["super_admin"]);
+  if (!z.string().uuid().safeParse(productId).success) return { error: "Bad id" };
+  const { data, error } = await supabaseAdmin.storage
+    .from(PHOTO_BUCKET)
+    .createSignedUploadUrl(`${productId}/${crypto.randomUUID()}.jpg`);
+  if (error || !data) return { error: "Couldn't start the upload — try again" };
+  return { path: data.path, token: data.token };
+}
+
+export async function setProductPhoto(productId: string, path: string) {
+  const { user } = await requireRole(["super_admin"]);
+  if (!z.string().uuid().safeParse(productId).success) return { error: "Bad id" };
+  // Only ever a file the upload above created for this product.
+  if (!new RegExp(`^${productId}/[0-9a-f-]{36}\\.jpg$`).test(path)) return { error: "Bad upload" };
+  const image_url = supabaseAdmin.storage.from(PHOTO_BUCKET).getPublicUrl(path).data.publicUrl;
+
+  const { data: old } = await supabaseAdmin.from("products").select("image_url").eq("id", productId).single();
+  const { error } = await supabaseAdmin.from("products").update({ image_url }).eq("id", productId);
+  if (error) return { error: "Couldn't save the photo" };
+
+  // Remove the photo this replaced, when it was one of ours.
+  const marker = `/object/public/${PHOTO_BUCKET}/`;
+  if (old?.image_url?.includes(marker)) {
+    await supabaseAdmin.storage.from(PHOTO_BUCKET).remove([old.image_url.split(marker)[1]]);
+  }
+  await audit({
+    actor_id: user.id, action: "UPDATE_PRODUCT_PHOTO", target_table: "products", target_id: productId,
+    old_data: { image_url: old?.image_url ?? null }, new_data: { image_url },
+  });
+  revalidatePath("/admin/menu"); revalidatePath("/"); revalidatePath("/order"); revalidatePath("/admin");
+  return { ok: true };
+}
+
 export async function deleteProduct(productId: string) {
   const { user } = await requireRole(["super_admin"]);
   if (!z.string().uuid().safeParse(productId).success) return { error: "Bad id" };

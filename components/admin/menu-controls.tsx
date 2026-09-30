@@ -1,15 +1,71 @@
 "use client";
 import { useState, useTransition } from "react";
+import Image from "next/image";
 import toast from "react-hot-toast";
-import { npr } from "@/lib/utils";
+import { UtensilsCrossed } from "lucide-react";
+import { npr, cn } from "@/lib/utils";
+import { createClient } from "@/lib/supabase/client";
 import {
   createProduct, updateProduct, setProductAvailability, deleteProduct, createCategory,
+  createProductPhotoUpload, setProductPhoto,
 } from "@/app/actions/admin-crud";
 
 type EditableProduct = {
   id: string; name: string; description: string | null; category_id: string;
   price: number; is_available: boolean; is_veg: boolean; spice_level: number; is_bestseller: boolean;
+  image_url: string | null;
 };
+
+// Phone photos are 3–10 MB; the menu never shows one wider than ~600px, so
+// shrink to 1200px JPEG before uploading — much faster on mobile data.
+async function shrinkPhoto(file: File): Promise<Blob> {
+  const bitmap = await createImageBitmap(file, { imageOrientation: "from-image" })
+    .catch(() => { throw new Error("Use a JPG, PNG or WebP photo"); });
+  const scale = Math.min(1, 1200 / Math.max(bitmap.width, bitmap.height));
+  const canvas = document.createElement("canvas");
+  canvas.width = Math.round(bitmap.width * scale);
+  canvas.height = Math.round(bitmap.height * scale);
+  const ctx = canvas.getContext("2d")!;
+  ctx.fillStyle = "#fff"; // transparent PNGs would otherwise turn black as JPEG
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  ctx.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+  return new Promise((resolve, reject) =>
+    canvas.toBlob((b) => (b ? resolve(b) : reject(new Error("Couldn't read that photo"))), "image/jpeg", 0.85));
+}
+
+/** Pick a photo → shrink it → upload straight to Storage → point the product at it. */
+export function ProductPhotoButton({ productId, hasPhoto }: { productId: string; hasPhoto: boolean }) {
+  const [busy, setBusy] = useState(false);
+
+  async function upload(file: File) {
+    setBusy(true);
+    try {
+      const photo = await shrinkPhoto(file);
+      const slot = await createProductPhotoUpload(productId);
+      if (!slot.path || !slot.token) throw new Error(slot.error ?? "Couldn't start the upload");
+      const { error } = await createClient().storage.from("products")
+        .uploadToSignedUrl(slot.path, slot.token, photo, { contentType: "image/jpeg" });
+      if (error) throw new Error("Upload failed — check the connection and try again");
+      const r = await setProductPhoto(productId, slot.path);
+      if (r?.error) throw new Error(r.error);
+      toast.success("Photo updated");
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Upload failed");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <label className={cn("cursor-pointer text-xs font-bold text-brand-orange", busy && "pointer-events-none opacity-50")}>
+      {busy ? "Uploading…" : hasPhoto ? "Change photo" : "Add photo"}
+      <input
+        type="file" accept="image/*" className="hidden" disabled={busy}
+        onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ""; if (f) upload(f); }}
+      />
+    </label>
+  );
+}
 
 /** One product row: summary + actions, with an inline edit form that expands below (not inside the actions flex row, so it lays out full-width regardless of sibling wrapping). */
 export function ProductRow({ product, categories }: { product: EditableProduct; categories: { id: string; name: string }[] }) {
@@ -19,12 +75,22 @@ export function ProductRow({ product, categories }: { product: EditableProduct; 
   return (
     <div className="px-4 py-3">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <p className="font-bold">{product.name} {product.is_bestseller && "⭐"}</p>
-          <p className="text-xs text-stone-500">{npr(Number(product.price))} · spice {"🌶".repeat(product.spice_level) || "—"}</p>
+        <div className="flex items-center gap-3">
+          <div className="relative h-12 w-12 shrink-0 overflow-hidden rounded-lg bg-orange-50">
+            {product.image_url ? (
+              <Image src={product.image_url} alt="" fill sizes="48px" className="object-cover" />
+            ) : (
+              <UtensilsCrossed size={18} className="absolute inset-0 m-auto text-stone-300" />
+            )}
+          </div>
+          <div>
+            <p className="font-bold">{product.name} {product.is_bestseller && "⭐"}</p>
+            <p className="text-xs text-stone-500">{npr(Number(product.price))} · spice {"🌶".repeat(product.spice_level) || "—"}</p>
+          </div>
         </div>
         <div className="flex items-center gap-3">
           <AvailabilityToggle id={product.id} available={product.is_available} />
+          <ProductPhotoButton productId={product.id} hasPhoto={!!product.image_url} />
           <button onClick={() => setEditing((v) => !v)} className="text-xs font-bold text-brand-orange">{editing ? "Close" : "Edit"}</button>
           <DeleteProductButton id={product.id} name={product.name} />
         </div>
