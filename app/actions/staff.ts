@@ -8,6 +8,17 @@ import { supabaseAdmin, audit, awardOrderLoyaltyPoints } from "@/lib/supabase/ad
 
 const resend = process.env.RESEND_API_KEY ? new Resend(process.env.RESEND_API_KEY) : null;
 
+/** True only if Resend accepted it — Resend returns { error } rather than throwing. */
+async function sendEmail(to: string, subject: string, html: string): Promise<boolean> {
+  if (!resend) return false;
+  try {
+    const { error } = await resend.emails.send({ from: "Thelawalaa <orders@thelawalaa.com>", to, subject, html });
+    return !error;
+  } catch {
+    return false;
+  }
+}
+
 /**
  * Invite POS / driver / admin staff. The role travels in APP metadata
  * (service-role only) — never user metadata — so the signup trigger
@@ -61,44 +72,27 @@ export async function inviteStaff(input: unknown) {
 
   const acceptUrl = `${process.env.NEXT_PUBLIC_SITE_URL}/auth/invite?token_hash=${generated.properties.hashed_token}&type=invite`;
 
-  if (resend) {
-    try {
-      await resend.emails.send({
-        from: "Thelawalaa <orders@thelawalaa.com>",
-        to: d.email,
-        subject: "You're invited to the Thelawalaa team",
-        html: `
-          <div style="font-family:sans-serif;max-width:560px;margin:auto">
-            <h1 style="color:#F97316">Welcome to the team 🥘</h1>
-            <p>${d.full_name}, you've been invited to join Thelawalaa as <b>${d.role.replace("_", " ")}</b>.</p>
-            <p>Open this on the device you'll actually use to work, then tap the button below.</p>
-            <a href="${acceptUrl}"
-               style="display:inline-block;background:#F97316;color:#fff;padding:12px 24px;border-radius:999px;text-decoration:none;font-weight:bold">Accept invite</a>
-            <p style="color:#78716c;font-size:12px;margin-top:24px">If you weren't expecting this, you can ignore this email.</p>
-          </div>`,
-      });
-    } catch {
-      // Account + role are already set — the admin just needs to know
-      // the email didn't go out, so they can resend or share the link.
-      await audit({
-        actor_id: user.id, action: "INVITE_STAFF", target_table: "profiles",
-        target_id: generated.user.id,
-        new_data: { role: d.role, branch_id: d.branch_id, email: d.email, email_failed: true },
-      });
-      revalidatePath("/admin/staff");
-      return { error: "Account created, but the invite email failed to send — resend it from the staff list." };
-    }
-  }
+  const emailed = await sendEmail(d.email, "You're invited to the Thelawalaa team", `
+    <div style="font-family:sans-serif;max-width:560px;margin:auto">
+      <h1 style="color:#F97316">Welcome to the team 🥘</h1>
+      <p>${d.full_name}, you've been invited to join Thelawalaa as <b>${d.role.replace("_", " ")}</b>.</p>
+      <p>Open this on the device you'll actually use to work, then tap the button below.</p>
+      <a href="${acceptUrl}"
+         style="display:inline-block;background:#F97316;color:#fff;padding:12px 24px;border-radius:999px;text-decoration:none;font-weight:bold">Accept invite</a>
+      <p style="color:#78716c;font-size:12px;margin-top:24px">If you weren't expecting this, you can ignore this email.</p>
+    </div>`);
 
   await audit({
     actor_id: user.id,
     action: "INVITE_STAFF",
     target_table: "profiles",
     target_id: generated.user.id,
-    new_data: { role: d.role, branch_id: d.branch_id, email: d.email },
+    new_data: { role: d.role, branch_id: d.branch_id, email: d.email, emailed },
   });
   revalidatePath("/admin/staff");
-  return { ok: true };
+  // No email service yet (no RESEND_API_KEY) or it refused the send: hand the
+  // admin the one-time link to pass on, rather than report an invite nobody got.
+  return { ok: true, inviteUrl: emailed ? undefined : acceptUrl };
 }
 
 /** Re-send a fresh invite link to someone whose first one expired or bounced. */
@@ -124,27 +118,16 @@ export async function resendStaffInvite(targetId: string) {
 
   const acceptUrl = `${process.env.NEXT_PUBLIC_SITE_URL}/auth/invite?token_hash=${generated.properties.hashed_token}&type=invite`;
 
-  if (resend) {
-    try {
-      await resend.emails.send({
-        from: "Thelawalaa <orders@thelawalaa.com>",
-        to: email,
-        subject: "Your Thelawalaa team invite",
-        html: `
-          <div style="font-family:sans-serif;max-width:560px;margin:auto">
-            <h1 style="color:#F97316">Welcome to the team 🥘</h1>
-            <p>${profile.full_name}, here's a fresh invite link for your <b>${profile.role.replace("_", " ")}</b> account.</p>
-            <a href="${acceptUrl}"
-               style="display:inline-block;background:#F97316;color:#fff;padding:12px 24px;border-radius:999px;text-decoration:none;font-weight:bold">Accept invite</a>
-          </div>`,
-      });
-    } catch {
-      return { error: "Link generated but the email failed to send — try again in a moment." };
-    }
-  }
+  const emailed = await sendEmail(email, "Your Thelawalaa team invite", `
+    <div style="font-family:sans-serif;max-width:560px;margin:auto">
+      <h1 style="color:#F97316">Welcome to the team 🥘</h1>
+      <p>${profile.full_name}, here's a fresh invite link for your <b>${profile.role.replace("_", " ")}</b> account.</p>
+      <a href="${acceptUrl}"
+         style="display:inline-block;background:#F97316;color:#fff;padding:12px 24px;border-radius:999px;text-decoration:none;font-weight:bold">Accept invite</a>
+    </div>`);
 
-  await audit({ actor_id: user.id, action: "RESEND_STAFF_INVITE", target_table: "profiles", target_id: targetId });
-  return { ok: true };
+  await audit({ actor_id: user.id, action: "RESEND_STAFF_INVITE", target_table: "profiles", target_id: targetId, new_data: { emailed } });
+  return { ok: true, inviteUrl: emailed ? undefined : acceptUrl };
 }
 
 export async function setUserActive(targetId: string, active: boolean) {

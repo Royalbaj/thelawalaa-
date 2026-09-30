@@ -3,8 +3,20 @@ import { useState, useTransition } from "react";
 import toast from "react-hot-toast";
 import { inviteStaff, setUserActive, changeUserRole, resendStaffInvite } from "@/app/actions/staff";
 
+// No invite email went out (email not set up yet, or refused), so the admin
+// has to pass the one-time link on themselves — WhatsApp, SMS, in person.
+async function copyInviteLink(url: string) {
+  try {
+    await navigator.clipboard.writeText(url);
+    toast.success("No email sent — invite link copied. Send it to them yourself.", { duration: 8000 });
+  } catch {
+    window.prompt("No email sent — copy this invite link and send it to them yourself:", url);
+  }
+}
+
 export function InviteStaffForm({ branches }: { branches: { id: string; name: string }[] }) {
   const [role, setRole] = useState("pos_user");
+  const [inviteUrl, setInviteUrl] = useState<string | null>(null);
   const [pending, start] = useTransition();
   return (
     <form
@@ -13,6 +25,7 @@ export function InviteStaffForm({ branches }: { branches: { id: string; name: st
         e.preventDefault();
         const form = e.currentTarget;
         const fd = Object.fromEntries(new FormData(form));
+        setInviteUrl(null);
         start(async () => {
           const r = await inviteStaff({
             full_name: fd.full_name, email: fd.email, phone: fd.phone,
@@ -20,8 +33,10 @@ export function InviteStaffForm({ branches }: { branches: { id: string; name: st
             vehicle_type: fd.vehicle_type || undefined,
             vehicle_number: fd.vehicle_number || undefined,
           });
-          if (r?.error) toast.error(r.error);
-          else { toast.success("Invite sent"); form.reset(); }
+          if (r?.error) return void toast.error(r.error);
+          form.reset();
+          if (r.inviteUrl) { setInviteUrl(r.inviteUrl); await copyInviteLink(r.inviteUrl); }
+          else toast.success("Invite sent");
         });
       }}
     >
@@ -48,7 +63,16 @@ export function InviteStaffForm({ branches }: { branches: { id: string; name: st
         </div>
       )}
       <button disabled={pending} className="btn-primary">{pending ? "Sending…" : "Send invite"}</button>
-
+      {inviteUrl && (
+        <div className="rounded-xl bg-amber-50 p-3 text-xs text-amber-900">
+          <p className="font-bold">Account created, but no email was sent.</p>
+          <p className="mt-1">Send this one-time link to them yourself (WhatsApp, SMS):</p>
+          <div className="mt-2 flex gap-2">
+            <input readOnly value={inviteUrl} className="input !py-1 text-xs" onFocus={(e) => e.currentTarget.select()} />
+            <button type="button" onClick={() => copyInviteLink(inviteUrl)} className="shrink-0 font-bold text-brand-orange">Copy</button>
+          </div>
+        </div>
+      )}
     </form>
   );
 }
@@ -102,7 +126,9 @@ export function StaffRowActions({
           onClick={() => {
             start(async () => {
               const r = await resendStaffInvite(userId);
-              r?.error ? toast.error(r.error) : toast.success("Invite resent");
+              if (r?.error) toast.error(r.error);
+              else if (r.inviteUrl) await copyInviteLink(r.inviteUrl);
+              else toast.success("Invite resent");
             });
           }}
           className="text-xs font-bold text-brand-orange"
