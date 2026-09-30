@@ -10,14 +10,12 @@ export default function ResetSalesData() {
   const [pin, setPin] = useState("");
   const [pending, start] = useTransition();
 
-  function downloadArchive(archive: { id: string; order_count: number; total_revenue: number; snapshot: unknown; created_at: string }) {
-    const blob = new Blob([JSON.stringify(archive, null, 2)], { type: "application/json" });
-    const url = URL.createObjectURL(blob);
+  // The route answers with Content-Disposition: attachment, so this downloads
+  // the Excel file without leaving the page. It stays listed under Sales archives.
+  function downloadExcel(archiveId: string) {
     const a = document.createElement("a");
-    a.href = url;
-    a.download = `thelawalaa-sales-archive-${new Date(archive.created_at).toISOString().slice(0, 10)}.json`;
+    a.href = `/admin/archives/${archiveId}/excel`;
     a.click();
-    URL.revokeObjectURL(url);
   }
 
   function submit() {
@@ -26,8 +24,8 @@ export default function ResetSalesData() {
     start(async () => {
       const r = await resetSalesData(pin);
       if (r?.error) { toast.error(r.error); return; }
-      if (r.archive) downloadArchive(r.archive as never);
-      toast.success(`Cleared ${r.archive?.order_count ?? 0} orders. Archive downloaded.`);
+      if (r.archive) downloadExcel(r.archive.id);
+      toast.success(`Cleared ${r.archive?.order_count ?? 0} orders. Excel file downloaded — it's also saved under Sales archives.`, { duration: 8000 });
       setOpen(false);
       setPin("");
     });
@@ -39,7 +37,7 @@ export default function ResetSalesData() {
         <AlertTriangle size={18} className="mt-0.5 shrink-0 text-brand-red" />
         <div>
           <h3 className="font-display font-bold text-brand-brown">Reset sales data</h3>
-          <p className="text-xs text-stone-500">Clears all orders and today&apos;s order counter so you can start fresh on opening day. Products, staff, and settings are untouched. A full copy is saved and downloaded automatically before anything is deleted.</p>
+          <p className="text-xs text-stone-500">Clears all orders and today&apos;s order counter so you can start fresh on opening day. Products, staff, and settings are untouched. A full copy is saved first and downloaded as an Excel file — you can download it again any time from Sales archives.</p>
         </div>
       </div>
       {!open ? (

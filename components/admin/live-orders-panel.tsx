@@ -6,6 +6,7 @@ import toast from "react-hot-toast";
 import { createClient } from "@/lib/supabase/client";
 import { npr, cn, STATUS_COLORS } from "@/lib/utils";
 import { orderStatusLabel, nextCounterAction, STATUS_FILTERS } from "@/lib/order-status";
+import { noteField, customerNote } from "@/lib/order-notes";
 import { adminUpdateOrderStatus, assignDriver, markOrderPaid, getOrderLines, getLiveOrders } from "@/app/actions/staff";
 
 interface Line { product_name: string; quantity: number }
@@ -58,15 +59,9 @@ function chime() {
   } catch { /* no audio — the toast still shows */ }
 }
 
-function noteField(o: Order, key: string) {
-  const m = o.notes?.match(new RegExp(`${key}:\\s*([^\\n]+)`));
-  return m && m[1] !== "N/A" ? m[1] : null;
-}
-const customerName = (o: Order) => noteField(o, "Name") ?? o.customer?.full_name ?? "Walk-in";
-const customerPhone = (o: Order) => noteField(o, "Phone") ?? o.customer?.phone ?? null;
-// What the customer typed, without the [..] / Name / Phone / Address header createOrder adds.
-const kitchenNote = (o: Order) =>
-  (o.notes ?? "").split("\n").filter((l) => !/^\[.*\]$|^(Name|Phone|Address):/.test(l.trim())).join(" ").trim() || null;
+const customerName = (o: Order) => noteField(o.notes, "Name") ?? o.customer?.full_name ?? "Walk-in";
+const customerPhone = (o: Order) => noteField(o.notes, "Phone") ?? o.customer?.phone ?? null;
+const kitchenNote = (o: Order) => customerNote(o.notes);
 
 export default function LiveOrdersPanel({ initialOrders, drivers }: { initialOrders: Order[]; drivers: Driver[] }) {
   const [orders, setOrders] = useState(initialOrders);
@@ -302,8 +297,8 @@ export default function LiveOrdersPanel({ initialOrders, drivers }: { initialOrd
                   {phone && (
                     <a href={`tel:${phone}`} className="inline-block text-xs font-bold text-brand-orange">📞 {phone}</a>
                   )}
-                  {o.type === "delivery" && noteField(o, "Address") && (
-                    <p className="text-[11px] font-bold text-stone-600 bg-stone-50 p-1.5 rounded">📍 {noteField(o, "Address")}</p>
+                  {o.type === "delivery" && noteField(o.notes, "Address") && (
+                    <p className="text-[11px] font-bold text-stone-600 bg-stone-50 p-1.5 rounded">📍 {noteField(o.notes, "Address")}</p>
                   )}
                   <div className="flex flex-wrap gap-1.5">
                     {unpaid && !takePayment && o.status !== "cancelled" && (

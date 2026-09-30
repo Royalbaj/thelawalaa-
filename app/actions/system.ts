@@ -11,8 +11,8 @@ const RESET_PIN = "8848";
 /**
  * Archives every order (with items + delivery) into sales_archives, then
  * wipes orders/loyalty-from-orders/daily counters/promo usage so the site
- * can start clean on opening day. Returns the snapshot so the caller can
- * also hand the admin a downloadable file — the DB row is the durable copy.
+ * can start clean on opening day. The DB row is the durable copy; the caller
+ * downloads it as Excel from /admin/archives/[id]/excel (Settings lists them all).
  */
 export async function resetSalesData(pin: string) {
   const { user } = await requireRole(["super_admin"]);
@@ -23,7 +23,7 @@ export async function resetSalesData(pin: string) {
 
   const { data: archive } = await supabaseAdmin
     .from("sales_archives")
-    .select("id, order_count, total_revenue, snapshot, created_at")
+    .select("id, order_count, total_revenue, created_at")
     .eq("id", archiveId)
     .single();
 
