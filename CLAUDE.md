@@ -1,7 +1,7 @@
 # Thelawalaa — project notes for Claude Code
 
 Multi-role street-food ordering app. **Launch market: Banepa–Godam Chowk, Kavrepalanchok, Nepal.**
-Stack: Next.js 14 (App Router) + TypeScript, Supabase (Postgres/RLS/Auth), Tailwind, Resend, Vercel.
+Stack: Next.js 15 (App Router) + React 19 + TypeScript, Supabase (Postgres/RLS/Auth), Tailwind, Resend, Vercel.
 
 ## First steps after unzipping
 1. `npm install`
@@ -40,6 +40,5 @@ exists to log into the separate Accounts app and has no access to the main site.
 - Verify exact Godam Chowk store lat/lng and postal code in `lib/seo.ts` (currently approximate).
 - Add real Google/Bing site-verification tokens to env (see README §7).
 - Replace placeholder social URLs and OG image if desired.
-- Could not run `npm install`/build in the build environment (no network) — run it locally and fix any version nits.
-- `next` is pinned to 14.2.30 in both apps, which has several known CVEs (`npm audit` in either app lists them) — worth a deliberate, tested upgrade pass at some point, not a drive-by bump given how much of the App Router API changed in 15/16.
+- `next` is pinned to 15.5.26 in both apps (`npm audit` clean as of 2026-09-30; a `postcss` override keeps Next's bundled copy patched). Next 15 rules: `cookies()`/`headers()` and page `params`/`searchParams` are async, so the server `createClient()` must be awaited. `typescript.ignoreBuildErrors` is off on purpose — those async page props are only type-checked by `next build`, never by a plain `tsc`.
 - Real logo file and a real (non-placeholder) `RESEND_API_KEY` are still pending from the user — both were requested/discussed earlier but never received as accessible files/values.
