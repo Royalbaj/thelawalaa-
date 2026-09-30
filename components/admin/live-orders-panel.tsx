@@ -1,15 +1,19 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { format } from "date-fns";
-import { createClient } from "@/lib/supabase/client";
-import { npr, cn } from "@/lib/utils";
-import { adminUpdateOrderStatus, assignDriver, markOrderPaid } from "@/app/actions/staff";
+import { useState, useEffect, useMemo } from "react";
+import { format, formatDistanceToNowStrict } from "date-fns";
 import toast from "react-hot-toast";
+import { createClient } from "@/lib/supabase/client";
+import { npr, cn, STATUS_COLORS } from "@/lib/utils";
+import { orderStatusLabel, nextCounterAction, STATUS_FILTERS } from "@/lib/order-status";
+import { adminUpdateOrderStatus, assignDriver, markOrderPaid, getOrderLines } from "@/app/actions/staff";
+
+interface Line { product_name: string; quantity: number }
 
 interface Order {
   id: string;
   order_number: string;
+  daily_number: number | null;
   status: string;
   type: string;
   total: number;
@@ -18,6 +22,7 @@ interface Order {
   created_at: string;
   notes: string | null;
   customer?: { full_name: string; phone: string | null } | null;
+  items?: Line[];
 }
 
 interface Driver {
@@ -26,29 +31,69 @@ interface Driver {
   is_online: boolean;
 }
 
-const STATUS_COLORS: Record<string, string> = {
-  pending: "bg-amber-100 text-amber-800",
-  confirmed: "bg-blue-100 text-blue-800",
-  preparing: "bg-purple-100 text-purple-800",
-  ready: "bg-green-100 text-green-800",
-  assigned: "bg-cyan-100 text-cyan-800",
-  picked_up: "bg-indigo-100 text-indigo-800",
-  on_the_way: "bg-violet-100 text-violet-800",
-  delivered: "bg-emerald-100 text-emerald-800",
-  cancelled: "bg-red-100 text-red-800",
-};
+const CLOSED = ["delivered", "cancelled"];
+const CHIPS = [
+  { key: "active", label: "Active" },
+  ...STATUS_FILTERS.filter((f) => ["pending", "confirmed", "ready"].includes(f.key)),
+  { key: "all", label: "All" },
+];
 
-const NEXT_STATUS: Record<string, string> = {
-  pending: "confirmed",
-  confirmed: "preparing",
-  preparing: "ready",
-  ready: "delivered",
-};
+// Two-tone chime so a new online order is heard, not just seen. Browsers only
+// allow sound once someone has tapped the page, which a POS always has.
+function chime() {
+  try {
+    const ctx = new AudioContext();
+    [880, 1320].forEach((freq, i) => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      const t = ctx.currentTime + i * 0.18;
+      osc.frequency.value = freq;
+      gain.gain.setValueAtTime(0.25, t);
+      gain.gain.exponentialRampToValueAtTime(0.001, t + 0.3);
+      osc.connect(gain).connect(ctx.destination);
+      osc.start(t);
+      osc.stop(t + 0.3);
+    });
+    setTimeout(() => ctx.close(), 800);
+  } catch { /* no audio — the toast still shows */ }
+}
+
+function noteField(o: Order, key: string) {
+  const m = o.notes?.match(new RegExp(`${key}:\\s*([^\\n]+)`));
+  return m && m[1] !== "N/A" ? m[1] : null;
+}
+const customerName = (o: Order) => noteField(o, "Name") ?? o.customer?.full_name ?? "Walk-in";
+const customerPhone = (o: Order) => noteField(o, "Phone") ?? o.customer?.phone ?? null;
+// What the customer typed, without the [..] / Name / Phone / Address header createOrder adds.
+const kitchenNote = (o: Order) =>
+  (o.notes ?? "").split("\n").filter((l) => !/^\[.*\]$|^(Name|Phone|Address):/.test(l.trim())).join(" ").trim() || null;
 
 export default function LiveOrdersPanel({ initialOrders, drivers }: { initialOrders: Order[]; drivers: Driver[] }) {
   const [orders, setOrders] = useState(initialOrders);
-  const [filter, setFilter] = useState<string>("active");
+  const [filter, setFilter] = useState("active");
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [busyId, setBusyId] = useState<string | null>(null);
+  const [lingering, setLingering] = useState<string[]>([]);
+  const [, setTick] = useState(0);
+
+  // A card that's just been closed stays put (dimmed) for a moment instead of
+  // vanishing — so the next card never slides under a quick second tap.
+  const linger = (id: string) => {
+    setLingering((l) => [...l, id]);
+    setTimeout(() => setLingering((l) => l.filter((x) => x !== id)), 2500);
+  };
+
+  const patch = (id: string, changes: Partial<Order>) =>
+    setOrders((prev) => prev.map((o) => (o.id === id ? { ...o, ...changes } : o)));
+
+  // Items are inserted just after the order row, so the first look can come back empty.
+  const loadLines = (id: string, tries = 3) =>
+    getOrderLines(id)
+      .then((items) => {
+        if (items.length || tries <= 1) patch(id, { items });
+        else setTimeout(() => loadLines(id, tries - 1), 1500);
+      })
+      .catch(() => {});
 
   useEffect(() => {
     const supabase = createClient();
@@ -56,63 +101,74 @@ export default function LiveOrdersPanel({ initialOrders, drivers }: { initialOrd
       .channel("admin-orders")
       .on("postgres_changes", { event: "*", schema: "public", table: "orders" }, (payload) => {
         if (payload.eventType === "INSERT") {
-          setOrders((prev) => [payload.new as Order, ...prev].slice(0, 50));
-          toast("🔔 New order!", { icon: "📦" });
+          const o = payload.new as Order;
+          setOrders((prev) => [o, ...prev].slice(0, 50));
+          loadLines(o.id);
+          // Counter orders start confirmed — only online orders need someone's attention.
+          if (o.status === "pending") { chime(); toast("New online order!", { icon: "🔔" }); }
         } else if (payload.eventType === "UPDATE") {
-          setOrders((prev) => prev.map((o) => (o.id === payload.new.id ? { ...o, ...payload.new } : o)));
+          patch(payload.new.id, payload.new as Partial<Order>);
         }
       })
       .subscribe();
-    return () => { supabase.removeChannel(channel); };
+    const clock = setInterval(() => setTick((n) => n + 1), 30_000); // keeps "5 min ago" current
+    return () => { supabase.removeChannel(channel); clearInterval(clock); };
   }, []);
 
-  const activeStatuses = ["pending", "confirmed", "preparing", "ready", "assigned", "picked_up", "on_the_way"];
-  const filtered = filter === "active"
-    ? orders.filter((o) => activeStatuses.includes(o.status))
-    : filter === "all" ? orders : orders.filter((o) => o.status === filter);
+  const counts = useMemo(() => {
+    const c: Record<string, number> = {
+      active: orders.filter((o) => !CLOSED.includes(o.status)).length,
+      all: orders.length,
+    };
+    for (const f of STATUS_FILTERS) c[f.key] = orders.filter((o) => f.statuses.includes(o.status)).length;
+    return c;
+  }, [orders]);
 
-  function getCustomerName(o: Order) {
-    if (o.notes) {
-      const match = o.notes.match(/Name:\s*([^\n]+)/);
-      if (match) return match[1];
-    }
-    if (o.customer) return o.customer.full_name;
-    return "Walk-in";
+  // Newest first and never re-sorted on a tap — cards must not jump under a finger.
+  const visible = useMemo(() => {
+    if (filter === "active") return orders.filter((o) => !CLOSED.includes(o.status) || lingering.includes(o.id));
+    if (filter === "all") return orders;
+    const statuses = STATUS_FILTERS.find((f) => f.key === filter)?.statuses ?? [];
+    return orders.filter((o) => statuses.includes(o.status) || lingering.includes(o.id));
+  }, [orders, filter, lingering]);
+
+  // Every action updates the card instantly; Realtime confirms it a moment later.
+  // A thrown action (e.g. an expired login) must still roll the card back.
+  const offline = () => ({ error: "Couldn't reach the server — check the connection and try again" });
+
+  async function move(o: Order, status: string) {
+    setBusyId(o.id);
+    if (CLOSED.includes(status)) linger(o.id);
+    patch(o.id, { status });
+    const r = await adminUpdateOrderStatus(o.id, status).catch(offline);
+    setBusyId(null);
+    if (r?.error) { patch(o.id, { status: o.status }); toast.error(r.error); return false; }
+    return true;
   }
 
-  function getCustomerPhone(o: Order) {
-    if (o.notes) {
-      const match = o.notes.match(/Phone:\s*([^\n]+)/);
-      if (match && match[1] !== "N/A") return match[1];
-    }
-    if (o.customer) return o.customer.phone;
-    return null;
+  async function markPaid(o: Order) {
+    setBusyId(o.id);
+    patch(o.id, { payment_status: "paid" });
+    const r = await markOrderPaid(o.id).catch(offline);
+    setBusyId(null);
+    if (r?.error) { patch(o.id, { payment_status: o.payment_status }); toast.error(r.error); return false; }
+    return true;
   }
 
-  function getAddress(o: Order) {
-    if (!o.notes) return null;
-    const match = o.notes.match(/Address:\s*([^\n]+)/);
-    return match ? match[1] : null;
+  // Ready and unpaid: taking the money and handing over the food is one moment, so it's one tap.
+  async function payAndHandOver(o: Order, status: string) {
+    if (await markPaid(o)) await move({ ...o, payment_status: "paid" }, status);
   }
 
-  async function advanceStatus(o: Order) {
-    const next = NEXT_STATUS[o.status];
-    if (!next) return;
-    const res = await adminUpdateOrderStatus(o.id, next);
-    if ("error" in res) { toast.error(res.error as string); return; }
-    toast.success(`→ ${next}`);
+  async function cancel(o: Order) {
+    if (!confirm(`Cancel order #${o.daily_number ?? o.order_number}? The customer will see it as cancelled.`)) return;
+    if (await move(o, "cancelled")) setExpandedId(null);
   }
 
   async function handleAssignDriver(orderId: string, driverId: string) {
     const res = await assignDriver(orderId, driverId);
     if ("error" in res) { toast.error(res.error as string); return; }
     toast.success("Driver assigned!");
-  }
-
-  async function handleMarkPaid(orderId: string) {
-    const res = await markOrderPaid(orderId);
-    if ("error" in res) { toast.error(res.error as string); return; }
-    toast.success("✅ Paid!");
   }
 
   return (
@@ -124,94 +180,128 @@ export default function LiveOrdersPanel({ initialOrders, drivers }: { initialOrd
             <span className="h-2 w-2 rounded-full bg-brand-green animate-pulse" />
             Live Orders
           </h3>
-          <span className="text-[10px] font-bold text-stone-400">{filtered.length} orders</span>
+          <span className="text-[10px] font-bold text-stone-400">{counts.active} active</span>
         </div>
-        <div className="flex gap-1">
-          {["active", "pending", "preparing", "ready", "all"].map((f) => (
-            <button key={f} onClick={() => setFilter(f)} className={cn("touch-manipulation rounded-full px-2.5 py-1.5 text-[10px] font-bold capitalize transition", filter === f ? "bg-brand-orange text-white" : "bg-stone-100 text-stone-500")}>{f}</button>
+        <div className="flex gap-1 overflow-x-auto">
+          {CHIPS.map((f) => (
+            <button key={f.key} onClick={() => setFilter(f.key)}
+              className={cn("shrink-0 touch-manipulation rounded-full px-3 py-1.5 text-[11px] font-bold transition",
+                filter === f.key ? "bg-brand-orange text-white" : "bg-stone-100 text-stone-500")}>
+              {f.label}{counts[f.key] ? ` ${counts[f.key]}` : ""}
+            </button>
           ))}
         </div>
       </div>
 
       {/* Order List */}
       <div className="flex-1 overflow-y-auto p-2 space-y-2">
-        {filtered.length === 0 && (
+        {visible.length === 0 && (
           <div className="text-center py-8">
-            <p className="text-2xl mb-1">📋</p>
-            <p className="text-xs text-stone-400">No orders</p>
+            <p className="text-2xl mb-1">{filter === "active" ? "✅" : "📋"}</p>
+            <p className="text-xs text-stone-400">{filter === "active" ? "All caught up" : "No orders"}</p>
           </div>
         )}
-        {filtered.map((o) => (
-          <div key={o.id} className={cn("touch-manipulation rounded-xl border p-3 transition-all cursor-pointer", o.status === "pending" ? "border-amber-300 bg-amber-50/50 ring-1 ring-amber-200" : "border-stone-100 hover:border-stone-200")} onClick={() => setExpandedId(expandedId === o.id ? null : o.id)}>
-            <div className="flex items-center justify-between gap-2">
-              <div>
-                <span className="font-mono text-xs font-bold text-brand-brown">{o.order_number}</span>
-                <span className="ml-2 text-[10px] text-stone-500">
-                  {getCustomerName(o)}
-                  {getCustomerPhone(o) ? ` • ${getCustomerPhone(o)}` : ""}
-                </span>
-              </div>
-              <span className={cn("rounded-full px-2 py-0.5 text-[10px] font-bold capitalize", STATUS_COLORS[o.status] ?? "bg-stone-100")}>
-                {o.status.replace(/_/g, " ")}
-              </span>
-            </div>
-            <div className="flex items-center justify-between mt-1.5">
-              <div className="flex items-center gap-2">
-                <span className={cn("text-[10px] font-bold rounded px-1.5 py-0.5", o.type === "delivery" ? "bg-purple-50 text-purple-600" : "bg-blue-50 text-blue-600")}>
-                  {o.type === "delivery" ? "🛵" : "🏪"} {o.type}
-                </span>
-                <span className={cn("text-[10px] font-bold rounded px-1.5 py-0.5", o.payment_status === "paid" ? "bg-green-50 text-green-600" : "bg-amber-50 text-amber-600")}>
-                  {o.payment_status === "paid" ? "✅ Paid" : "⏳ Unpaid"}
-                </span>
-              </div>
-              <span className="font-bold text-xs text-brand-orange">{npr(Number(o.total))}</span>
-            </div>
-
-            {/* Expanded Actions */}
-            {expandedId === o.id && (
-              <div className="mt-3 pt-2 border-t border-stone-100 space-y-2" onClick={(e) => e.stopPropagation()}>
-                <p className="text-[10px] text-stone-400">{format(new Date(o.created_at), "d MMM, h:mm a")}</p>
-                {o.type === "delivery" && getAddress(o) && (
-                  <p className="text-[11px] font-bold text-stone-600 bg-stone-50 p-1.5 rounded">📍 {getAddress(o)}</p>
-                )}
-                <div className="flex flex-wrap gap-1.5">
-                  {NEXT_STATUS[o.status] && (
-                    <button onClick={() => advanceStatus(o)} className="touch-manipulation rounded-lg bg-brand-orange text-white px-3 py-2 text-[11px] font-bold hover:brightness-110 transition">
-                      → {NEXT_STATUS[o.status].replace(/_/g, " ")}
-                    </button>
-                  )}
-                  {o.payment_status !== "paid" && (
-                    <button onClick={() => handleMarkPaid(o.id)} className="touch-manipulation rounded-lg bg-green-600 text-white px-3 py-2 text-[11px] font-bold hover:brightness-110 transition">
-                      Mark Paid
-                    </button>
-                  )}
-                  {o.status === "cancelled" ? null : (
-                    <button onClick={() => { adminUpdateOrderStatus(o.id, "cancelled"); toast.success("Cancelled"); }} className="touch-manipulation rounded-lg bg-red-100 text-red-600 px-3 py-2 text-[11px] font-bold hover:bg-red-200 transition">
-                      Cancel
-                    </button>
-                  )}
-                </div>
-
-                {/* Driver Assignment */}
-                {o.type === "delivery" && o.status === "ready" && (
-                  <div className="mt-2">
-                    <p className="text-[10px] font-bold text-stone-500 mb-1">Assign Driver:</p>
-                    <div className="flex flex-wrap gap-1">
-                      {drivers.filter((d) => d.is_online).map((d) => (
-                        <button key={d.id} onClick={() => handleAssignDriver(o.id, d.id)} className="touch-manipulation rounded-lg bg-cyan-50 text-cyan-700 px-2.5 py-1.5 text-[10px] font-bold hover:bg-cyan-100 transition border border-cyan-200">
-                          {d.full_name}
-                        </button>
-                      ))}
-                      {drivers.filter((d) => d.is_online).length === 0 && (
-                        <p className="text-[10px] text-stone-400">No drivers online</p>
-                      )}
+        {visible.map((o) => {
+          const next = nextCounterAction(o.status, o.type);
+          const unpaid = o.payment_status !== "paid";
+          const takePayment = next?.status === "delivered" && unpaid;
+          const note = kitchenNote(o);
+          const phone = customerPhone(o);
+          const expanded = expandedId === o.id;
+          const busy = busyId === o.id;
+          return (
+            <div key={o.id} className={cn("rounded-xl border p-3 transition-all",
+              o.status === "pending" ? "border-amber-300 bg-amber-50/60 ring-1 ring-amber-200"
+                : o.status === "ready" ? "border-emerald-200 bg-emerald-50/40" : "border-stone-100",
+              CLOSED.includes(o.status) && lingering.includes(o.id) && "opacity-50")}>
+              <button type="button" onClick={() => setExpandedId(expanded ? null : o.id)} className="block w-full touch-manipulation text-left">
+                <div className="flex items-start justify-between gap-2">
+                  <div className="flex min-w-0 items-center gap-2.5">
+                    <span className="font-mono text-2xl font-extrabold leading-none text-brand-brown">
+                      #{o.daily_number != null ? String(o.daily_number).padStart(2, "0") : "—"}
+                    </span>
+                    <div className="min-w-0">
+                      <p className="truncate text-xs font-bold text-stone-800">{customerName(o)}</p>
+                      <p className="text-[10px] text-stone-400" suppressHydrationWarning>
+                        {o.type === "dine_in" ? "Dine-in" : o.type === "delivery" ? "🛵 Delivery" : "Pickup"}
+                        {" · "}{formatDistanceToNowStrict(new Date(o.created_at), { addSuffix: true })}
+                      </p>
                     </div>
                   </div>
+                  <span className={cn("shrink-0 rounded-full px-2 py-0.5 text-[10px] font-bold", STATUS_COLORS[o.status] ?? "bg-stone-100")}>
+                    {orderStatusLabel(o.status, o.type)}
+                  </span>
+                </div>
+                {o.items && o.items.length > 0 && (
+                  <p className="mt-2 text-sm font-bold leading-snug text-stone-800">
+                    {o.items.map((i) => `${i.quantity}× ${i.product_name}`).join(", ")}
+                  </p>
+                )}
+                {note && <p className="mt-1.5 rounded-lg bg-yellow-50 px-2 py-1 text-xs font-bold text-yellow-900">📝 {note}</p>}
+              </button>
+
+              <div className="mt-2.5 flex items-center gap-2">
+                <span className={cn("shrink-0 rounded-lg px-2 py-1 text-[11px] font-bold",
+                  unpaid ? "bg-amber-50 text-amber-700" : "bg-green-50 text-green-700")}>
+                  {unpaid ? `${npr(Number(o.total))} due` : `✓ ${npr(Number(o.total))}`}
+                </span>
+                {next && (
+                  <button disabled={busy}
+                    onClick={() => (takePayment ? payAndHandOver(o, next.status) : move(o, next.status))}
+                    className={cn("flex-1 touch-manipulation rounded-xl py-3 text-sm font-extrabold text-white transition active:scale-[0.97] disabled:opacity-60",
+                      next.status === "confirmed" ? "bg-brand-orange" : next.status === "ready" ? "bg-blue-600" : "bg-brand-green")}>
+                    {takePayment ? `Paid · ${next.label}` : next.label}
+                  </button>
                 )}
               </div>
-            )}
-          </div>
-        ))}
+
+              {/* Details + less common actions */}
+              {expanded && (
+                <div className="mt-3 space-y-2 border-t border-stone-100 pt-2">
+                  <p className="text-[10px] text-stone-400" suppressHydrationWarning>
+                    {o.order_number} · {format(new Date(o.created_at), "d MMM, h:mm a")}
+                    {o.payment_method ? ` · ${o.payment_method.toUpperCase()}` : ""}
+                  </p>
+                  {phone && (
+                    <a href={`tel:${phone}`} className="inline-block text-xs font-bold text-brand-orange">📞 {phone}</a>
+                  )}
+                  {o.type === "delivery" && noteField(o, "Address") && (
+                    <p className="text-[11px] font-bold text-stone-600 bg-stone-50 p-1.5 rounded">📍 {noteField(o, "Address")}</p>
+                  )}
+                  <div className="flex flex-wrap gap-1.5">
+                    {unpaid && !takePayment && o.status !== "cancelled" && (
+                      <button disabled={busy} onClick={() => markPaid(o)} className="touch-manipulation rounded-lg bg-green-600 text-white px-3 py-2 text-[11px] font-bold hover:brightness-110 transition">
+                        Mark paid
+                      </button>
+                    )}
+                    {!CLOSED.includes(o.status) && (
+                      <button disabled={busy} onClick={() => cancel(o)} className="touch-manipulation rounded-lg bg-red-100 text-red-600 px-3 py-2 text-[11px] font-bold hover:bg-red-200 transition">
+                        Cancel order
+                      </button>
+                    )}
+                  </div>
+
+                  {/* Driver Assignment */}
+                  {o.type === "delivery" && o.status === "ready" && (
+                    <div className="mt-2">
+                      <p className="text-[10px] font-bold text-stone-500 mb-1">Assign Driver:</p>
+                      <div className="flex flex-wrap gap-1">
+                        {drivers.filter((d) => d.is_online).map((d) => (
+                          <button key={d.id} onClick={() => handleAssignDriver(o.id, d.id)} className="touch-manipulation rounded-lg bg-cyan-50 text-cyan-700 px-2.5 py-1.5 text-[10px] font-bold hover:bg-cyan-100 transition border border-cyan-200">
+                            {d.full_name}
+                          </button>
+                        ))}
+                        {drivers.filter((d) => d.is_online).length === 0 && (
+                          <p className="text-[10px] text-stone-400">No drivers online</p>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          );
+        })}
       </div>
     </div>
   );

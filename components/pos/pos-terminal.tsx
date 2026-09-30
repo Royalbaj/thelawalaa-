@@ -1,5 +1,5 @@
 "use client";
-import { useMemo, useState, useTransition } from "react";
+import { useEffect, useMemo, useState, useTransition } from "react";
 import Image from "next/image";
 import toast from "react-hot-toast";
 import { Search, X, Trash2, ShoppingCart, ChevronUp, UtensilsCrossed, CheckCircle2 } from "lucide-react";
@@ -44,6 +44,15 @@ export default function PosTerminal({
   const itemCount = useMemo(() => cart.reduce((s, l) => s + l.qty, 0), [cart]);
   const received = Number(cashReceived) || 0;
   const change = method === "cash" && received > subtotal ? received - subtotal : 0;
+  // One tap for the usual cash handed over: the exact amount, or a note bigger than the total.
+  const quickCash = [subtotal, ...[100, 500, 1000].filter((n) => n > subtotal)];
+
+  // The confirmation shouldn't block the next customer — it clears itself.
+  useEffect(() => {
+    if (!done) return;
+    const t = setTimeout(() => setDone(null), 8000);
+    return () => clearTimeout(t);
+  }, [done]);
 
   const add = (p: Product) => {
     if (!p.is_available) return;
@@ -142,6 +151,17 @@ export default function PosTerminal({
             {change > 0 && <span className="shrink-0 text-sm font-extrabold text-brand-green">Change {npr(change)}</span>}
           </div>
         )}
+        {method === "cash" && cart.length > 0 && (
+          <div className="flex gap-1.5">
+            {quickCash.map((v, i) => (
+              <button key={v} onClick={() => setCashReceived(String(v))}
+                className={cn("flex-1 touch-manipulation rounded-lg border py-2 text-xs font-bold transition active:scale-95",
+                  received === v ? "border-brand-green bg-green-50 text-brand-green" : "border-orange-100 bg-white text-stone-600")}>
+                {i === 0 ? "Exact" : npr(v)}
+              </button>
+            ))}
+          </div>
+        )}
         <div className="flex justify-between font-display text-lg font-bold">
           <span>Total ({itemCount})</span><span>{npr(subtotal)}</span>
         </div>
@@ -238,8 +258,8 @@ export default function PosTerminal({
 
       {/* Success modal — print:only isolates this from the rest of the app */}
       {done && (
-        <div className="absolute inset-0 z-[60] flex items-center justify-center bg-black/50 p-4 print:static print:bg-white print:p-0">
-          <div id="pos-receipt" className="card w-full max-w-sm p-6 text-center print:shadow-none print:border-0">
+        <div onClick={() => setDone(null)} className="absolute inset-0 z-[60] flex items-center justify-center bg-black/50 p-4 print:static print:bg-white print:p-0">
+          <div id="pos-receipt" onClick={(e) => e.stopPropagation()} className="card w-full max-w-sm p-6 text-center print:shadow-none print:border-0">
             <CheckCircle2 size={40} className="mx-auto text-brand-green" />
             <h2 className="mt-2 font-display text-xl font-bold text-brand-brown">Order placed</h2>
             {done.dailyNumber != null && (

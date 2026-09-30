@@ -184,10 +184,18 @@ const ALLOWED_STATUSES = [
 export async function adminUpdateOrderStatus(orderId: string, status: string) {
   const { user } = await requireRole(["super_admin", "pos_user"]);
   if (!ALLOWED_STATUSES.includes(status)) return { error: "Invalid status" };
-  await supabaseAdmin.from("orders").update({ status }).eq("id", orderId);
+  const { error } = await supabaseAdmin.from("orders").update({ status }).eq("id", orderId);
+  if (error) return { error: "Couldn't update the order — try again" };
   await audit({ actor_id: user.id, action: "UPDATE_ORDER_STATUS", target_table: "orders", target_id: orderId, new_data: { status } });
   revalidatePath("/admin/orders");
   return { ok: true };
+}
+
+/** An order's lines, for orders the POS Live Orders panel only learns about over Realtime. */
+export async function getOrderLines(orderId: string) {
+  await requireRole(["super_admin", "pos_user"]);
+  const { data } = await supabaseAdmin.from("order_items").select("product_name, quantity").eq("order_id", orderId);
+  return data ?? [];
 }
 
 export async function assignDriver(orderId: string, driverId: string) {
