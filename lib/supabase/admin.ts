@@ -57,3 +57,15 @@ export async function awardOrderLoyaltyPoints(customerId: string | null, orderTo
   await supabaseAdmin.from("loyalty_transactions")
     .insert({ customer_id: customerId, points_change: points, reason: "order_reward" });
 }
+
+/**
+ * Branch a staff-placed order belongs to. The operator's own profile wins;
+ * without one (admins, or a POS account nobody assigned) a single-branch
+ * business has nothing to choose, so use its only active branch. With
+ * several branches this stays null and an admin must assign one.
+ */
+export async function resolveStaffBranchId(ownBranchId: string | null): Promise<string | null> {
+  if (ownBranchId) return ownBranchId;
+  const { data } = await supabaseAdmin.from("branches").select("id").eq("is_active", true).limit(2);
+  return data?.length === 1 ? data[0].id : null;
+}

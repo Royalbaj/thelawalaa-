@@ -4,7 +4,7 @@ import crypto from "crypto";
 import { Resend } from "resend";
 import { orderSchema } from "@/lib/validations/order";
 import { getVerifiedUser } from "@/lib/supabase/server";
-import { supabaseAdmin, audit } from "@/lib/supabase/admin";
+import { supabaseAdmin, audit, resolveStaffBranchId } from "@/lib/supabase/admin";
 import { applyOpeningPromoPrice } from "@/lib/promo";
 
 const resend = process.env.RESEND_API_KEY ? new Resend(process.env.RESEND_API_KEY) : null;
@@ -160,7 +160,7 @@ export async function createOrder(input: unknown) {
       order_number: "pending", // replaced by trigger
       customer_id: isSelfCheckout ? user.id : null,
       placed_by: isStaff ? user.id : null,
-      branch_id: isStaff ? profile.branch_id : (data.branch_id ?? null),
+      branch_id: isStaff ? await resolveStaffBranchId(profile.branch_id) : (data.branch_id ?? null),
       type: data.type,
       subtotal,
       delivery_fee,

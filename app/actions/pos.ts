@@ -2,7 +2,7 @@
 
 import { posOrderSchema } from "@/lib/validations/order";
 import { requireRole } from "@/lib/supabase/server";
-import { supabaseAdmin, audit, awardOrderLoyaltyPoints } from "@/lib/supabase/admin";
+import { supabaseAdmin, audit, awardOrderLoyaltyPoints, resolveStaffBranchId } from "@/lib/supabase/admin";
 import { applyOpeningPromoPrice } from "@/lib/promo";
 
 /** POS order: branch comes from the operator's OWN profile — never the client. */
@@ -12,7 +12,8 @@ export async function createPosOrder(input: unknown) {
   if (!parsed.success) return { error: "Invalid order" };
   const d = parsed.data;
 
-  if (!profile.branch_id && profile.role === "pos_user") {
+  const branchId = await resolveStaffBranchId(profile.branch_id);
+  if (!branchId && profile.role === "pos_user") {
     return { error: "Your account isn't linked to a branch — ask an admin" };
   }
 
@@ -51,7 +52,7 @@ export async function createPosOrder(input: unknown) {
       order_number: "pending",
       customer_id,
       placed_by: user.id,
-      branch_id: profile.branch_id,
+      branch_id: branchId,
       type: d.type,
       status: "confirmed",
       subtotal,
