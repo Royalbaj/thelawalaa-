@@ -2,7 +2,7 @@
 const nextConfig = {
   poweredByHeader: false,
   eslint: { ignoreDuringBuilds: true },
-  typescript: { ignoreBuildErrors: true },
+  typescript: { ignoreBuildErrors: false }, // type errors must fail the deploy
   async headers() {
     return [
       {

@@ -10,8 +10,9 @@ const SOURCE_LABEL: Record<string, string> = {
   qr_poster: "QR Poster",
 };
 
-export default async function SignupsPage({ searchParams }: { searchParams: { q?: string; source?: string } }) {
+export default async function SignupsPage(props: { searchParams: Promise<{ q?: string; source?: string }> }) {
   await requireRole(["admin"]);
+  const searchParams = await props.searchParams;
   const q = (searchParams.q ?? "").slice(0, 60);
   const source = searchParams.source ?? "all";
 

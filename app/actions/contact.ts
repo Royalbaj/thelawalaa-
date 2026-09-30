@@ -15,7 +15,7 @@ export async function submitContact(input: unknown) {
   if (!parsed.success) return { error: "Please check the form" };
   if (parsed.data.website) return { ok: true }; // honeypot tripped — pretend success
 
-  const ip = headers().get("x-forwarded-for")?.split(",")[0]?.trim() ?? "unknown";
+  const ip = (await headers()).get("x-forwarded-for")?.split(",")[0]?.trim() ?? "unknown";
   const now = Date.now();
   const hits = (recent.get(ip) ?? []).filter((t) => now - t < WINDOW_MS);
   if (hits.length >= MAX_PER_WINDOW) return { error: "Too many messages — try again later" };

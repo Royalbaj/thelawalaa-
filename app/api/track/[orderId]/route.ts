@@ -10,7 +10,8 @@ import { supabaseAdmin } from "@/lib/supabase/admin";
 
 export const dynamic = "force-dynamic";
 
-export async function GET(_req: Request, { params }: { params: { orderId: string } }) {
+export async function GET(_req: Request, props: { params: Promise<{ orderId: string }> }) {
+  const params = await props.params;
   if (!z.string().uuid().safeParse(params.orderId).success) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }

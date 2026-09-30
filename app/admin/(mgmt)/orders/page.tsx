@@ -10,8 +10,9 @@ export const dynamic = "force-dynamic";
 
 const TABS = ["all","pending","confirmed","preparing","ready","on_the_way","delivered","cancelled"] as const;
 
-export default async function AdminOrders({ searchParams }: { searchParams: { status?: string; q?: string } }) {
+export default async function AdminOrders(props: { searchParams: Promise<{ status?: string; q?: string }> }) {
   await requireRole(["admin"]);
+  const searchParams = await props.searchParams;
   const status = TABS.includes((searchParams.status ?? "all") as never) ? searchParams.status : "all";
   const q = (searchParams.q ?? "").slice(0, 40);
 

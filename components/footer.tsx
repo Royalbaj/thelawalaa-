@@ -11,7 +11,7 @@ function platformIcon(platform: string) {
 }
 
 export default async function Footer() {
-  const supabase = createClient();
+  const supabase = await createClient();
   const { data: socialLinks } = await supabase
     .from("social_links").select("id, platform, url").order("sort_order");
 

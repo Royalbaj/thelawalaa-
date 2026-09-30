@@ -12,8 +12,9 @@ const ROLE_BADGE: Record<string, string> = {
   delivery_driver: "bg-purple-100 text-purple-800",
 };
 
-export default async function StaffPage({ searchParams }: { searchParams: { q?: string } }) {
+export default async function StaffPage(props: { searchParams: Promise<{ q?: string }> }) {
   await requireRole(["admin"]);
+  const searchParams = await props.searchParams;
   const q = (searchParams.q ?? "").slice(0, 60);
 
   let query = supabaseAdmin

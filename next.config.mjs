@@ -7,7 +7,8 @@ const supabaseHost = (process.env.NEXT_PUBLIC_SUPABASE_URL || "")
 
 const csp = [
   "default-src 'self'",
-  "script-src 'self' 'unsafe-inline' https://maps.googleapis.com",
+  // 'unsafe-eval' in dev only — React Refresh needs it; without it local pages never hydrate.
+  `script-src 'self' 'unsafe-inline'${process.env.NODE_ENV === "development" ? " 'unsafe-eval'" : ""} https://maps.googleapis.com`,
   "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
   "font-src 'self' https://fonts.gstatic.com",
   `img-src 'self' data: blob: https://*.supabase.co https://maps.gstatic.com https://maps.googleapis.com https://images.unsplash.com`,
@@ -33,13 +34,21 @@ const securityHeaders = [
 const nextConfig = {
   poweredByHeader: false, // don't advertise the framework
   images: {
-    remotePatterns: [{ protocol: "https", hostname: "*.supabase.co" }],
+    // Keep in sync with img-src in the CSP above — legacy seed data
+    // (supabase/migrations/004_legacy_update_images.sql) still points some
+    // products at Unsplash, which 400s through /_next/image if not listed.
+    remotePatterns: [
+      { protocol: "https", hostname: "*.supabase.co" },
+      { protocol: "https", hostname: "images.unsplash.com" },
+    ],
   },
   eslint: {
     ignoreDuringBuilds: true,
   },
   typescript: {
-    ignoreBuildErrors: true,
+    // Type errors must fail the deploy — Next 15's async params/searchParams
+    // are only type-checked here, never by a plain `tsc`.
+    ignoreBuildErrors: false,
   },
   async headers() {
     return [{ source: "/(.*)", headers: securityHeaders }];

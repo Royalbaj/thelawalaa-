@@ -10,7 +10,7 @@ export default async function MyOrders() {
   const { user } = await getVerifiedUser();
   if (!user) return null;
 
-  const supabase = createClient();
+  const supabase = await createClient();
   const { data: orders } = await supabase
     .from("orders")
     .select("id, order_number, status, total, type, payment_status, payment_method, created_at")

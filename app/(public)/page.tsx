@@ -20,7 +20,7 @@ export const metadata: Metadata = {
 };
 
 export default async function HomePage() {
-  const supabase = createClient();
+  const supabase = await createClient();
   const [{ data: bestsellers }, { data: menuItems }, { data: announcement }, { data: settings }, { data: faqRows }] = await Promise.all([
     supabase
       .from("products")

@@ -9,7 +9,7 @@ export default async function RewardsPage() {
   const { user } = await getVerifiedUser();
   if (!user) return null;
 
-  const supabase = createClient();
+  const supabase = await createClient();
   const [{ data: loyalty }, { data: transactions }] = await Promise.all([
     supabase.from("loyalty_points").select("*").eq("customer_id", user.id).maybeSingle(),
     supabase.from("loyalty_transactions").select("*").eq("customer_id", user.id).order("created_at", { ascending: false }).limit(20),

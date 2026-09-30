@@ -5,8 +5,8 @@ import { cookies } from "next/headers";
 
 const ALLOWED_ROLES = ["admin", "accountant"];
 
-export function createClient() {
-  const cookieStore = cookies();
+export async function createClient() {
+  const cookieStore = await cookies();
   return createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL || "https://placeholder.supabase.co",
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "placeholder",
@@ -26,7 +26,7 @@ export function createClient() {
 
 /** The only trusted way to identify the caller — verifies the JWT, then reads role from the DB. */
 export async function getVerifiedUser() {
-  const supabase = createClient();
+  const supabase = await createClient();
   const { data: { user }, error } = await supabase.auth.getUser();
   if (error || !user) return { user: null, profile: null, supabase };
 

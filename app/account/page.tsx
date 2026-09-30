@@ -12,7 +12,7 @@ export default async function AccountHome() {
   if (!user || !profile) return null;
 
   // Fetch offers, recent orders, loyalty points
-  const supabase = createClient();
+  const supabase = await createClient();
   const [{ data: offers }, { data: recentOrders }, { data: loyalty }, { data: favorites }] = await Promise.all([
     supabase.from("offers").select("*").order("sort_order").limit(6),
     supabase.from("orders").select("id, order_number, status, total, type, created_at").order("created_at", { ascending: false }).limit(3),
