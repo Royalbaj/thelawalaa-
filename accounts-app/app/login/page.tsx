@@ -1,11 +1,10 @@
 "use client";
 import { Suspense, useState } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import toast from "react-hot-toast";
 import { createClient } from "@/lib/supabase/client";
 
 function LoginForm() {
-  const router = useRouter();
   const params = useSearchParams();
   const [busy, setBusy] = useState(false);
 
@@ -23,12 +22,12 @@ function LoginForm() {
 
     const { data: profile } = await supabase.from("profiles").select("role, is_active").eq("id", data.user.id).single();
     if (!profile?.is_active || !["super_admin", "accountant"].includes(profile.role)) {
-      await supabase.auth.signOut();
+      await supabase.auth.signOut({ scope: "local" });
       setBusy(false);
       return toast.error("This account can't access Accounts");
     }
-    router.push("/");
-    router.refresh();
+    // Full page load, replacing this page in history — see components/shell.tsx.
+    window.location.replace("/");
   }
 
   return (

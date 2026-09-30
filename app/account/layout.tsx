@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { getVerifiedUser } from "@/lib/supabase/server";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
+import SessionGuard from "@/components/session-guard";
 
 export const dynamic = "force-dynamic";
 
@@ -11,6 +12,7 @@ export default async function AccountLayout({ children }: { children: React.Reac
 
   return (
     <div className="min-h-screen bg-brand-cream">
+      <SessionGuard userId={profile.id} />
       {/* App-like sticky header */}
       <header className="sticky top-0 z-30 bg-brand-dark text-white">
         <div className="max-w-lg mx-auto px-4 py-3 flex items-center justify-between">

@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { getVerifiedUser } from "@/lib/supabase/server";
 import { ROLE_HOME } from "@/lib/role-home";
 import PosHeader from "@/components/admin/pos-header";
+import SessionGuard from "@/components/session-guard";
 
 export const dynamic = "force-dynamic";
 
@@ -24,6 +25,7 @@ export default async function PosLayout({ children }: { children: React.ReactNod
 
   return (
     <div className="flex h-screen flex-col overflow-hidden bg-brand-cream">
+      <SessionGuard userId={profile.id} />
       <PosHeader fullName={profile.full_name} />
       <main className="min-h-0 flex-1">{children}</main>
     </div>

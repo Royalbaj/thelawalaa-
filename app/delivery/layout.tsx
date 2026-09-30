@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import Link from "next/link";
 import { GraduationCap } from "lucide-react";
 import { getVerifiedUser } from "@/lib/supabase/server";
+import SessionGuard from "@/components/session-guard";
 
 export const dynamic = "force-dynamic";
 
@@ -13,6 +14,7 @@ export default async function DeliveryLayout({ children }: { children: React.Rea
 
   return (
     <div className="min-h-screen bg-stone-900 text-white">
+      <SessionGuard userId={profile.id} />
       {/* Mobile-first sticky header */}
       <header className="sticky top-0 z-30 bg-stone-900/95 backdrop-blur-md border-b border-white/10 px-4 py-3">
         <div className="flex items-center justify-between max-w-lg mx-auto">

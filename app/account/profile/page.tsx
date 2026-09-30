@@ -1,21 +1,15 @@
 "use client";
 
 import { useTransition } from "react";
-import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { User, MapPin, MessageCircle, LogOut } from "lucide-react";
-import { createClient } from "@/lib/supabase/client";
+import { signOutHere } from "@/lib/sign-out";
 
 export default function ProfilePage() {
-  const router = useRouter();
   const [, startTransition] = useTransition();
 
   async function handleSignOut() {
-    startTransition(async () => {
-      await createClient().auth.signOut();
-      router.push("/auth/login");
-      router.refresh();
-    });
+    startTransition(signOutHere);
   }
 
   return (

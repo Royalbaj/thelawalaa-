@@ -5,6 +5,7 @@ import { format } from "date-fns";
 import toast from "react-hot-toast";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import { signOutHere } from "@/lib/sign-out";
 import { npr, cn } from "@/lib/utils";
 import { setDriverOnline, driverAdvanceStatus, verifyDeliveryOtp, getCustomerTelLink } from "@/app/actions/delivery";
 
@@ -284,11 +285,7 @@ export default function DriverDashboard({
 
       {/* Sign Out */}
       <button
-        onClick={async () => {
-          const { createClient } = await import("@/lib/supabase/client");
-          await createClient().auth.signOut();
-          window.location.href = "/auth/login";
-        }}
+        onClick={signOutHere}
         className="w-full rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 py-2.5 text-sm font-bold mt-4"
       >
         Sign Out

@@ -1,11 +1,11 @@
 "use client";
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname } from "next/navigation";
 import {
   LayoutDashboard, ShoppingBag, UtensilsCrossed, Gift, UserPlus,
   Megaphone, Truck, Users, GraduationCap, BarChart3, Settings, LogOut, ExternalLink, HelpCircle,
 } from "lucide-react";
-import { createClient } from "@/lib/supabase/client";
+import { signOutHere } from "@/lib/sign-out";
 import { cn } from "@/lib/utils";
 
 // No "POS Terminal" entry — super_admin's interface no longer includes
@@ -35,7 +35,6 @@ const sectionLabels: Record<string, string> = {
 
 export default function AdminSidebar({ onNavigate }: { onNavigate?: () => void }) {
   const pathname = usePathname();
-  const router = useRouter();
 
   const sections: Record<string, typeof NAV> = {};
   NAV.forEach((item) => {
@@ -83,7 +82,7 @@ export default function AdminSidebar({ onNavigate }: { onNavigate?: () => void }
       </a>
 
       <button
-        onClick={async () => { await createClient().auth.signOut(); router.push("/auth/login"); router.refresh(); }}
+        onClick={signOutHere}
         className="mt-auto flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-bold text-red-300/80 hover:bg-red-500/10 hover:text-red-200 transition-all"
       >
         <LogOut size={18} />

@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { getVerifiedUser } from "@/lib/supabase/server";
 import { ROLE_HOME } from "@/lib/role-home";
 import StaffHeader from "@/components/staff/staff-header";
+import SessionGuard from "@/components/session-guard";
 
 export const dynamic = "force-dynamic";
 
@@ -15,6 +16,7 @@ export default async function StaffLayout({ children }: { children: React.ReactN
 
   return (
     <div className="min-h-screen bg-brand-cream">
+      <SessionGuard userId={profile.id} />
       <StaffHeader backHref={ROLE_HOME[profile.role] ?? "/"} />
       <main className="mx-auto max-w-2xl">{children}</main>
     </div>

@@ -1,6 +1,6 @@
 "use client";
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname } from "next/navigation";
 import { LayoutDashboard, Package, Receipt, BarChart3, LogOut, Menu, X, ClipboardList } from "lucide-react";
 import { useState } from "react";
 import { createClient } from "@/lib/supabase/client";
@@ -16,7 +16,6 @@ const NAV = [
 
 export default function Shell({ fullName, children }: { fullName: string; children: React.ReactNode }) {
   const pathname = usePathname();
-  const router = useRouter();
   const [open, setOpen] = useState(false);
 
   return (
@@ -46,7 +45,11 @@ export default function Shell({ fullName, children }: { fullName: string; childr
           <div className="flex items-center gap-3">
             <span className="hidden text-sm font-bold text-stone-400 sm:inline">{fullName}</span>
             <button
-              onClick={async () => { await createClient().auth.signOut(); router.push("/login"); router.refresh(); }}
+              onClick={async () => {
+                // This device only, then a full page load so Back can't show the last user's screens.
+                await createClient().auth.signOut({ scope: "local" });
+                window.location.replace("/login");
+              }}
               aria-label="Sign out"
               className="flex h-9 w-9 items-center justify-center rounded-full text-stone-400 transition hover:bg-red-50 hover:text-brand-red"
             >

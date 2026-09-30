@@ -27,13 +27,15 @@ function LoginForm() {
 
     const { data: profile } = await supabase
       .from("profiles").select("role, is_active").eq("id", data.user.id).single();
-    if (!profile?.is_active) { await supabase.auth.signOut(); setBusy(false); return router.push("/auth/suspended"); }
+    if (!profile?.is_active) { await supabase.auth.signOut({ scope: "local" }); setBusy(false); return router.push("/auth/suspended"); }
 
     const redirect = params.get("redirect");
     // Only allow same-site relative redirects — blocks open-redirect phishing
     const safe = redirect && redirect.startsWith("/") && !redirect.startsWith("//");
-    router.push(profile.role === "customer" && safe ? redirect! : ROLE_HOME[profile.role] ?? "/account");
-    router.refresh();
+    // A full page load, replacing this login page in history: it drops Next's
+    // in-memory copy of whatever the previous user had open on this device,
+    // so pressing Back can't show their screens.
+    window.location.replace(profile.role === "customer" && safe ? redirect! : ROLE_HOME[profile.role] ?? "/account");
   }
 
   return (
