@@ -5,7 +5,7 @@ import OfferControls from "@/components/admin/offer-controls";
 export const dynamic = "force-dynamic";
 
 export default async function OffersPage() {
-  await requireRole(["admin"]);
+  await requireRole(["super_admin"]);
 
   const { data: offers } = await supabaseAdmin
     .from("offers")

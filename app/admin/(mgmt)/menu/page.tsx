@@ -7,7 +7,7 @@ import {
 export const dynamic = "force-dynamic";
 
 export default async function MenuManager() {
-  await requireRole(["admin"]);
+  await requireRole(["super_admin"]);
   const [{ data: categories }, { data: products }] = await Promise.all([
     supabaseAdmin.from("categories").select("id, name").order("sort_order"),
     supabaseAdmin.from("products").select("id, name, description, price, is_available, is_veg, is_bestseller, spice_level, category_id").order("sort_order"),

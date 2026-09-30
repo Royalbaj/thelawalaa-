@@ -7,7 +7,7 @@ export const dynamic = "force-dynamic";
 
 export default async function DeliveryLayout({ children }: { children: React.ReactNode }) {
   const { profile } = await getVerifiedUser();
-  if (!profile || !["delivery_driver", "admin"].includes(profile.role)) {
+  if (!profile || !["delivery_driver", "super_admin"].includes(profile.role)) {
     redirect("/auth/login?redirect=/delivery");
   }
 

@@ -6,7 +6,7 @@ export const dynamic = "force-dynamic";
 
 export default async function ManagementLayout({ children }: { children: React.ReactNode }) {
   const { profile } = await getVerifiedUser();
-  if (!profile || profile.role !== "admin") redirect("/auth/login?redirect=/admin/dashboard");
+  if (!profile || profile.role !== "super_admin") redirect("/auth/login?redirect=/admin/dashboard");
 
   return <AdminShell fullName={profile.full_name}>{children}</AdminShell>;
 }

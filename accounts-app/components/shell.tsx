@@ -1,13 +1,14 @@
 "use client";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { LayoutDashboard, Package, Receipt, BarChart3, LogOut, Menu, X } from "lucide-react";
+import { LayoutDashboard, Package, Receipt, BarChart3, LogOut, Menu, X, ClipboardList } from "lucide-react";
 import { useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { cn } from "@/lib/utils";
 
 const NAV = [
   { href: "/", label: "Dashboard", icon: LayoutDashboard },
+  { href: "/orders", label: "Orders", icon: ClipboardList },
   { href: "/stock", label: "Stock", icon: Package },
   { href: "/expenses", label: "Expenses", icon: Receipt },
   { href: "/reports", label: "Reports", icon: BarChart3 },

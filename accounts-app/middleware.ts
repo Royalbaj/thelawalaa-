@@ -1,7 +1,7 @@
 import { createServerClient, type CookieOptions } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
-const ALLOWED_ROLES = ["admin", "accountant"];
+const ALLOWED_ROLES = ["super_admin", "accountant"];
 
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;

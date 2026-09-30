@@ -2,14 +2,16 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import {
-  Store, LayoutDashboard, ShoppingBag, UtensilsCrossed, Gift, UserPlus,
+  LayoutDashboard, ShoppingBag, UtensilsCrossed, Gift, UserPlus,
   Megaphone, Truck, Users, GraduationCap, BarChart3, Settings, LogOut, ExternalLink, HelpCircle,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { cn } from "@/lib/utils";
 
+// No "POS Terminal" entry — super_admin's interface no longer includes
+// the counter screen at all (see app/admin/layout.tsx). pos_user has
+// their own separate login that lands straight on /admin.
 export const NAV = [
-  { href: "/admin", label: "POS Terminal", icon: Store, section: "main" },
   { href: "/admin/dashboard", label: "Dashboard", icon: LayoutDashboard, section: "main" },
   { href: "/admin/orders", label: "Orders", icon: ShoppingBag, section: "main" },
   { href: "/admin/menu", label: "Menu Items", icon: UtensilsCrossed, section: "main" },
@@ -49,7 +51,7 @@ export default function AdminSidebar({ onNavigate }: { onNavigate?: () => void }
             {sectionLabels[section]}
           </p>
           {items.map(({ href, label, icon: Icon }) => {
-            const active = href === "/admin" ? pathname === "/admin" : pathname.startsWith(href);
+            const active = pathname.startsWith(href);
             return (
               <Link
                 key={href}

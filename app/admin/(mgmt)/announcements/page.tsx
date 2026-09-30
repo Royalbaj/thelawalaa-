@@ -6,7 +6,7 @@ import { AnnouncementForm, AnnouncementToggle } from "@/components/admin/announc
 export const dynamic = "force-dynamic";
 
 export default async function AnnouncementsPage() {
-  await requireRole(["admin"]);
+  await requireRole(["super_admin"]);
   const { data: rows } = await supabaseAdmin
     .from("announcements")
     .select("id, message, link_url, is_active, ends_at, created_at")

@@ -5,7 +5,7 @@ import { requireRole } from "@/lib/supabase/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 
 export async function toggleFavorite(productId: string) {
-  const { user } = await requireRole(["customer", "admin"]);
+  const { user } = await requireRole(["customer", "super_admin"]);
   
   const { data: existing } = await supabaseAdmin
     .from("customer_favorites")

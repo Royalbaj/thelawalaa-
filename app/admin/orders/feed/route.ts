@@ -8,7 +8,7 @@ export const dynamic = "force-dynamic";
 
 export async function GET() {
   const { profile } = await getVerifiedUser();
-  if (!profile || profile.role !== "admin") {
+  if (!profile || profile.role !== "super_admin") {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
   const { data } = await supabaseAdmin

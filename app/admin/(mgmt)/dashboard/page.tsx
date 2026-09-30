@@ -9,7 +9,7 @@ import { Package, Wallet, Clock, Bell, Bike, XCircle, ClipboardList, UtensilsCro
 export const dynamic = "force-dynamic";
 
 export default async function DashboardPage() {
-  await requireRole(["admin"]);
+  await requireRole(["super_admin"]);
   const today = startOfDay(new Date()).toISOString();
 
   const [{ data: todays }, { count: activeDeliveries }, { count: pendingCount }] = await Promise.all([

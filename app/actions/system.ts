@@ -15,7 +15,7 @@ const RESET_PIN = "8848";
  * also hand the admin a downloadable file — the DB row is the durable copy.
  */
 export async function resetSalesData(pin: string) {
-  const { user } = await requireRole(["admin"]);
+  const { user } = await requireRole(["super_admin"]);
   if (pin !== RESET_PIN) return { error: "Wrong PIN" };
 
   const { data: archiveId, error } = await supabaseAdmin.rpc("reset_sales_data", { p_actor: user.id });

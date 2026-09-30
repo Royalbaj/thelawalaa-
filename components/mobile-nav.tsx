@@ -41,7 +41,7 @@ export default function MobileNav() {
     return null;
   }
 
-  const isCustomer = role === "customer" || role === "admin";
+  const isCustomer = role === "customer" || role === "super_admin";
   const navItems = isCustomer ? CUSTOMER_NAV : PUBLIC_NAV;
   
   const active = navItems.find((item) => {

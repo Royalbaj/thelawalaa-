@@ -5,7 +5,7 @@ import StaffHeader from "@/components/staff/staff-header";
 
 export const dynamic = "force-dynamic";
 
-const STAFF_ROLES = ["pos_user", "delivery_driver", "admin"];
+const STAFF_ROLES = ["pos_user", "delivery_driver", "super_admin"];
 
 export default async function StaffLayout({ children }: { children: React.ReactNode }) {
   const { profile } = await getVerifiedUser();

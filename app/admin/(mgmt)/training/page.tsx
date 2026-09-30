@@ -5,7 +5,7 @@ import TrainingVideosManager from "@/components/admin/training-videos-manager";
 export const dynamic = "force-dynamic";
 
 export default async function TrainingPage() {
-  await requireRole(["admin"]);
+  await requireRole(["super_admin"]);
 
   const [{ data: videos }, { data: progress }] = await Promise.all([
     supabaseAdmin.from("training_videos").select("id, title, youtube_url, is_active").order("sort_order"),
