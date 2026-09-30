@@ -1,6 +1,7 @@
 import { getVerifiedUser } from "@/lib/supabase/server";
 import { createClient } from "@/lib/supabase/server";
 import { npr } from "@/lib/utils";
+import { orderStatusLabel } from "@/lib/order-status";
 import Link from "next/link";
 import Image from "next/image";
 import { ShoppingBag, Package, Gift, Settings, UtensilsCrossed, Heart } from "lucide-react";
@@ -114,7 +115,7 @@ export default async function AccountHome() {
               <Link key={o.id} href={`/track/${o.id}`} className="flex items-center justify-between rounded-2xl bg-white p-4 border border-stone-100 hover:shadow-sm transition">
                 <div>
                   <p className="font-mono text-xs font-bold text-brand-brown">{o.order_number}</p>
-                  <p className="text-[10px] text-stone-400 mt-0.5 capitalize">{o.type} · {o.status.replace(/_/g, " ")}</p>
+                  <p className="text-[10px] text-stone-400 mt-0.5"><span className="capitalize">{o.type}</span> · {orderStatusLabel(o.status, o.type)}</p>
                 </div>
                 <div className="text-right">
                   <p className="font-bold text-sm text-brand-orange">{npr(Number(o.total))}</p>

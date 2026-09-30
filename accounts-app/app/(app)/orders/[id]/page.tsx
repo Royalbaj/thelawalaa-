@@ -4,6 +4,7 @@ import Link from "next/link";
 import { requireAuth } from "@/lib/supabase/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { npr, cn } from "@/lib/utils";
+import { orderStatusLabel } from "@/lib/order-status";
 import { ArrowLeft } from "lucide-react";
 
 export const dynamic = "force-dynamic";
@@ -49,7 +50,7 @@ export default async function OrderDetailPage(props: { params: Promise<{ id: str
         </div>
         <div className="flex gap-2">
           <span className={cn("badge", o.payment_status === "paid" ? "bg-green-100 text-green-800" : "bg-amber-100 text-amber-800")}>{o.payment_status}</span>
-          <span className="badge bg-stone-100 text-stone-700 capitalize">{o.status.replace(/_/g, " ")}</span>
+          <span className="badge bg-stone-100 text-stone-700">{orderStatusLabel(o.status, o.type)}</span>
         </div>
       </div>
 

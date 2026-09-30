@@ -1,6 +1,7 @@
 import { getVerifiedUser } from "@/lib/supabase/server";
 import { createClient } from "@/lib/supabase/server";
-import { npr } from "@/lib/utils";
+import { npr, STATUS_COLORS } from "@/lib/utils";
+import { orderStatusLabel } from "@/lib/order-status";
 import Link from "next/link";
 import { Package, Bike, Store, CheckCircle2, Clock } from "lucide-react";
 
@@ -16,18 +17,6 @@ export default async function MyOrders() {
     .select("id, order_number, status, total, type, payment_status, payment_method, created_at")
     .order("created_at", { ascending: false })
     .limit(30);
-
-  const statusColors: Record<string, string> = {
-    pending: "text-amber-600 bg-amber-50",
-    confirmed: "text-blue-600 bg-blue-50",
-    preparing: "text-purple-600 bg-purple-50",
-    ready: "text-green-600 bg-green-50",
-    assigned: "text-cyan-600 bg-cyan-50",
-    picked_up: "text-indigo-600 bg-indigo-50",
-    on_the_way: "text-violet-600 bg-violet-50",
-    delivered: "text-emerald-600 bg-emerald-50",
-    cancelled: "text-red-600 bg-red-50",
-  };
 
   return (
     <div className="px-4 py-4 pb-24 space-y-3">
@@ -47,8 +36,8 @@ export default async function MyOrders() {
                 <p className="font-mono text-sm font-bold text-brand-brown">{o.order_number}</p>
                 <p className="text-[10px] text-stone-400 mt-0.5">{new Date(o.created_at).toLocaleDateString("en-US", { day: "numeric", month: "short", year: "numeric", hour: "numeric", minute: "2-digit" })}</p>
               </div>
-              <span className={`rounded-full px-2.5 py-1 text-[10px] font-bold capitalize ${statusColors[o.status] ?? "bg-stone-100 text-stone-600"}`}>
-                {o.status.replace(/_/g, " ")}
+              <span className={`rounded-full px-2.5 py-1 text-[10px] font-bold ${STATUS_COLORS[o.status] ?? "bg-stone-100 text-stone-600"}`}>
+                {orderStatusLabel(o.status, o.type)}
               </span>
             </div>
             <div className="flex items-center justify-between mt-2 pt-2 border-t border-stone-50">

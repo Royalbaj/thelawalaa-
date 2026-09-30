@@ -3,11 +3,27 @@ import { useTransition } from "react";
 import toast from "react-hot-toast";
 import { adminUpdateOrderStatus } from "@/app/actions/staff";
 import { STATUS_COLORS, cn } from "@/lib/utils";
+import { orderStatusLabel } from "@/lib/order-status";
 
-const STATUSES = ["pending","confirmed","preparing","ready","assigned","picked_up","on_the_way","delivered","cancelled"];
+// The three customer-facing steps plus done/cancelled; delivery orders also keep
+// the driver hand-off states. An old status (e.g. 'preparing') stays listed as itself.
+const PICKUP = ["pending", "confirmed", "ready", "delivered", "cancelled"];
+const DELIVERY = ["pending", "confirmed", "ready", "assigned", "picked_up", "on_the_way", "delivered", "cancelled"];
+const STAFF_LABELS: Record<string, string> = {
+  preparing: "Confirmed (preparing)",
+  assigned: "Driver assigned",
+  picked_up: "Picked up",
+};
 
-export default function OrderStatusSelect({ orderId, status }: { orderId: string; status: string }) {
+function optionLabel(status: string, type: string) {
+  if (status === "ready") return type === "delivery" ? "Ready for driver" : "Ready to collect";
+  return STAFF_LABELS[status] ?? orderStatusLabel(status, type);
+}
+
+export default function OrderStatusSelect({ orderId, status, type }: { orderId: string; status: string; type: string }) {
   const [pending, start] = useTransition();
+  const base = type === "delivery" ? DELIVERY : PICKUP;
+  const options = base.includes(status) ? base : [status, ...base];
   return (
     <select
       defaultValue={status}
@@ -20,7 +36,7 @@ export default function OrderStatusSelect({ orderId, status }: { orderId: string
         })
       }
     >
-      {STATUSES.map((s) => <option key={s} value={s}>{s.replace(/_/g, " ")}</option>)}
+      {options.map((s) => <option key={s} value={s}>{optionLabel(s, type)}</option>)}
     </select>
   );
 }

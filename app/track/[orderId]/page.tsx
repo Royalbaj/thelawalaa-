@@ -5,18 +5,7 @@ import { useParams, useSearchParams } from "next/navigation";
 import { format } from "date-fns";
 import { createClient } from "@/lib/supabase/client";
 import { npr, STATUS_COLORS, cn } from "@/lib/utils";
-
-const DELIVERY_STEPS = ["pending", "confirmed", "preparing", "on_the_way", "delivered"];
-const PICKUP_STEPS = ["pending", "confirmed", "preparing", "ready", "delivered"];
-const LABELS: Record<string, string> = {
-  pending: "Order placed", confirmed: "Confirmed", preparing: "Preparing",
-  ready: "Ready for pickup", on_the_way: "Out for delivery", delivered: "Done!",
-};
-const TAB_TITLES: Record<string, string> = {
-  pending: "Order received", confirmed: "Order confirmed", preparing: "Preparing your order",
-  ready: "Ready for pickup", on_the_way: "Out for delivery", delivered: "Order complete",
-  cancelled: "Order cancelled",
-};
+import { orderSteps, orderStep, orderStatusLabel } from "@/lib/order-status";
 
 export default function TrackPage() {
   return (
@@ -52,28 +41,24 @@ function TrackContent() {
       setItems(items);
     }
     load();
-    const interval = setInterval(load, 8000);
+    const interval = setInterval(load, 5000);
     return () => { cancelled = true; clearInterval(interval); };
   }, [orderId]);
 
   useEffect(() => {
     if (!order) return;
-    const title = TAB_TITLES[order.status];
-    if (title) document.title = `${title} · Thelawalaa`;
+    document.title = `${orderStatusLabel(order.status, order.type)} · Thelawalaa`;
     return () => { document.title = "Thelawalaa"; };
-  }, [order?.status]);
+  }, [order?.status, order?.type]);
 
   if (notFound)
     return <div className="flex min-h-screen items-center justify-center bg-brand-cream"><p className="font-bold">Order not found, or you don&apos;t have access to it.</p></div>;
   if (!order)
     return <div className="flex min-h-screen items-center justify-center bg-brand-cream"><p className="animate-pulse font-bold">Loading your order…</p></div>;
 
-  const steps = order.type === "pickup" ? PICKUP_STEPS : DELIVERY_STEPS;
-  const statusIndex = (s: string) =>
-    s === "cancelled" ? -1
-    : ["assigned", "picked_up"].includes(s) ? steps.indexOf("on_the_way") - 0.5
-    : steps.indexOf(s);
-  const current = statusIndex(order.status);
+  const steps = orderSteps(order.type);
+  const current = orderStep(order.status, order.type); // 3 = collected/delivered, -1 = cancelled
+  const readyToCollect = order.type !== "delivery" && order.status === "ready";
 
   return (
     <div className="min-h-screen bg-brand-cream px-4 py-10">
@@ -85,8 +70,11 @@ function TrackContent() {
           <p className="mb-4 rounded-xl bg-amber-50 p-4 text-center font-bold text-amber-700">Payment didn&apos;t go through — you can pay cash on arrival, or try eSewa again from support.</p>
         )}
         {order.type === "pickup" && order.status !== "cancelled" && (
-          <div className="mb-4 rounded-2xl border-2 border-dashed border-brand-orange bg-orange-50 p-5 text-center">
-            <p className="text-xs font-bold uppercase tracking-wide text-brand-orange">Tell our counter staff this number</p>
+          <div className={cn("mb-4 rounded-2xl border-2 border-dashed p-5 text-center",
+            readyToCollect ? "border-brand-green bg-green-50" : "border-brand-orange bg-orange-50")}>
+            <p className={cn("text-xs font-bold uppercase tracking-wide", readyToCollect ? "text-brand-green" : "text-brand-orange")}>
+              {readyToCollect ? "Ready! Show this number at the counter" : "Tell our counter staff this number"}
+            </p>
             {order.daily_number != null ? (
               <p className="mt-1 font-mono text-6xl font-extrabold text-brand-brown tracking-wider">{String(order.daily_number).padStart(2, "0")}</p>
             ) : (
@@ -110,18 +98,18 @@ function TrackContent() {
               <p className="font-mono text-sm text-stone-500">{order.order_number}</p>
               <p className="text-sm text-stone-500">{format(new Date(order.created_at), "d MMM yyyy, h:mm a")}</p>
             </div>
-            <span className={cn("badge", STATUS_COLORS[order.status])}>{order.status.replace(/_/g, " ")}</span>
+            <span className={cn("badge", STATUS_COLORS[order.status])}>{orderStatusLabel(order.status, order.type)}</span>
           </div>
 
           {order.status === "cancelled" ? (
             <p className="mt-6 rounded-xl bg-red-50 p-4 font-bold text-brand-red">This order was cancelled.</p>
           ) : (
             <ol className="mt-8 space-y-0">
-              {steps.map((s, i) => {
+              {steps.map((label, i) => {
                 const done = current >= i;
-                const isCurrent = Math.floor(current) === i && order.status !== "delivered";
+                const isCurrent = current === i;
                 return (
-                  <li key={s} className="flex gap-4">
+                  <li key={label} className="flex gap-4">
                     <div className="flex flex-col items-center">
                       <span className={cn(
                         "flex h-8 w-8 items-center justify-center rounded-full text-sm font-bold",
@@ -132,11 +120,16 @@ function TrackContent() {
                       </span>
                       {i < steps.length - 1 && <span className={cn("h-8 w-0.5", done ? "bg-brand-orange" : "bg-stone-200")} />}
                     </div>
-                    <p className={cn("pt-1 font-bold", done ? "text-stone-900" : "text-stone-400")}>{LABELS[s]}</p>
+                    <p className={cn("pt-1 font-bold", done ? "text-stone-900" : "text-stone-400")}>{label}</p>
                   </li>
                 );
               })}
             </ol>
+          )}
+          {current === 3 && (
+            <p className="mt-4 rounded-xl bg-green-50 p-4 text-center font-bold text-brand-green">
+              {orderStatusLabel(order.status, order.type)} — enjoy your food!
+            </p>
           )}
 
           <div className="mt-8 border-t pt-4">

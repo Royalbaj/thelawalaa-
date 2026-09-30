@@ -2,18 +2,20 @@ import { format } from "date-fns";
 import { requireRole } from "@/lib/supabase/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { npr, cn } from "@/lib/utils";
+import { STATUS_FILTERS } from "@/lib/order-status";
 import OrderStatusSelect from "@/components/admin/order-status-select";
 import MarkPaidButton from "@/components/admin/mark-paid-button";
 import Link from "next/link";
 
 export const dynamic = "force-dynamic";
 
-const TABS = ["all","pending","confirmed","preparing","ready","on_the_way","delivered","cancelled"] as const;
+const TABS = [{ key: "all", label: "All", statuses: [] as string[] }, ...STATUS_FILTERS];
 
 export default async function AdminOrders(props: { searchParams: Promise<{ status?: string; q?: string }> }) {
   await requireRole(["super_admin"]);
   const searchParams = await props.searchParams;
-  const status = TABS.includes((searchParams.status ?? "all") as never) ? searchParams.status : "all";
+  const tab = TABS.find((t) => t.key === searchParams.status) ?? TABS[0];
+  const status = tab.key;
   const q = (searchParams.q ?? "").slice(0, 40);
 
   let query = supabaseAdmin
@@ -21,20 +23,19 @@ export default async function AdminOrders(props: { searchParams: Promise<{ statu
     .select("id, order_number, daily_number, status, type, total, payment_status, payment_method, created_at, notes, discount_amount, promo_codes:promo_code_id(code), profiles:customer_id(full_name)")
     .order("created_at", { ascending: false })
     .limit(100);
-  if (status && status !== "all") query = query.eq("status", status);
+  if (tab.statuses.length) query = query.in("status", tab.statuses);
   if (q) query = query.ilike("order_number", `%${q}%`);
   const { data: orders } = await query;
 
-  // Count orders by status for the tab badges
+  // Count orders per tab for the badges
   const { data: statusCounts } = await supabaseAdmin
     .from("orders")
     .select("status");
-  
-  const counts: Record<string, number> = {};
-  (statusCounts ?? []).forEach((o: { status: string }) => {
-    counts[o.status] = (counts[o.status] ?? 0) + 1;
-  });
-  counts["all"] = statusCounts?.length ?? 0;
+
+  const counts: Record<string, number> = { all: statusCounts?.length ?? 0 };
+  for (const t of STATUS_FILTERS) {
+    counts[t.key] = (statusCounts ?? []).filter((o: { status: string }) => t.statuses.includes(o.status)).length;
+  }
 
   return (
     <div className="space-y-5">
@@ -53,13 +54,13 @@ export default async function AdminOrders(props: { searchParams: Promise<{ statu
       {/* Status Tabs */}
       <div className="flex flex-wrap items-center gap-2 pb-2 border-b border-stone-200">
         {TABS.map((t) => (
-          <a key={t} href={`/admin/orders?status=${t}`}
-             className={cn("rounded-full px-4 py-1.5 text-sm font-bold capitalize transition",
-               status === t 
-                 ? "bg-brand-orange text-white shadow-sm" 
+          <a key={t.key} href={`/admin/orders?status=${t.key}`}
+             className={cn("rounded-full px-4 py-1.5 text-sm font-bold transition",
+               status === t.key
+                 ? "bg-brand-orange text-white shadow-sm"
                  : "bg-white text-stone-600 hover:bg-orange-50 border border-stone-200")}>
-            {t.replace(/_/g, " ")}
-            {counts[t] ? <span className="ml-1.5 text-[10px] opacity-70">({counts[t]})</span> : null}
+            {t.label}
+            {counts[t.key] ? <span className="ml-1.5 text-[10px] opacity-70">({counts[t.key]})</span> : null}
           </a>
         ))}
       </div>
@@ -128,7 +129,7 @@ export default async function AdminOrders(props: { searchParams: Promise<{ statu
                     <div className="text-stone-400">{format(new Date(o.created_at), "h:mm a")}</div>
                   </td>
                   <td className="px-4 py-3.5">
-                    <OrderStatusSelect orderId={o.id} status={o.status} />
+                    <OrderStatusSelect orderId={o.id} status={o.status} type={o.type} />
                   </td>
                 </tr>
               );

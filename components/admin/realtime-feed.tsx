@@ -58,7 +58,7 @@ export default function RealtimeFeed({ initial }: { initial: Row[] }) {
                 <MarkPaidButton orderId={o.id} total={Number(o.total)} paid={o.payment_status === "paid"} method={o.payment_method} />
               </td>
               <td className="px-4 py-3 text-stone-500">{format(new Date(o.created_at), "h:mm a")}</td>
-              <td className="px-4 py-3"><OrderStatusSelect orderId={o.id} status={o.status} /></td>
+              <td className="px-4 py-3"><OrderStatusSelect orderId={o.id} status={o.status} type={o.type} /></td>
             </tr>
           ))}
           {orders.length === 0 && (

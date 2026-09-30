@@ -3,10 +3,11 @@ import Link from "next/link";
 import { requireAuth } from "@/lib/supabase/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { npr, cn } from "@/lib/utils";
+import { orderStatusLabel, STATUS_FILTERS } from "@/lib/order-status";
 
 export const dynamic = "force-dynamic";
 
-const TABS = ["all", "pending", "confirmed", "preparing", "ready", "on_the_way", "delivered", "cancelled"] as const;
+const TABS = [{ key: "all", label: "All", statuses: [] as string[] }, ...STATUS_FILTERS];
 
 // Read-only — accountants and admins can see every order here, but
 // nothing on this page can change one. Status/payment changes stay in
@@ -14,7 +15,8 @@ const TABS = ["all", "pending", "confirmed", "preparing", "ready", "on_the_way",
 export default async function OrdersPage(props: { searchParams: Promise<{ status?: string; q?: string }> }) {
   await requireAuth();
   const searchParams = await props.searchParams;
-  const status = TABS.includes((searchParams.status ?? "all") as never) ? searchParams.status : "all";
+  const tab = TABS.find((t) => t.key === searchParams.status) ?? TABS[0];
+  const status = tab.key;
   const q = (searchParams.q ?? "").slice(0, 40);
 
   let query = supabaseAdmin
@@ -22,7 +24,7 @@ export default async function OrdersPage(props: { searchParams: Promise<{ status
     .select("id, order_number, daily_number, status, type, total, payment_status, payment_method, created_at, customer:customer_id(full_name)")
     .order("created_at", { ascending: false })
     .limit(200);
-  if (status && status !== "all") query = query.eq("status", status);
+  if (tab.statuses.length) query = query.in("status", tab.statuses);
   if (q) query = query.ilike("order_number", `%${q}%`);
   const { data: orders } = await query;
 
@@ -42,14 +44,14 @@ export default async function OrdersPage(props: { searchParams: Promise<{ status
       <div className="flex flex-wrap items-center gap-2 border-b border-stone-200 pb-2">
         {TABS.map((t) => (
           <a
-            key={t}
-            href={`/orders?status=${t}`}
+            key={t.key}
+            href={`/orders?status=${t.key}`}
             className={cn(
-              "rounded-full px-4 py-1.5 text-sm font-bold capitalize transition",
-              status === t ? "bg-brand-orange text-white shadow-sm" : "border border-stone-200 bg-white text-stone-600 hover:bg-orange-50"
+              "rounded-full px-4 py-1.5 text-sm font-bold transition",
+              status === t.key ? "bg-brand-orange text-white shadow-sm" : "border border-stone-200 bg-white text-stone-600 hover:bg-orange-50"
             )}
           >
-            {t.replace(/_/g, " ")}
+            {t.label}
           </a>
         ))}
       </div>
@@ -88,7 +90,7 @@ export default async function OrdersPage(props: { searchParams: Promise<{ status
                   <div>{format(new Date(o.created_at), "d MMM yyyy")}</div>
                   <div className="text-stone-400">{format(new Date(o.created_at), "h:mm a")}</div>
                 </td>
-                <td className="px-4 py-3.5 capitalize text-stone-600">{o.status.replace(/_/g, " ")}</td>
+                <td className="px-4 py-3.5 text-stone-600">{orderStatusLabel(o.status, o.type)}</td>
               </tr>
             ))}
             {(orders ?? []).length === 0 && (
