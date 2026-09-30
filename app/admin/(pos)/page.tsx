@@ -6,7 +6,7 @@ import LiveOrdersPanel from "@/components/admin/live-orders-panel";
 
 export const dynamic = "force-dynamic";
 
-// pos_user only — see app/admin/layout.tsx for why super_admin no
+// pos_user only — see app/admin/(pos)/layout.tsx for why super_admin no
 // longer reaches this screen at all.
 export default async function AdminDashboard() {
   await requireRole(["pos_user"]);

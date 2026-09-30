@@ -6,18 +6,21 @@ import { NextResponse, type NextRequest } from "next/server";
 // order tracking is a public direct-link page (unguessable UUID in the
 // URL = the capability). Access to the actual row is still enforced by
 // orders RLS, not by this middleware.
+// super_admin is the management role (see supabase/migrations/018). The
+// /admin prefix covers both the POS screen (pos_user) and the management
+// pages (super_admin); their layouts split the two apart.
 const ROLE_ROUTES: [string, string[]][] = [
-  ["/admin", ["admin", "pos_user"]],
-  ["/pos", ["admin", "pos_user"]],
-  ["/delivery", ["admin", "delivery_driver"]],
-  ["/staff", ["admin", "pos_user", "delivery_driver"]],
-  ["/account", ["admin", "pos_user", "delivery_driver", "customer"]],
+  ["/admin", ["super_admin", "pos_user"]],
+  ["/pos", ["super_admin", "pos_user"]],
+  ["/delivery", ["super_admin", "delivery_driver"]],
+  ["/staff", ["super_admin", "pos_user", "delivery_driver"]],
+  ["/account", ["super_admin", "pos_user", "delivery_driver", "customer"]],
 ];
 
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
-  // Super Admin and Admin are one tier now — keep old /super-admin links working.
+  // Management lives under /admin — keep old /super-admin links working.
   if (pathname === "/super-admin" || pathname.startsWith("/super-admin/")) {
     const target = new URL(pathname.replace(/^\/super-admin/, "/admin") || "/admin", request.url);
     target.search = request.nextUrl.search;

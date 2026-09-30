@@ -9,7 +9,7 @@ import { createClient } from "@/lib/supabase/client";
 import { cn } from "@/lib/utils";
 
 // No "POS Terminal" entry — super_admin's interface no longer includes
-// the counter screen at all (see app/admin/layout.tsx). pos_user has
+// the counter screen at all (see app/admin/(pos)/layout.tsx). pos_user has
 // their own separate login that lands straight on /admin.
 export const NAV = [
   { href: "/admin/dashboard", label: "Dashboard", icon: LayoutDashboard, section: "main" },
