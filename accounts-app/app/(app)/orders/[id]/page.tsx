@@ -8,8 +8,9 @@ import { ArrowLeft } from "lucide-react";
 
 export const dynamic = "force-dynamic";
 
-export default async function OrderDetailPage({ params }: { params: { id: string } }) {
+export default async function OrderDetailPage(props: { params: Promise<{ id: string }> }) {
   await requireAuth();
+  const params = await props.params;
 
   const [{ data: order }, { data: items }, { data: delivery }] = await Promise.all([
     supabaseAdmin

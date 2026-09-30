@@ -11,8 +11,9 @@ const TABS = ["all", "pending", "confirmed", "preparing", "ready", "on_the_way",
 // Read-only — accountants and admins can see every order here, but
 // nothing on this page can change one. Status/payment changes stay in
 // the main admin console, where every write is audited.
-export default async function OrdersPage({ searchParams }: { searchParams: { status?: string; q?: string } }) {
+export default async function OrdersPage(props: { searchParams: Promise<{ status?: string; q?: string }> }) {
   await requireAuth();
+  const searchParams = await props.searchParams;
   const status = TABS.includes((searchParams.status ?? "all") as never) ? searchParams.status : "all";
   const q = (searchParams.q ?? "").slice(0, 40);
 
