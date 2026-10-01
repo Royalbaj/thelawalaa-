@@ -53,6 +53,14 @@ const nextConfig = {
   async headers() {
     return [{ source: "/(.*)", headers: securityHeaders }];
   },
+  async redirects() {
+    // Old business-card / QR link. Temporary, so it can point elsewhere later
+    // without browsers having cached a permanent redirect.
+    return [
+      { source: "/vcard", destination: "/", permanent: false },
+      { source: "/vcard/:path*", destination: "/", permanent: false },
+    ];
+  },
 };
 
 export default nextConfig;
