@@ -2,7 +2,7 @@
 
 import { posOrderSchema } from "@/lib/validations/order";
 import { requireRole } from "@/lib/supabase/server";
-import { supabaseAdmin, audit, awardOrderLoyaltyPoints, resolveStaffBranchId } from "@/lib/supabase/admin";
+import { supabaseAdmin, audit, resolveStaffBranchId } from "@/lib/supabase/admin";
 import { applyOpeningPromoPrice } from "@/lib/promo";
 import { studentDiscount, STUDENT_DISCOUNT_LABEL } from "@/lib/discounts";
 
@@ -40,23 +40,12 @@ export async function createPosOrder(input: unknown) {
   // Worked out here, never trusted from the screen — the toggle only asks for it.
   const discount = d.student_discount ? studentDiscount(discountable) : 0;
 
-  // Optional: attach walk-in customer by phone
-  let customer_id: string | null = null;
-  if (d.customer_phone) {
-    const { data: c } = await supabaseAdmin
-      .from("profiles")
-      .select("id")
-      .eq("phone", d.customer_phone.replace(/^\+977/, ""))
-      .eq("role", "customer")
-      .maybeSingle();
-    customer_id = c?.id ?? null;
-  }
-
+  // Counter sales are anonymous walk-ins — the POS no longer asks for a name or phone.
   const { data: order, error } = await supabaseAdmin
     .from("orders")
     .insert({
       order_number: "pending",
-      customer_id,
+      customer_id: null,
       placed_by: user.id,
       branch_id: branchId,
       type: d.type,
@@ -68,14 +57,13 @@ export async function createPosOrder(input: unknown) {
       total: subtotal - discount,
       payment_method: d.payment_method,
       payment_status: "paid", // POS = paid at counter
-      notes: d.customer_name ? `[POS Order]\nName: ${d.customer_name}\nPhone: ${d.customer_phone || "N/A"}` : null,
+      notes: null,
     })
     .select("id, order_number, daily_number, total")
     .single();
   if (error || !order) return { error: "Order failed" };
 
   await supabaseAdmin.from("order_items").insert(rows.map((r) => ({ ...r, order_id: order.id })));
-  await awardOrderLoyaltyPoints(customer_id, Number(order.total));
   await audit({
     actor_id: user.id, action: "POS_ORDER", target_table: "orders", target_id: order.id,
     new_data: { total: order.total, ...(discount ? { discount, discount_label: STUDENT_DISCOUNT_LABEL } : {}) },

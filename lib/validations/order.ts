@@ -30,9 +30,7 @@ export const orderSchema = z.object({
 
 export const posOrderSchema = z.object({
   type: z.enum(["pickup", "dine_in"]),
-  payment_method: z.enum(["cash", "qr", "card"]),
-  customer_name: z.string().trim().max(100).optional().or(z.literal("")),
-  customer_phone: z.string().regex(/^(\+977)?9[6-8]\d{8}$/).optional().or(z.literal("")),
+  payment_method: z.enum(["cash", "qr"]),
   student_discount: z.boolean().optional(),
   items: z
     .array(z.object({ product_id: z.string().uuid(), quantity: z.number().int().min(1).max(50) }))

@@ -17,7 +17,9 @@ export function PosThemeRoot({ initialDark, children }: { initialDark: boolean; 
   };
   return (
     <ThemeContext.Provider value={{ dark, toggle }}>
-      <div className={cn("flex h-screen flex-col overflow-hidden bg-brand-cream text-stone-900 dark:bg-stone-950 dark:text-stone-100", dark && "dark")}>
+      {/* h-dvh: the height Safari actually shows (100vh hides the bottom under its toolbar).
+          touch-action: no double-tap zoom on a tapping-heavy screen. */}
+      <div className={cn("flex h-dvh flex-col overflow-hidden bg-brand-cream text-stone-900 [touch-action:manipulation] select-none dark:bg-stone-950 dark:text-stone-100", dark && "dark")}>
         {children}
       </div>
     </ThemeContext.Provider>

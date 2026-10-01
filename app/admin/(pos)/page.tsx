@@ -1,9 +1,7 @@
 import { requireRole } from "@/lib/supabase/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { fetchLiveOrders } from "@/lib/live-orders";
-import { npr } from "@/lib/utils";
-import PosTerminal from "@/components/pos/pos-terminal";
-import LiveOrdersPanel from "@/components/admin/live-orders-panel";
+import PosWorkspace from "@/components/pos/pos-workspace";
 
 export const dynamic = "force-dynamic";
 
@@ -33,23 +31,12 @@ export default async function AdminDashboard() {
   ]);
 
   return (
-    <div className="flex h-full flex-col gap-3 p-2 xl:flex-row xl:gap-4 xl:p-4">
-      {/* LEFT — POS Terminal */}
-      <div className="min-h-0 flex-1 overflow-hidden rounded-2xl border border-orange-100 dark:border-stone-800">
-        <PosTerminal
-          products={(products ?? []) as any}
-          categories={(categories ?? []) as any}
-          openingPromo={settings ?? null}
-        />
-      </div>
-
-      {/* RIGHT — Live Orders */}
-      <div className="min-h-0 flex-1 overflow-hidden xl:w-[400px] xl:flex-none">
-        <LiveOrdersPanel
-          initialOrders={(recentOrders ?? []) as any}
-          drivers={(drivers ?? []) as any}
-        />
-      </div>
-    </div>
+    <PosWorkspace
+      products={(products ?? []) as any}
+      categories={(categories ?? []) as any}
+      openingPromo={settings ?? null}
+      initialOrders={(recentOrders ?? []) as any}
+      drivers={(drivers ?? []) as any}
+    />
   );
 }

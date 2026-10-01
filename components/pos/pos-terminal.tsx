@@ -25,9 +25,7 @@ export default function PosTerminal({
   const [cart, setCart] = useState<Line[]>([]);
   const [cartOpen, setCartOpen] = useState(false);
   const [type, setType] = useState<"dine_in" | "pickup">("dine_in");
-  const [method, setMethod] = useState<"cash" | "qr" | "card">("cash");
-  const [name, setName] = useState("");
-  const [phone, setPhone] = useState("");
+  const [method, setMethod] = useState<"cash" | "qr">("cash");
   const [cashReceived, setCashReceived] = useState("");
   const [student, setStudent] = useState(false);
   const [done, setDone] = useState<{ orderNumber: string; dailyNumber: number | null; total: number; discount: number } | null>(null);
@@ -84,14 +82,13 @@ export default function PosTerminal({
     start(async () => {
       const r = await createPosOrder({
         type, payment_method: method,
-        customer_name: name || undefined,
-        customer_phone: phone || undefined,
         student_discount: student,
         items: cart.map((l) => ({ product_id: l.product.id, quantity: l.qty })),
       });
       if (r?.error) { toast.error(r.error); return; }
       setDone({ orderNumber: r.orderNumber!, dailyNumber: r.dailyNumber ?? null, total: Number(r.total), discount: Number(r.discount ?? 0) });
-      setCart([]); setName(""); setPhone(""); setCashReceived(""); setStudent(false); setCartOpen(false);
+      // Ready for the next customer: back to cash, no discount.
+      setCart([]); setCashReceived(""); setStudent(false); setMethod("cash"); setCartOpen(false);
     });
 
   const CartContents = (
@@ -110,15 +107,14 @@ export default function PosTerminal({
       <div className="flex-1 overflow-y-auto p-4">
         {cart.length === 0 && <p className="py-12 text-center text-sm text-stone-400 dark:text-stone-500">Tap items to add them.</p>}
         {cart.map((l) => (
-          <div key={l.product.id} className="mb-3 flex items-center justify-between gap-2">
-            <div className="min-w-0 flex-1">
-              <p className="truncate text-sm font-bold">{l.product.name}</p>
-              <p className="text-xs text-stone-500 dark:text-stone-400">
-                {npr(priceOf(l.product) * l.qty)}
-                {isDiscounted(l.product) && <span className="ml-1 font-bold text-brand-green">Opening offer</span>}
-              </p>
+          // Name on its own line so it wraps instead of being cut off in the narrow cart.
+          <div key={l.product.id} className="mb-3 border-b border-orange-50 pb-3 last:border-0 dark:border-stone-800">
+            <div className="flex items-baseline justify-between gap-2">
+              <p className="text-sm font-bold leading-snug">{l.product.name}</p>
+              <p className="shrink-0 text-sm font-bold">{npr(priceOf(l.product) * l.qty)}</p>
             </div>
-            <div className="flex items-center gap-1.5">
+            {isDiscounted(l.product) && <p className="text-xs font-bold text-brand-green">Opening offer</p>}
+            <div className="mt-1.5 flex items-center gap-1.5">
               <button onClick={() => changeQty(l.product, (n) => n - 1)} aria-label={`One less ${l.product.name}`}
                 className="flex h-11 w-11 shrink-0 touch-manipulation items-center justify-center rounded-full bg-orange-50 transition active:scale-90 dark:bg-stone-800">
                 <Minus size={16} />
@@ -135,7 +131,7 @@ export default function PosTerminal({
                 <Plus size={16} />
               </button>
               <button onClick={() => changeQty(l.product, () => 0)} aria-label={`Remove ${l.product.name}`}
-                className="ml-1 flex h-11 w-11 shrink-0 touch-manipulation items-center justify-center rounded-full text-stone-400 transition hover:bg-red-50 hover:text-brand-red dark:hover:bg-red-950/40">
+                className="ml-auto flex h-11 w-11 shrink-0 touch-manipulation items-center justify-center rounded-full text-stone-400 transition hover:bg-red-50 hover:text-brand-red dark:hover:bg-red-950/40">
                 <Trash2 size={15} />
               </button>
             </div>
@@ -152,12 +148,6 @@ export default function PosTerminal({
             </button>
           ))}
         </div>
-        <div className="grid grid-cols-2 gap-2">
-          <input value={name} onChange={(e) => setName(e.target.value.slice(0, 100))}
-            placeholder="Customer name" className="input !py-2.5 text-sm" />
-          <input value={phone} onChange={(e) => setPhone(e.target.value.slice(0, 13))}
-            placeholder="Phone (optional)" className="input !py-2.5 text-sm" />
-        </div>
         <button
           onClick={() => setStudent((s) => !s)}
           aria-pressed={student}
@@ -170,7 +160,7 @@ export default function PosTerminal({
           <span>{student ? (discount ? `−${npr(discount)}` : "On") : "Off"}</span>
         </button>
         <div className="flex gap-2">
-          {([["cash", "Cash"], ["qr", "QR"], ["card", "Card"]] as const).map(([v, label]) => (
+          {([["cash", "Cash"], ["qr", "QR"]] as const).map(([v, label]) => (
             <button key={v} onClick={() => setMethod(v)}
               className={cn("flex-1 touch-manipulation rounded-xl py-3 text-sm font-bold",
                 method === v ? "bg-brand-green text-white" : "bg-orange-50 text-stone-600 dark:bg-stone-800 dark:text-stone-300")}>
@@ -184,7 +174,7 @@ export default function PosTerminal({
             <input
               type="number" min="0" inputMode="decimal" value={cashReceived}
               onChange={(e) => setCashReceived(e.target.value)}
-              placeholder="Rs" className="input !w-24 !py-1.5 !text-sm ml-auto"
+              placeholder="Rs" className="input !w-24 !py-1.5 !text-base ml-auto sm:!text-sm"
             />
             {change > 0 && <span className="shrink-0 text-sm font-extrabold text-brand-green">Change {npr(change)}</span>}
           </div>
@@ -226,7 +216,8 @@ export default function PosTerminal({
         <div className="flex items-center gap-2 overflow-x-auto border-b border-orange-100 bg-white p-3 dark:border-stone-800 dark:bg-stone-900">
           <div className="relative shrink-0">
             <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-stone-400" />
-            <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search" className="input !w-36 !py-1.5 !pl-9 text-sm sm:!w-40" />
+            {/* 16px on phones — iPhone Safari zooms the page into any smaller input */}
+            <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search" className="input !w-32 !py-1.5 !pl-9 text-base sm:!w-40 sm:text-sm" />
           </div>
           {[{ id: "all", name: "All" }, ...categories].map((c) => (
             <button key={c.id} onClick={() => setCat(c.id)}
@@ -236,7 +227,8 @@ export default function PosTerminal({
             </button>
           ))}
         </div>
-        <div className="grid flex-1 auto-rows-min grid-cols-2 gap-3 overflow-y-auto bg-brand-cream p-4 pb-24 dark:bg-stone-950 sm:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 lg:pb-4">
+        {/* Columns: phone 2 · iPad portrait 4 · beside the cart (iPad landscape, laptop) 3 · wide 4 */}
+        <div className="grid flex-1 auto-rows-min grid-cols-2 gap-3 overflow-y-auto overscroll-contain bg-brand-cream p-3 pb-24 dark:bg-stone-950 sm:grid-cols-3 sm:p-4 md:grid-cols-4 lg:grid-cols-3 lg:pb-4 2xl:grid-cols-4">
           {visible.map((p) => {
             const qty = qtyOf(p.id);
             return (
@@ -304,7 +296,7 @@ export default function PosTerminal({
       {cartOpen && <div className="absolute inset-0 z-40 bg-black/40 lg:hidden" onClick={() => setCartOpen(false)} />}
       <div
         className={cn(
-          "absolute inset-x-0 bottom-0 z-50 flex max-h-[85%] flex-col rounded-t-3xl bg-white transition-transform duration-300 ease-out dark:bg-stone-900 lg:static lg:z-auto lg:h-full lg:w-80 lg:max-h-none lg:translate-y-0 lg:rounded-none lg:border-l lg:border-orange-100 lg:dark:border-stone-800 xl:w-96",
+          "absolute inset-x-0 bottom-0 z-50 flex max-h-[85%] flex-col rounded-t-3xl bg-white transition-transform duration-300 ease-out dark:bg-stone-900 lg:static lg:z-auto lg:h-full lg:w-80 lg:max-h-none lg:translate-y-0 lg:rounded-none lg:border-l lg:border-orange-100 lg:dark:border-stone-800 2xl:w-96",
           cartOpen ? "translate-y-0" : "translate-y-full lg:translate-y-0"
         )}
       >
