@@ -1,11 +1,14 @@
 "use server";
 
 import crypto from "crypto";
+import { after } from "next/server";
 import { Resend } from "resend";
 import { orderSchema } from "@/lib/validations/order";
 import { getVerifiedUser } from "@/lib/supabase/server";
 import { supabaseAdmin, audit, resolveStaffBranchId } from "@/lib/supabase/admin";
 import { applyOpeningPromoPrice } from "@/lib/promo";
+import { pushToStaff } from "@/lib/push";
+import { npr } from "@/lib/utils";
 
 const resend = process.env.RESEND_API_KEY ? new Resend(process.env.RESEND_API_KEY) : null;
 
@@ -222,6 +225,18 @@ export async function createOrder(input: unknown) {
           </div>`,
       });
     } catch { /* email failure must not fail the order */ }
+  }
+
+  // An online order: alert the POS devices (Web Push, with sound) — after the
+  // customer already has their response, so a slow push service can't delay checkout.
+  if (!isStaff) {
+    const no = order.daily_number != null ? `#${String(order.daily_number).padStart(2, "0")}` : order.order_number;
+    after(() => pushToStaff({
+      title: `New online order ${no}`,
+      body: `${data.type === "delivery" ? "Delivery" : "Pickup"} · ${itemRows.map((r) => `${r.quantity}× ${r.product_name}`).join(", ")} · ${npr(total)}`,
+      tag: order.id,
+      url: "/admin",
+    }));
   }
 
   return { orderId: order.id, orderNumber: order.order_number, dailyNumber: order.daily_number, total };

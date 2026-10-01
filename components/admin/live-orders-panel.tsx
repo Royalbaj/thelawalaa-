@@ -7,11 +7,12 @@ import { createClient } from "@/lib/supabase/client";
 import { npr, cn, STATUS_COLORS } from "@/lib/utils";
 import { orderStatusLabel, nextCounterAction, STATUS_FILTERS } from "@/lib/order-status";
 import { noteField, customerNote } from "@/lib/order-notes";
+import { playOrderSound } from "@/lib/order-sound";
 import { adminUpdateOrderStatus, assignDriver, markOrderPaid, getOrderLines, getLiveOrders } from "@/app/actions/staff";
 
 interface Line { product_name: string; quantity: number }
 
-interface Order {
+export interface Order {
   id: string;
   order_number: string;
   daily_number: number | null;
@@ -40,31 +41,20 @@ const CHIPS = [
   { key: "all", label: "All" },
 ];
 
-// Two-tone chime so a new online order is heard, not just seen. Browsers only
-// allow sound once someone has tapped the page, which a POS always has.
-function chime() {
-  try {
-    const ctx = new AudioContext();
-    [880, 1320].forEach((freq, i) => {
-      const osc = ctx.createOscillator();
-      const gain = ctx.createGain();
-      const t = ctx.currentTime + i * 0.18;
-      osc.frequency.value = freq;
-      gain.gain.setValueAtTime(0.25, t);
-      gain.gain.exponentialRampToValueAtTime(0.001, t + 0.3);
-      osc.connect(gain).connect(ctx.destination);
-      osc.start(t);
-      osc.stop(t + 0.3);
-    });
-    setTimeout(() => ctx.close(), 800);
-  } catch { /* no audio — the toast still shows */ }
-}
-
 const customerName = (o: Order) => noteField(o.notes, "Name") ?? o.customer?.full_name ?? "Walk-in";
 const customerPhone = (o: Order) => noteField(o.notes, "Phone") ?? o.customer?.phone ?? null;
 const kitchenNote = (o: Order) => customerNote(o.notes);
 
-export default function LiveOrdersPanel({ initialOrders, drivers }: { initialOrders: Order[]; drivers: Driver[] }) {
+export default function LiveOrdersPanel({
+  initialOrders, drivers, onNewOrder, onNewCount,
+}: {
+  initialOrders: Order[];
+  drivers: Driver[];
+  /** A new online order arrived (the chime has already played). Default: a toast. */
+  onNewOrder?: (o: Order) => void;
+  /** How many orders are waiting to be confirmed — for a badge outside the panel. */
+  onNewCount?: (n: number) => void;
+}) {
   const [orders, setOrders] = useState(initialOrders);
   const [filter, setFilter] = useState("active");
   const [expandedId, setExpandedId] = useState<string | null>(null);
@@ -80,7 +70,9 @@ export default function LiveOrdersPanel({ initialOrders, drivers }: { initialOrd
   const announce = (o: Order) => {
     if (known.current.has(o.id)) return;
     known.current.add(o.id);
-    if (o.status === "pending") { chime(); toast("New online order!", { icon: "🔔" }); }
+    if (o.status !== "pending") return;
+    playOrderSound();
+    if (onNewOrder) onNewOrder(o); else toast("New online order!", { icon: "🔔" });
   };
 
   // A card that's just been closed stays put (dimmed) for a moment instead of
@@ -156,6 +148,8 @@ export default function LiveOrdersPanel({ initialOrders, drivers }: { initialOrd
     for (const f of STATUS_FILTERS) c[f.key] = orders.filter((o) => f.statuses.includes(o.status)).length;
     return c;
   }, [orders]);
+
+  useEffect(() => { onNewCount?.(counts.pending); }, [counts.pending, onNewCount]);
 
   // Newest first and never re-sorted on a tap — cards must not jump under a finger.
   const visible = useMemo(() => {
