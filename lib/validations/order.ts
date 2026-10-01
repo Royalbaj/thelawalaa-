@@ -32,6 +32,7 @@ export const posOrderSchema = z.object({
   type: z.enum(["pickup", "dine_in"]),
   payment_method: z.enum(["cash", "qr"]),
   student_discount: z.boolean().optional(),
+  member: z.boolean().optional(),
   items: z
     .array(z.object({ product_id: z.string().uuid(), quantity: z.number().int().min(1).max(50) }))
     .min(1).max(40),

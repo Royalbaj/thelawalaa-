@@ -2,9 +2,10 @@ import { startOfDay } from "date-fns";
 import { requireRole } from "@/lib/supabase/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { npr } from "@/lib/utils";
+import { getTrainingStatus } from "@/lib/training-status";
 import RealtimeFeed from "@/components/admin/realtime-feed";
 import Link from "next/link";
-import { Package, Wallet, Clock, Bell, Bike, XCircle, ClipboardList, UtensilsCrossed, Megaphone } from "lucide-react";
+import { Package, Wallet, Clock, Bell, Bike, XCircle, ClipboardList, UtensilsCrossed, Megaphone, GraduationCap } from "lucide-react";
 
 export const dynamic = "force-dynamic";
 
@@ -12,12 +13,14 @@ export default async function DashboardPage() {
   await requireRole(["super_admin"]);
   const today = startOfDay(new Date()).toISOString();
 
-  const [{ data: todays }, { count: activeDeliveries }, { count: pendingCount }] = await Promise.all([
+  const [{ data: todays }, { count: activeDeliveries }, { count: pendingCount }, training] = await Promise.all([
     supabaseAdmin.from("orders").select("total, payment_status, status").gte("created_at", today),
     supabaseAdmin.from("orders").select("id", { count: "exact", head: true })
       .eq("type", "delivery").in("status", ["assigned", "picked_up", "on_the_way"]),
     supabaseAdmin.from("orders").select("id", { count: "exact", head: true }).eq("status", "pending"),
+    getTrainingStatus(),
   ]);
+  const stillTraining = training.team.filter((t) => t.missing.length > 0);
 
   const revenue = (todays ?? [])
     .filter((o) => o.payment_status === "paid" && o.status !== "cancelled")
@@ -74,6 +77,25 @@ export default async function DashboardPage() {
           <Megaphone size={16} /> Announcements
         </Link>
       </div>
+
+      {/* Staff training — who still has to finish the videos on the Staff Portal */}
+      {training.activeCount > 0 && training.team.length > 0 && (
+        <Link
+          href="/admin/training"
+          className={`flex items-center gap-3 rounded-2xl border p-4 transition hover:shadow-md ${stillTraining.length ? "border-amber-300 bg-amber-50" : "border-green-200 bg-green-50"}`}
+        >
+          <GraduationCap size={20} className={stillTraining.length ? "shrink-0 text-amber-600" : "shrink-0 text-brand-green"} />
+          <div className="min-w-0 flex-1">
+            <p className="text-sm font-bold text-brand-brown">
+              Staff training: {training.team.length - stillTraining.length} of {training.team.length} finished
+            </p>
+            <p className="truncate text-xs text-stone-500">
+              {stillTraining.length ? `Not finished yet: ${stillTraining.map((t) => t.name).join(", ")}` : "Everyone has watched every training video."}
+            </p>
+          </div>
+          <span className="shrink-0 text-sm font-bold text-brand-orange">See who →</span>
+        </Link>
+      )}
 
       {/* Live Orders */}
       <div>

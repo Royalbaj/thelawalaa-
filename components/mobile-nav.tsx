@@ -41,6 +41,12 @@ export default function MobileNav() {
     return null;
   }
 
+  // Room at the end of the page so the fixed bar never covers the last of the
+  // content. It lives here (not as body padding) so the staff screens above,
+  // which have no bar, don't get a strip of blank page — on the POS that made
+  // the whole till scroll on iPhones.
+  const spacer = <div aria-hidden className="h-20 sm:hidden" />;
+
   const isCustomer = role === "customer" || role === "super_admin";
   const navItems = isCustomer ? CUSTOMER_NAV : PUBLIC_NAV;
   
@@ -52,6 +58,8 @@ export default function MobileNav() {
 
   if (isCustomer) {
     return (
+      <>
+      {spacer}
       <nav className="fixed bottom-0 left-0 right-0 z-50 bg-white border-t border-stone-200 shadow-lg sm:hidden pb-safe">
         <div className="flex">
           {navItems.map((item) => {
@@ -73,11 +81,14 @@ export default function MobileNav() {
           })}
         </div>
       </nav>
+      </>
     );
   }
 
   // Public Nav
   return (
+    <>
+    {spacer}
     <nav className="fixed bottom-0 left-0 right-0 z-50 flex items-center justify-between border-t border-stone-800 bg-[#1A1A1A] px-2 py-2 sm:hidden pb-safe">
       {navItems.map((item) => {
         const isActive = active === item.id;
@@ -97,5 +108,6 @@ export default function MobileNav() {
         );
       })}
     </nav>
+    </>
   );
 }

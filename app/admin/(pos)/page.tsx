@@ -13,7 +13,7 @@ export default async function AdminDashboard() {
   const [{ data: products }, { data: categories }, { data: recentOrders }, { data: drivers }, { data: settings }] = await Promise.all([
     supabaseAdmin
       .from("products")
-      .select("id, name, price, image_url, category_id, is_available, is_veg, student_discount_eligible")
+      .select("id, name, price, image_url, category_id, is_available, is_veg, student_discount_eligible, member_price")
       .eq("is_available", true)
       .order("sort_order"),
     supabaseAdmin.from("categories").select("id, name").order("sort_order"),

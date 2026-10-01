@@ -18,8 +18,14 @@ export function PosThemeRoot({ initialDark, children }: { initialDark: boolean; 
   return (
     <ThemeContext.Provider value={{ dark, toggle }}>
       {/* h-dvh: the height Safari actually shows (100vh hides the bottom under its toolbar).
-          touch-action: no double-tap zoom on a tapping-heavy screen. */}
-      <div className={cn("flex h-dvh flex-col overflow-hidden bg-brand-cream text-stone-900 [touch-action:manipulation] select-none dark:bg-stone-950 dark:text-stone-100", dark && "dark")}>
+          Safe-area padding: clear of the iPhone home bar / notch (layout sets viewportFit cover).
+          touch-action: no double-tap zoom on a tapping-heavy screen.
+          select-none for the taps, but inputs opt back in — older iOS won't type into them otherwise. */}
+      <div className={cn(
+        "flex h-dvh flex-col overflow-hidden bg-brand-cream text-stone-900 [touch-action:manipulation] select-none dark:bg-stone-950 dark:text-stone-100",
+        "pb-[env(safe-area-inset-bottom)] pl-[env(safe-area-inset-left)] pr-[env(safe-area-inset-right)] pt-[env(safe-area-inset-top)] [&_input]:select-text",
+        dark && "dark",
+      )}>
         {children}
       </div>
     </ThemeContext.Provider>

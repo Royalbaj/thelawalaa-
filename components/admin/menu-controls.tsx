@@ -14,10 +14,13 @@ type EditableProduct = {
   id: string; name: string; description: string | null; category_id: string;
   price: number; is_available: boolean; is_veg: boolean; spice_level: number; is_bestseller: boolean;
   image_url: string | null; pos_only: boolean; student_discount_eligible: boolean;
+  member_price: number | string | null;
 };
 
 /** "Where it's sold" + discount options, shared by the add and edit forms. */
-function SalesOptions({ posOnly = false, studentDiscount = true }: { posOnly?: boolean; studentDiscount?: boolean }) {
+function SalesOptions({ posOnly = false, studentDiscount = true, memberPrice = null }: {
+  posOnly?: boolean; studentDiscount?: boolean; memberPrice?: number | string | null;
+}) {
   return (
     <div className="flex flex-wrap items-center gap-4 text-sm font-bold text-stone-600">
       <label className="flex items-center gap-2" title="Shown on the POS only — hidden from the website and online orders">
@@ -25,6 +28,10 @@ function SalesOptions({ posOnly = false, studentDiscount = true }: { posOnly?: b
       </label>
       <label className="flex items-center gap-2" title="The POS student discount (5%) applies to this item">
         <input type="checkbox" name="student_discount_eligible" defaultChecked={studentDiscount} /> Student discount applies
+      </label>
+      <label className="flex items-center gap-2" title="What a member pays when the POS has Member switched on. Leave blank for no member price.">
+        Member price
+        <input name="member_price" type="number" min="1" step="0.01" defaultValue={memberPrice ?? ""} placeholder="—" className="input !w-24 !py-1" />
       </label>
     </div>
   );
@@ -104,6 +111,7 @@ export function ProductRow({ product, categories }: { product: EditableProduct; 
             </p>
             <p className="text-xs text-stone-500">
               {npr(Number(product.price))} · spice {"🌶".repeat(product.spice_level) || "—"}
+              {product.member_price != null && ` · member ${npr(Number(product.member_price))}`}
               {!product.student_discount_eligible && " · no student discount"}
             </p>
           </div>
@@ -127,6 +135,7 @@ export function ProductRow({ product, categories }: { product: EditableProduct; 
                 price: fd.price, spice_level: fd.spice_level,
                 is_veg: fd.is_veg === "on", is_bestseller: fd.is_bestseller === "on",
                 pos_only: fd.pos_only === "on", student_discount_eligible: fd.student_discount_eligible === "on",
+                member_price: fd.member_price,
               });
               if (r?.error) toast.error(r.error);
               else { toast.success("Product updated"); setEditing(false); }
@@ -148,7 +157,7 @@ export function ProductRow({ product, categories }: { product: EditableProduct; 
               <select name="spice_level" defaultValue={product.spice_level} className="input !w-16 !py-1">{[0, 1, 2, 3].map((n) => <option key={n}>{n}</option>)}</select>
             </label>
           </div>
-          <SalesOptions posOnly={product.pos_only} studentDiscount={product.student_discount_eligible} />
+          <SalesOptions posOnly={product.pos_only} studentDiscount={product.student_discount_eligible} memberPrice={product.member_price} />
           <div className="flex gap-2">
             <button disabled={pending} className="btn-primary !py-1.5 text-sm">{pending ? "Saving…" : "Save"}</button>
             <button type="button" onClick={() => setEditing(false)} className="rounded-full bg-white px-4 py-1.5 text-sm font-bold border border-stone-200">Cancel</button>
@@ -209,6 +218,7 @@ export function AddProductForm({ categories }: { categories: { id: string; name:
             price: fd.price, spice_level: fd.spice_level,
             is_veg: fd.is_veg === "on", is_bestseller: fd.is_bestseller === "on",
             pos_only: fd.pos_only === "on", student_discount_eligible: fd.student_discount_eligible === "on",
+            member_price: fd.member_price,
           });
           if (r?.error) toast.error(r.error);
           else { toast.success("Product added"); form.reset(); }

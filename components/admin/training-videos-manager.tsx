@@ -1,10 +1,9 @@
 "use client";
 import { useTransition } from "react";
 import toast from "react-hot-toast";
-import { Trash2, PlayCircle } from "lucide-react";
+import { Trash2, PlayCircle, CheckCircle2, Clock } from "lucide-react";
 import { addTrainingVideo, setTrainingVideoActive, deleteTrainingVideo } from "@/app/actions/training";
-
-type Video = { id: string; title: string; youtube_url: string; is_active: boolean; watchCount: number };
+import type { TrainingVideoStatus as Video } from "@/lib/training-status";
 
 export default function TrainingVideosManager({ videos }: { videos: Video[] }) {
   const [pending, start] = useTransition();
@@ -17,12 +16,27 @@ export default function TrainingVideosManager({ videos }: { videos: Video[] }) {
       </div>
       <div className="space-y-2">
         {videos.map((v) => (
-          <div key={v.id} className="flex items-center gap-2 rounded-xl bg-stone-50 p-2.5">
-            <PlayCircle size={16} className="shrink-0 text-brand-brown" />
+          <div key={v.id} className="flex items-start gap-2 rounded-xl bg-stone-50 p-2.5">
+            <PlayCircle size={16} className="mt-0.5 shrink-0 text-brand-brown" />
             <div className="min-w-0 flex-1">
               <p className="text-xs font-bold">{v.title}</p>
               <p className="truncate text-[11px] text-stone-500">{v.youtube_url}</p>
-              <p className="text-[10px] text-stone-400">{v.watchCount} staff watched</p>
+              {/* Who finished it (first time, Nepal time) and, while it's on, who hasn't yet. */}
+              <ul className="mt-1.5 space-y-0.5 text-[11px]">
+                {v.watched.map((w, i) => (
+                  <li key={i} className="flex items-center gap-1 font-bold text-green-700">
+                    <CheckCircle2 size={11} className="shrink-0" /> {w.name} <span className="font-normal text-stone-400">· {w.at}</span>
+                  </li>
+                ))}
+                {v.is_active && v.notYet.length > 0 && (
+                  <li className="flex items-center gap-1 font-bold text-amber-700">
+                    <Clock size={11} className="shrink-0" /> Not yet: {v.notYet.join(", ")}
+                  </li>
+                )}
+                {v.watched.length === 0 && !(v.is_active && v.notYet.length > 0) && (
+                  <li className="text-stone-400">Nobody has watched this yet.</li>
+                )}
+              </ul>
             </div>
             <button
               disabled={pending}

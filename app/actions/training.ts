@@ -54,10 +54,17 @@ export async function deleteTrainingVideo(id: string) {
 export async function markVideoWatched(videoId: string) {
   const { user } = await requireRole(STAFF_ROLES);
   if (!z.string().uuid().safeParse(videoId).success) return { error: "Bad id" };
-  await supabaseAdmin
+  // The first finish is the one admin sees — watching again later doesn't move the date.
+  const { data, error } = await supabaseAdmin
     .from("staff_training_progress")
-    .upsert({ staff_id: user.id, video_id: videoId, completed_at: new Date().toISOString() }, { onConflict: "staff_id,video_id" });
+    .upsert({ staff_id: user.id, video_id: videoId }, { onConflict: "staff_id,video_id", ignoreDuplicates: true })
+    .select("id");
+  if (error) return { error: "Couldn't save" };
+  if (data?.length) {
+    await audit({ actor_id: user.id, action: "TRAINING_COMPLETED", target_table: "training_videos", target_id: videoId });
+  }
   revalidatePath("/staff");
   revalidatePath("/admin/training");
+  revalidatePath("/admin/dashboard");
   return { ok: true };
 }

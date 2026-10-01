@@ -68,7 +68,7 @@ import MobileNav from "@/components/mobile-nav";
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en-NP" className={`${display.variable} ${body.variable}`}>
-      <body className="pb-20 sm:pb-0">
+      <body>
         {children}
         <MobileNav />
         <Toaster position="top-center" toastOptions={{ style: { borderRadius: "999px", fontWeight: 700 } }} />

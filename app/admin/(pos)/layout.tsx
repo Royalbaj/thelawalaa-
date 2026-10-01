@@ -17,7 +17,10 @@ export const metadata: Metadata = {
   manifest: "/pos.webmanifest",
   appleWebApp: { capable: true, title: "Thelawalaa POS", statusBarStyle: "black" },
 };
-export const viewport: Viewport = { themeColor: "#0c0a09" };
+// viewportFit cover + the safe-area padding in PosThemeRoot: on an iPhone
+// with no home button, the installed POS keeps its bottom row clear of the
+// home bar (and the notch, sideways) instead of running underneath it.
+export const viewport: Viewport = { themeColor: "#0c0a09", viewportFit: "cover" };
 
 // The POS screen at /admin. Its own route group, NOT app/admin/layout.tsx:
 // a layout there wraps every /admin/(mgmt) page too, so gating it to

@@ -9,6 +9,7 @@ import { orderStatusLabel, nextCounterAction, STATUS_FILTERS } from "@/lib/order
 import { noteField, customerNote } from "@/lib/order-notes";
 import { playOrderSound } from "@/lib/order-sound";
 import { adminUpdateOrderStatus, assignDriver, markOrderPaid, getOrderLines, getLiveOrders } from "@/app/actions/staff";
+import { MEMBER_PRICE_LABEL } from "@/lib/discounts";
 
 interface Line { product_name: string; quantity: number }
 
@@ -274,7 +275,7 @@ export default function LiveOrdersPanel({
                 </span>
                 {o.discount_label && (
                   <span className="shrink-0 rounded-lg bg-sky-50 px-2 py-1 text-[11px] font-bold text-sky-700 dark:bg-sky-950/40 dark:text-sky-300" title={`Discount: ${o.discount_label}`}>
-                    🎓
+                    {o.discount_label === MEMBER_PRICE_LABEL ? "👑" : "🎓"}
                   </span>
                 )}
                 {next && (

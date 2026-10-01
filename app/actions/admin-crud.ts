@@ -16,12 +16,18 @@ const productSchema = z.object({
   is_bestseller: z.coerce.boolean().default(false),
   pos_only: z.boolean().default(false), // sold at the counter only — hidden from the website
   student_discount_eligible: z.boolean().default(true), // POS student 5% applies to it
+  // What a member pays at the POS (lib/discounts.ts); blank = no member price.
+  member_price: z.preprocess((v) => (v === "" || v == null ? null : v), z.coerce.number().positive().max(100000).nullable()).default(null),
+}).refine((p) => p.member_price == null || p.member_price < p.price, {
+  message: "Member price must be lower than the normal price", path: ["member_price"],
 });
+const productError = (e: z.ZodError) =>
+  e.issues.find((i) => i.path[0] === "member_price")?.message ?? "Check the product fields";
 
 export async function createProduct(input: unknown) {
   const { user } = await requireRole(["super_admin"]);
   const parsed = productSchema.safeParse(input);
-  if (!parsed.success) return { error: "Check the product fields" };
+  if (!parsed.success) return { error: productError(parsed.error) };
   const { data, error } = await supabaseAdmin.from("products").insert(parsed.data).select("id").single();
   if (error) return { error: "Couldn't create product" };
   await audit({ actor_id: user.id, action: "CREATE_PRODUCT", target_table: "products", target_id: data.id, new_data: parsed.data });
@@ -33,7 +39,7 @@ export async function updateProduct(productId: string, input: unknown) {
   const { user } = await requireRole(["super_admin"]);
   if (!z.string().uuid().safeParse(productId).success) return { error: "Bad id" };
   const parsed = productSchema.safeParse(input);
-  if (!parsed.success) return { error: "Check the product fields" };
+  if (!parsed.success) return { error: productError(parsed.error) };
 
   const { data: old } = await supabaseAdmin.from("products").select("name, price").eq("id", productId).single();
   const { error } = await supabaseAdmin.from("products").update(parsed.data).eq("id", productId);
