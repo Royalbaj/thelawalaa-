@@ -13,8 +13,22 @@ import {
 type EditableProduct = {
   id: string; name: string; description: string | null; category_id: string;
   price: number; is_available: boolean; is_veg: boolean; spice_level: number; is_bestseller: boolean;
-  image_url: string | null;
+  image_url: string | null; pos_only: boolean; student_discount_eligible: boolean;
 };
+
+/** "Where it's sold" + discount options, shared by the add and edit forms. */
+function SalesOptions({ posOnly = false, studentDiscount = true }: { posOnly?: boolean; studentDiscount?: boolean }) {
+  return (
+    <div className="flex flex-wrap items-center gap-4 text-sm font-bold text-stone-600">
+      <label className="flex items-center gap-2" title="Shown on the POS only — hidden from the website and online orders">
+        <input type="checkbox" name="pos_only" defaultChecked={posOnly} /> POS only
+      </label>
+      <label className="flex items-center gap-2" title="The POS student discount (5%) applies to this item">
+        <input type="checkbox" name="student_discount_eligible" defaultChecked={studentDiscount} /> Student discount applies
+      </label>
+    </div>
+  );
+}
 
 // Phone photos are 3–10 MB; the menu never shows one wider than ~600px, so
 // shrink to 1200px JPEG before uploading — much faster on mobile data.
@@ -84,8 +98,14 @@ export function ProductRow({ product, categories }: { product: EditableProduct; 
             )}
           </div>
           <div>
-            <p className="font-bold">{product.name} {product.is_bestseller && "⭐"}</p>
-            <p className="text-xs text-stone-500">{npr(Number(product.price))} · spice {"🌶".repeat(product.spice_level) || "—"}</p>
+            <p className="font-bold">
+              {product.name} {product.is_bestseller && "⭐"}
+              {product.pos_only && <span className="badge ml-1.5 bg-stone-800 text-white">POS only</span>}
+            </p>
+            <p className="text-xs text-stone-500">
+              {npr(Number(product.price))} · spice {"🌶".repeat(product.spice_level) || "—"}
+              {!product.student_discount_eligible && " · no student discount"}
+            </p>
           </div>
         </div>
         <div className="flex items-center gap-3">
@@ -106,6 +126,7 @@ export function ProductRow({ product, categories }: { product: EditableProduct; 
                 name: fd.name, description: fd.description, category_id: fd.category_id,
                 price: fd.price, spice_level: fd.spice_level,
                 is_veg: fd.is_veg === "on", is_bestseller: fd.is_bestseller === "on",
+                pos_only: fd.pos_only === "on", student_discount_eligible: fd.student_discount_eligible === "on",
               });
               if (r?.error) toast.error(r.error);
               else { toast.success("Product updated"); setEditing(false); }
@@ -127,6 +148,7 @@ export function ProductRow({ product, categories }: { product: EditableProduct; 
               <select name="spice_level" defaultValue={product.spice_level} className="input !w-16 !py-1">{[0, 1, 2, 3].map((n) => <option key={n}>{n}</option>)}</select>
             </label>
           </div>
+          <SalesOptions posOnly={product.pos_only} studentDiscount={product.student_discount_eligible} />
           <div className="flex gap-2">
             <button disabled={pending} className="btn-primary !py-1.5 text-sm">{pending ? "Saving…" : "Save"}</button>
             <button type="button" onClick={() => setEditing(false)} className="rounded-full bg-white px-4 py-1.5 text-sm font-bold border border-stone-200">Cancel</button>
@@ -186,6 +208,7 @@ export function AddProductForm({ categories }: { categories: { id: string; name:
             name: fd.name, description: fd.description, category_id: fd.category_id,
             price: fd.price, spice_level: fd.spice_level,
             is_veg: fd.is_veg === "on", is_bestseller: fd.is_bestseller === "on",
+            pos_only: fd.pos_only === "on", student_discount_eligible: fd.student_discount_eligible === "on",
           });
           if (r?.error) toast.error(r.error);
           else { toast.success("Product added"); form.reset(); }
@@ -208,6 +231,7 @@ export function AddProductForm({ categories }: { categories: { id: string; name:
           <select name="spice_level" className="input !w-16 !py-1">{[0,1,2,3].map((n) => <option key={n}>{n}</option>)}</select>
         </label>
       </div>
+      <SalesOptions />
       <button disabled={pending} className="btn-primary">{pending ? "Saving…" : "Add product"}</button>
     </form>
   );

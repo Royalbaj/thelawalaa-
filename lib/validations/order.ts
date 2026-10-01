@@ -33,6 +33,7 @@ export const posOrderSchema = z.object({
   payment_method: z.enum(["cash", "qr", "card"]),
   customer_name: z.string().trim().max(100).optional().or(z.literal("")),
   customer_phone: z.string().regex(/^(\+977)?9[6-8]\d{8}$/).optional().or(z.literal("")),
+  student_discount: z.boolean().optional(),
   items: z
     .array(z.object({ product_id: z.string().uuid(), quantity: z.number().int().min(1).max(50) }))
     .min(1).max(40),

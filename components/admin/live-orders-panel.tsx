@@ -18,6 +18,7 @@ interface Order {
   status: string;
   type: string;
   total: number;
+  discount_label?: string | null;
   payment_status: string;
   payment_method: string | null;
   created_at: string;
@@ -204,11 +205,11 @@ export default function LiveOrdersPanel({ initialOrders, drivers }: { initialOrd
   }
 
   return (
-    <div className="bg-white rounded-xl border border-stone-200 flex flex-col h-full">
+    <div className="bg-white rounded-xl border border-stone-200 flex flex-col h-full dark:bg-stone-900 dark:border-stone-800">
       {/* Header */}
-      <div className="p-3 border-b border-stone-100 shrink-0">
+      <div className="p-3 border-b border-stone-100 shrink-0 dark:border-stone-800">
         <div className="flex items-center justify-between mb-2">
-          <h3 className="font-bold text-sm text-brand-brown flex items-center gap-1.5">
+          <h3 className="font-bold text-sm text-brand-brown flex items-center gap-1.5 dark:text-orange-100">
             <span className="h-2 w-2 rounded-full bg-brand-green animate-pulse" />
             Live Orders
           </h3>
@@ -218,7 +219,7 @@ export default function LiveOrdersPanel({ initialOrders, drivers }: { initialOrd
           {CHIPS.map((f) => (
             <button key={f.key} onClick={() => setFilter(f.key)}
               className={cn("shrink-0 touch-manipulation rounded-full px-3 py-1.5 text-[11px] font-bold transition",
-                filter === f.key ? "bg-brand-orange text-white" : "bg-stone-100 text-stone-500")}>
+                filter === f.key ? "bg-brand-orange text-white" : "bg-stone-100 text-stone-500 dark:bg-stone-800 dark:text-stone-400")}>
               {f.label}{counts[f.key] ? ` ${counts[f.key]}` : ""}
             </button>
           ))}
@@ -243,17 +244,17 @@ export default function LiveOrdersPanel({ initialOrders, drivers }: { initialOrd
           const busy = busyId === o.id;
           return (
             <div key={o.id} className={cn("rounded-xl border p-3 transition-all",
-              o.status === "pending" ? "border-amber-300 bg-amber-50/60 ring-1 ring-amber-200"
-                : o.status === "ready" ? "border-emerald-200 bg-emerald-50/40" : "border-stone-100",
+              o.status === "pending" ? "border-amber-300 bg-amber-50/60 ring-1 ring-amber-200 dark:border-amber-600/60 dark:bg-amber-950/30 dark:ring-amber-900/60"
+                : o.status === "ready" ? "border-emerald-200 bg-emerald-50/40 dark:border-emerald-800 dark:bg-emerald-950/30" : "border-stone-100 dark:border-stone-800",
               CLOSED.includes(o.status) && lingering.includes(o.id) && "opacity-50")}>
               <button type="button" onClick={() => setExpandedId(expanded ? null : o.id)} className="block w-full touch-manipulation text-left">
                 <div className="flex items-start justify-between gap-2">
                   <div className="flex min-w-0 items-center gap-2.5">
-                    <span className="font-mono text-2xl font-extrabold leading-none text-brand-brown">
+                    <span className="font-mono text-2xl font-extrabold leading-none text-brand-brown dark:text-orange-100">
                       #{o.daily_number != null ? String(o.daily_number).padStart(2, "0") : "—"}
                     </span>
                     <div className="min-w-0">
-                      <p className="truncate text-xs font-bold text-stone-800">{customerName(o)}</p>
+                      <p className="truncate text-xs font-bold text-stone-800 dark:text-stone-100">{customerName(o)}</p>
                       <p className="text-[10px] text-stone-400" suppressHydrationWarning>
                         {o.type === "dine_in" ? "Dine-in" : o.type === "delivery" ? "🛵 Delivery" : "Pickup"}
                         {" · "}{formatDistanceToNowStrict(new Date(o.created_at), { addSuffix: true })}
@@ -265,18 +266,23 @@ export default function LiveOrdersPanel({ initialOrders, drivers }: { initialOrd
                   </span>
                 </div>
                 {o.items && o.items.length > 0 && (
-                  <p className="mt-2 text-sm font-bold leading-snug text-stone-800">
+                  <p className="mt-2 text-sm font-bold leading-snug text-stone-800 dark:text-stone-100">
                     {o.items.map((i) => `${i.quantity}× ${i.product_name}`).join(", ")}
                   </p>
                 )}
-                {note && <p className="mt-1.5 rounded-lg bg-yellow-50 px-2 py-1 text-xs font-bold text-yellow-900">📝 {note}</p>}
+                {note && <p className="mt-1.5 rounded-lg bg-yellow-50 px-2 py-1 text-xs font-bold text-yellow-900 dark:bg-yellow-900/30 dark:text-yellow-200">📝 {note}</p>}
               </button>
 
               <div className="mt-2.5 flex items-center gap-2">
                 <span className={cn("shrink-0 rounded-lg px-2 py-1 text-[11px] font-bold",
-                  unpaid ? "bg-amber-50 text-amber-700" : "bg-green-50 text-green-700")}>
+                  unpaid ? "bg-amber-50 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300" : "bg-green-50 text-green-700 dark:bg-green-950/40 dark:text-green-400")}>
                   {unpaid ? `${npr(Number(o.total))} due` : `✓ ${npr(Number(o.total))}`}
                 </span>
+                {o.discount_label && (
+                  <span className="shrink-0 rounded-lg bg-sky-50 px-2 py-1 text-[11px] font-bold text-sky-700 dark:bg-sky-950/40 dark:text-sky-300" title={`Discount: ${o.discount_label}`}>
+                    🎓
+                  </span>
+                )}
                 {next && (
                   <button disabled={busy}
                     onClick={() => (takePayment ? payAndHandOver(o, next.status) : move(o, next.status))}
@@ -289,7 +295,7 @@ export default function LiveOrdersPanel({ initialOrders, drivers }: { initialOrd
 
               {/* Details + less common actions */}
               {expanded && (
-                <div className="mt-3 space-y-2 border-t border-stone-100 pt-2">
+                <div className="mt-3 space-y-2 border-t border-stone-100 pt-2 dark:border-stone-800">
                   <p className="text-[10px] text-stone-400" suppressHydrationWarning>
                     {o.order_number} · {format(new Date(o.created_at), "d MMM, h:mm a")}
                     {o.payment_method ? ` · ${o.payment_method.toUpperCase()}` : ""}
@@ -298,7 +304,7 @@ export default function LiveOrdersPanel({ initialOrders, drivers }: { initialOrd
                     <a href={`tel:${phone}`} className="inline-block text-xs font-bold text-brand-orange">📞 {phone}</a>
                   )}
                   {o.type === "delivery" && noteField(o.notes, "Address") && (
-                    <p className="text-[11px] font-bold text-stone-600 bg-stone-50 p-1.5 rounded">📍 {noteField(o.notes, "Address")}</p>
+                    <p className="text-[11px] font-bold text-stone-600 bg-stone-50 p-1.5 rounded dark:bg-stone-800 dark:text-stone-300">📍 {noteField(o.notes, "Address")}</p>
                   )}
                   <div className="flex flex-wrap gap-1.5">
                     {unpaid && !takePayment && o.status !== "cancelled" && (
@@ -307,7 +313,7 @@ export default function LiveOrdersPanel({ initialOrders, drivers }: { initialOrd
                       </button>
                     )}
                     {!CLOSED.includes(o.status) && (
-                      <button disabled={busy} onClick={() => cancel(o)} className="touch-manipulation rounded-lg bg-red-100 text-red-600 px-3 py-2 text-[11px] font-bold hover:bg-red-200 transition">
+                      <button disabled={busy} onClick={() => cancel(o)} className="touch-manipulation rounded-lg bg-red-100 text-red-600 px-3 py-2 text-[11px] font-bold hover:bg-red-200 transition dark:bg-red-950/50 dark:text-red-300 dark:hover:bg-red-900/50">
                         Cancel order
                       </button>
                     )}

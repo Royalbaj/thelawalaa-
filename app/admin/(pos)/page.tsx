@@ -15,7 +15,7 @@ export default async function AdminDashboard() {
   const [{ data: products }, { data: categories }, { data: recentOrders }, { data: drivers }, { data: settings }] = await Promise.all([
     supabaseAdmin
       .from("products")
-      .select("id, name, price, image_url, category_id, is_available, is_veg")
+      .select("id, name, price, image_url, category_id, is_available, is_veg, student_discount_eligible")
       .eq("is_available", true)
       .order("sort_order"),
     supabaseAdmin.from("categories").select("id, name").order("sort_order"),
@@ -35,7 +35,7 @@ export default async function AdminDashboard() {
   return (
     <div className="flex h-full flex-col gap-3 p-2 xl:flex-row xl:gap-4 xl:p-4">
       {/* LEFT — POS Terminal */}
-      <div className="min-h-0 flex-1 overflow-hidden rounded-2xl border border-orange-100">
+      <div className="min-h-0 flex-1 overflow-hidden rounded-2xl border border-orange-100 dark:border-stone-800">
         <PosTerminal
           products={(products ?? []) as any}
           categories={(categories ?? []) as any}

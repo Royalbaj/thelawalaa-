@@ -26,12 +26,14 @@ export default async function HomePage() {
       .from("products")
       .select("id, name, description, price, spice_level, is_veg, image_url, categories(name)")
       .eq("is_bestseller", true)
+      .eq("pos_only", false)
       .order("sort_order")
       .limit(4),
     supabase
       .from("products")
       .select("name, description, price")
       .eq("is_available", true)
+      .eq("pos_only", false)
       .order("sort_order")
       .limit(50),
     supabase

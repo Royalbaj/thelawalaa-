@@ -14,6 +14,8 @@ const productSchema = z.object({
   is_veg: z.coerce.boolean().default(true),
   spice_level: z.coerce.number().int().min(0).max(3).default(0),
   is_bestseller: z.coerce.boolean().default(false),
+  pos_only: z.boolean().default(false), // sold at the counter only — hidden from the website
+  student_discount_eligible: z.boolean().default(true), // POS student 5% applies to it
 });
 
 export async function createProduct(input: unknown) {

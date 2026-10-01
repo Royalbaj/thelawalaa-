@@ -10,7 +10,7 @@ type ArchivedItem = { product_name: string; product_price: number; quantity: num
 type ArchivedOrder = {
   order_number: string; daily_number: number | null; created_at: string;
   type: string; status: string; payment_method: string | null; payment_status: string;
-  subtotal: number; delivery_fee: number; discount_amount: number; total: number;
+  subtotal: number; delivery_fee: number; discount_amount: number; discount_label?: string | null; total: number;
   customer_id: string | null; notes: string | null; items?: ArchivedItem[] | null;
 };
 export type SalesArchive = { id: string; created_at: string; snapshot: ArchivedOrder[] | null };
@@ -154,6 +154,7 @@ export async function buildSalesArchiveWorkbook(archive: SalesArchive): Promise<
     { header: "Subtotal", key: "subtotal", width: 12, numFmt: RS },
     { header: "Delivery", key: "delivery", width: 11, numFmt: RS },
     { header: "Discount", key: "discount", width: 11, numFmt: RS },
+    { header: "Discount for", key: "discountFor", width: 13 },
     { header: "Total", key: "total", width: 12, numFmt: RS },
   ], orders.map((o) => ({
     number: o.order_number,
@@ -170,6 +171,7 @@ export async function buildSalesArchiveWorkbook(archive: SalesArchive): Promise<
     subtotal: money(o.subtotal),
     delivery: money(o.delivery_fee),
     discount: money(o.discount_amount),
+    discountFor: o.discount_label ?? "",
     total: money(o.total),
   })), ["subtotal", "delivery", "discount", "total"]);
 

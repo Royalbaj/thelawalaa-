@@ -2,6 +2,9 @@ import type { Config } from "tailwindcss";
 
 const config: Config = {
   content: ["./app/**/*.{ts,tsx}", "./components/**/*.{ts,tsx}"],
+  // Dark mode only where an ancestor has class="dark" — today just the POS
+  // (components/pos/pos-theme.tsx), so the rest of the site never changes.
+  darkMode: "selector",
   theme: {
     extend: {
       colors: {

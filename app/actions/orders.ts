@@ -59,12 +59,15 @@ export async function createOrder(input: unknown) {
   const ids = data.items.map((i) => i.product_id);
   const { data: products } = await supabaseAdmin
     .from("products")
-    .select("id, name, price, is_available, categories(name)")
+    .select("id, name, price, is_available, pos_only, categories(name)")
     .in("id", ids);
 
   if (!products || products.length !== new Set(ids).size) {
     return { error: "Some items are no longer on the menu" };
   }
+  // POS-only items aren't sold online (the website never lists them).
+  const counterOnly = !isStaff && products.find((p) => p.pos_only);
+  if (counterOnly) return { error: `"${counterOnly.name}" is only available at the counter` };
   const byId = new Map(products.map((p) => [p.id, p]));
   for (const item of data.items) {
     const p = byId.get(item.product_id);

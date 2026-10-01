@@ -79,7 +79,7 @@ export default function OrderPage() {
       }
     });
     Promise.all([
-      supabase.from("products").select("id, name, description, price, category_id, spice_level, image_url").order("sort_order"),
+      supabase.from("products").select("id, name, description, price, category_id, spice_level, image_url").eq("pos_only", false).order("sort_order"),
       supabase.from("categories").select("id, name").order("sort_order"),
       supabase.from("branches").select("id, name, address"),
       supabase.from("addresses").select("id, label, full_address"),
