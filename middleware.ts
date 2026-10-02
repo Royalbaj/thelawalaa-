@@ -1,5 +1,6 @@
 import { createServerClient, type CookieOptions } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
+import { ACCOUNTS_LOGIN } from "@/lib/role-home";
 
 // First-match wins, so list the most specific prefixes first.
 // /track is deliberately NOT here — guest checkouts have no account, so
@@ -68,6 +69,10 @@ export async function middleware(request: NextRequest) {
 
   if (!profile?.is_active) {
     return NextResponse.redirect(new URL("/auth/suspended", request.url));
+  }
+  if (profile.role === "accountant") {
+    // Accounts logins only belong on the Accounts app (its own site and sign-in).
+    return NextResponse.redirect(ACCOUNTS_LOGIN);
   }
   if (!matched[1].includes(profile.role)) {
     return NextResponse.redirect(new URL("/unauthorized", request.url));

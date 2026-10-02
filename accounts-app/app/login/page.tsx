@@ -32,6 +32,11 @@ function LoginForm() {
 
   return (
     <form onSubmit={onSubmit} className="space-y-4">
+      {params.get("from") === "main" && (
+        <p className="rounded-xl bg-orange-50 px-4 py-2.5 text-sm font-bold text-brand-brown">
+          Accounts has its own sign-in — use the same email and password here. Bookmark this page for next time.
+        </p>
+      )}
       {params.get("error") === "forbidden" && (
         <p className="rounded-xl bg-red-50 px-4 py-2.5 text-sm font-bold text-brand-red">That account can&apos;t access Accounts.</p>
       )}

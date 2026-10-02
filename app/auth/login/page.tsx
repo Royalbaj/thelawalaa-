@@ -5,7 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import toast from "react-hot-toast";
 import { createClient } from "@/lib/supabase/client";
 import { loginSchema } from "@/lib/validations/auth";
-import { ROLE_HOME } from "@/lib/role-home";
+import { ROLE_HOME, ACCOUNTS_LOGIN } from "@/lib/role-home";
 
 function LoginForm() {
   const router = useRouter();
@@ -28,6 +28,12 @@ function LoginForm() {
     const { data: profile } = await supabase
       .from("profiles").select("role, is_active").eq("id", data.user.id).single();
     if (!profile?.is_active) { await supabase.auth.signOut({ scope: "local" }); setBusy(false); return router.push("/auth/suspended"); }
+    // Accounts logins have nothing on this site — send them to the Accounts app's own sign-in.
+    if (profile.role === "accountant") {
+      await supabase.auth.signOut({ scope: "local" });
+      toast("Accounts has its own sign-in — taking you there", { icon: "📒" });
+      return window.location.replace(ACCOUNTS_LOGIN);
+    }
 
     const redirect = params.get("redirect");
     // Only allow same-site relative redirects — blocks open-redirect phishing

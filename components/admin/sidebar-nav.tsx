@@ -3,9 +3,10 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
   LayoutDashboard, ShoppingBag, UtensilsCrossed, Gift, UserPlus,
-  Megaphone, Truck, Users, GraduationCap, BarChart3, Settings, LogOut, ExternalLink, HelpCircle,
+  Megaphone, Truck, Users, GraduationCap, BarChart3, Settings, LogOut, ExternalLink, HelpCircle, BookOpen,
 } from "lucide-react";
 import { signOutHere } from "@/lib/sign-out";
+import { ACCOUNTS_URL } from "@/lib/role-home";
 import { cn } from "@/lib/utils";
 
 // No "POS Terminal" entry — super_admin's interface no longer includes
@@ -79,6 +80,16 @@ export default function AdminSidebar({ onNavigate }: { onNavigate?: () => void }
       >
         <ExternalLink size={18} />
         <span>View Website</span>
+      </a>
+      {/* Separate site, separate sign-in (same email/password works for super_admin). */}
+      <a
+        href={ACCOUNTS_URL}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-bold text-white/40 hover:bg-white/10 hover:text-white transition-all"
+      >
+        <BookOpen size={18} />
+        <span>Accounts</span>
       </a>
 
       <button

@@ -14,7 +14,9 @@ customer · super_admin · pos_user · delivery_driver · accountant. Route prot
 `super_admin` is the management role (migration 018 restored it after 014 had merged it into `admin`;
 `admin` stays allowed by the DB constraint but no code grants it anything). Counter work and management
 are separate logins: `pos_user` gets only the POS screen, `super_admin` never sees it. `accountant` only
-exists to log into the separate Accounts app and has no access to the main site.
+exists to log into the separate Accounts app and has no access to the main site — signing in
+there (or opening any staff page) sends them to `accounts.thelawalaa.com/login?from=main`
+(`ACCOUNTS_LOGIN` in `lib/role-home.ts`); the two sites don't share a session.
 **A role rename must land in the DB, `middleware.ts` ROLE_ROUTES, every `requireRole()`, `lib/role-home.ts`
 and the Accounts app together, and be deployed** — a half-applied rename (DB changed, production code not)
 locked every manager out in Sep 2026.
