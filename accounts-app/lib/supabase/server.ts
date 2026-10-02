@@ -3,6 +3,7 @@
 import { cache } from "react";
 import { createServerClient, type CookieOptions } from "@supabase/ssr";
 import { cookies } from "next/headers";
+import { redirect } from "next/navigation";
 import { PIN_COOKIE, peekPerson, verifyUnlock } from "@/lib/pin-cookie";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 
@@ -48,10 +49,10 @@ export const getVerifiedUser = cache(async () => {
   return { user, profile, supabase };
 });
 
-/** Signed in with an allowed role — enough for the PIN screen, nothing else. */
+/** Signed in with an allowed role — enough for the PIN screen, nothing else. Otherwise → /login. */
 export async function requireSignedIn() {
   const ctx = await getVerifiedUser();
-  if (!ctx.user || !ctx.profile) throw new Error("Forbidden");
+  if (!ctx.user || !ctx.profile) redirect("/login");
   return ctx as { user: NonNullable<typeof ctx.user>; profile: NonNullable<typeof ctx.profile>; supabase: typeof ctx.supabase };
 }
 
@@ -72,7 +73,8 @@ export const requireAuth = cache(async () => {
   const peeked = peekPerson(unlock);
   const [ctx, person] = await Promise.all([requireSignedIn(), peeked ? getPerson(peeked) : null]);
   const verified = await verifyUnlock(ctx.user.id, unlock);
-  // A person the admin switched off is locked out on their next click.
-  if (!verified || !person || verified !== person.id) throw new Error("Locked");
+  // Locked (Lock button, idle timer, expired) or a person the admin switched off → the PIN
+  // screen. A redirect, not an error: locking re-renders the page it happened on.
+  if (!verified || !person || verified !== person.id) redirect("/pin");
   return { ...ctx, person };
 });
