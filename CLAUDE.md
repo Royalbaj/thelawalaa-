@@ -30,6 +30,10 @@ locked every manager out in Sep 2026.
   Shares the Supabase project; deployed independently. Restricted to `super_admin`/`accountant`.
   Its Vercel project's Root Directory must be `accounts-app` — with `.` it builds the customer site
   (it did until 2 Oct 2026; set via `vercel project update accounts-app --root-directory accounts-app`).
+  The main `thelawalaa` project's Root Directory must stay `.` (automatic). On 2 Oct 2026 it ended up as
+  `accounts-app` as well, right after that change, and promoting the next build put the Accounts login on
+  www.thelawalaa.com for ~3 minutes. After ANY Vercel settings change, run `vercel project inspect` on BOTH
+  projects, and before promoting a main-site build, check its URL actually serves the customer site.
 
 ## Conventions / guardrails (please preserve)
 - ALL mutations go through server actions in `app/actions/*` — they start with `requireRole(...)` and are Zod-validated. Clients never write orders or payment status directly.
