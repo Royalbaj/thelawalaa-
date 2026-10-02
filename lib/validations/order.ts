@@ -11,6 +11,9 @@ export const orderSchema = z.object({
   guest_name: z.string().min(2).max(100).optional(),
   guest_phone: z.string().regex(/^(\+977)?9[6-8]\d{8}$/, "Must be a valid Nepali mobile number").optional(),
   guest_address: z.string().max(300).optional(),
+  // Signed-in customers only — the server works out (and takes) the amounts.
+  use_points: z.boolean().optional(),
+  use_free_item: z.boolean().optional(),
   items: z
     .array(
       z.object({

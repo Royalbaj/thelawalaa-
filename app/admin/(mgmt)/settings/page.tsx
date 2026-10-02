@@ -3,6 +3,7 @@ import { supabaseAdmin } from "@/lib/supabase/admin";
 import { npr } from "@/lib/utils";
 import { BranchForm, PromoForm, ActiveToggle, FeatureFlagsForm, OpeningPromoForm, SocialLinksManager } from "@/components/admin/settings-controls";
 import ResetSalesData from "@/components/admin/reset-sales-data";
+import TestEmailButton from "@/components/admin/test-email-button";
 
 export const dynamic = "force-dynamic";
 
@@ -96,6 +97,7 @@ export default async function SettingsPage() {
           startsAt={settings?.opening_promo_starts_at ?? null}
           endsAt={settings?.opening_promo_ends_at ?? null}
         />
+        <TestEmailButton />
         <SocialLinksManager links={(socialLinks ?? []) as never} />
         <BranchForm />
         <PromoForm />

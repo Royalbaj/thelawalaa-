@@ -65,9 +65,7 @@ export default async function HomePage() {
           own edges (#0e0805, warm light from the left like the photo), via
           overlays in the same colour. Phones: photo on top, text below.
           Wide screens: text on the left, photo bleeding off the right edge. */}
-      {/* White behind the hero's rounded bottom corners, so they meet the next section cleanly. */}
-      <div className="bg-white">
-      <section id="home" className="relative overflow-hidden rounded-b-[2rem] bg-[#0e0805] text-amber-50 md:rounded-b-[3rem]">
+      <section id="home" className="relative overflow-hidden bg-[#0e0805] text-amber-50">
         {/* Ambient backdrop: the photo's own tiny blur preview, stretched over the whole
             hero and darkened — everything around the photo is made of its colours,
             so the sharp photo sits in it with no visible "photo area". */}
@@ -105,7 +103,7 @@ export default async function HomePage() {
           <div aria-hidden className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_70%_60%_at_15%_55%,rgba(235,104,52,0.14),transparent_70%)]" />
 
           {/* Words */}
-          <div className="relative z-10 -mt-10 px-4 pb-14 text-center sm:-mt-16 lg:mt-0 lg:w-[44%] lg:py-20 lg:pl-8 lg:text-left xl:w-[46%] xl:pl-4">
+          <div className="relative z-10 -mt-10 px-4 pb-28 text-center sm:-mt-16 lg:mt-0 lg:w-[44%] lg:pt-20 lg:pb-32 lg:pl-8 lg:text-left xl:w-[46%] xl:pl-4">
             <p className="text-xs font-bold uppercase tracking-[0.2em] text-brand-orange">{t["hero.eyebrow"]}</p>
             <h1 className="mt-3 font-display text-4xl font-extrabold leading-tight text-amber-50 sm:text-5xl md:text-6xl xl:text-7xl">
               {t["hero.title"]}
@@ -122,26 +120,30 @@ export default async function HomePage() {
                 {t["hero.button2"]}
               </a>
             </div>
-            {/* Trust badges */}
-            <div className="mt-10 flex flex-wrap justify-center gap-2.5 text-xs font-bold text-amber-100/80 lg:justify-start">
-              {[
-                [SprayCan, t["hero.badge1"]],
-                [Salad, t["hero.badge2"]],
-                deliveryEnabled ? [Bike, t["hero.badge3_delivery"]] : [Store, t["hero.badge3_pickup"]],
-                [Zap, t["hero.badge4"]],
-              ].map(([Icon, text]: any) => (
-                <span key={text} className="flex items-center gap-1.5 rounded-full bg-white/[0.06] px-3 py-1.5 ring-1 ring-white/10 backdrop-blur-sm">
-                  <Icon size={14} className="text-brand-orange" /> {text}
-                </span>
-              ))}
-            </div>
           </div>
         </div>
       </section>
+
+      {/* Trust strip: a white card straddling the hero's straight bottom edge (top
+          3.5rem sits over the dark hero, the rest over the white section below). */}
+      <div className="relative z-10 -mt-14 bg-[linear-gradient(to_bottom,transparent_3.5rem,#fff_3.5rem)] px-4">
+        <ul className="mx-auto grid max-w-5xl grid-cols-2 gap-px overflow-hidden rounded-2xl bg-stone-100 shadow-xl shadow-stone-900/10 ring-1 ring-stone-200/70 md:grid-cols-4">
+          {[
+            [SprayCan, t["hero.badge1"]],
+            [Salad, t["hero.badge2"]],
+            deliveryEnabled ? [Bike, t["hero.badge3_delivery"]] : [Store, t["hero.badge3_pickup"]],
+            [Zap, t["hero.badge4"]],
+          ].map(([Icon, text]: any) => (
+            <li key={text} className="flex items-center gap-3 bg-white px-4 py-4 sm:px-5 sm:py-5">
+              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-orange-50 text-brand-orange"><Icon size={20} /></span>
+              <span className="text-sm font-bold leading-snug text-brand-brown">{text}</span>
+            </li>
+          ))}
+        </ul>
       </div>
 
       {/* WHY THELAWALAA */}
-      <section id="about" className="bg-white px-4 py-12 md:py-20">
+      <section id="about" className="bg-white px-4 pb-12 pt-10 md:pb-20 md:pt-16">
         <div className="mx-auto max-w-6xl">
           <div className="text-center mb-12">
             <p className="font-bold tracking-widest text-brand-orange text-xs mb-2 uppercase">{t["about.eyebrow"]}</p>

@@ -7,6 +7,11 @@ import { createClient } from "@/lib/supabase/client";
  * Next's in-memory page cache, so Back can't bring the last user's screens up.
  */
 export async function signOutHere() {
+  await signOutTo("/auth/login");
+}
+
+/** The same, landing somewhere else (checkout's "Not you?" goes back to /order as a guest). */
+export async function signOutTo(path: string) {
   await createClient().auth.signOut({ scope: "local" });
-  window.location.replace("/auth/login");
+  window.location.replace(path);
 }

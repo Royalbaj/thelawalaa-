@@ -11,14 +11,15 @@ export default function AddressesPage() {
   useEffect(() => { load(); }, []);
 
   return (
-    <div className="px-4 py-4 pb-24">
-      <h1 className="font-display text-xl font-bold text-brand-brown">Saved addresses</h1>
+    <div className="pb-24 sm:pb-8">
+      <h1 className="font-display text-2xl font-extrabold text-brand-brown">Saved addresses</h1>
+      <p className="text-sm text-stone-500">Pick one at checkout for home delivery. Up to 5.</p>
       {addresses.length === 0 && (
-        <p className="mt-6 rounded-2xl bg-white border border-stone-100 p-6 text-center text-sm text-stone-400">No saved addresses yet.</p>
+        <p className="mt-6 rounded-3xl bg-white p-6 text-center text-sm text-stone-400 shadow-sm ring-1 ring-stone-100">No saved addresses yet.</p>
       )}
       <ul className="mt-6 space-y-3">
         {addresses.map((a) => (
-          <li key={a.id} className="card flex items-start justify-between gap-3 p-4">
+          <li key={a.id} className="flex items-start justify-between gap-3 rounded-2xl bg-white p-4 shadow-sm ring-1 ring-stone-100">
             <div><p className="font-bold">{a.label}</p><p className="text-sm text-stone-600">{a.full_address}</p></div>
             <button
               className="text-sm font-bold text-brand-red"
@@ -29,7 +30,7 @@ export default function AddressesPage() {
       </ul>
       {addresses.length < 5 && (
         <form
-          className="card mt-6 space-y-4 p-6"
+          className="mt-6 space-y-4 rounded-3xl bg-white p-6 shadow-sm ring-1 ring-stone-100"
           onSubmit={async (e) => {
             e.preventDefault();
             const fd = Object.fromEntries(new FormData(e.currentTarget));

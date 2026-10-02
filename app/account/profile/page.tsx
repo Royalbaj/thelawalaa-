@@ -1,54 +1,55 @@
-"use client";
-
-import { useTransition } from "react";
 import Link from "next/link";
-import { User, MapPin, MessageCircle, LogOut } from "lucide-react";
-import { signOutHere } from "@/lib/sign-out";
+import { MapPin, MessageCircle, ChevronRight, BadgeCheck } from "lucide-react";
+import { getVerifiedUser } from "@/lib/supabase/server";
+import { DetailsForm, PasswordForm } from "@/components/account/profile-forms";
+import SignOutButton from "@/components/account/sign-out-button";
 
-export default function ProfilePage() {
-  const [, startTransition] = useTransition();
+export const dynamic = "force-dynamic";
 
-  async function handleSignOut() {
-    startTransition(signOutHere);
-  }
+export default async function ProfilePage() {
+  const { user, profile } = await getVerifiedUser();
+  if (!user || !profile) return null;
+  const since = new Date(user.created_at).toLocaleDateString("en-GB", { timeZone: "Asia/Kathmandu", month: "long", year: "numeric" });
 
   return (
-    <div className="px-4 py-4 pb-24 space-y-4">
-      <h1 className="font-display text-xl font-bold text-brand-brown">My Profile</h1>
-
-      <div className="rounded-2xl bg-white border border-stone-100 p-5 space-y-4">
-        <div className="text-center">
-          <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-brand-cream text-brand-orange"><User size={28} /></div>
-          <p className="mt-2 font-bold text-brand-brown">Your Account</p>
-          <p className="text-xs text-stone-400">Manage your profile settings</p>
-        </div>
-
-        <div className="space-y-3">
-          <Link href="/account/addresses" className="w-full flex items-center gap-3 rounded-xl bg-stone-50 p-3 hover:bg-stone-100 transition text-left">
-            <MapPin size={20} className="text-brand-orange" />
-            <div>
-              <p className="text-sm font-bold text-brand-brown">Saved Addresses</p>
-              <p className="text-[10px] text-stone-400">Manage delivery addresses</p>
-            </div>
-          </Link>
-          <a href="/whatsapp" target="_blank" rel="noopener noreferrer" className="w-full flex items-center gap-3 rounded-xl bg-stone-50 p-3 hover:bg-stone-100 transition text-left">
-            <MessageCircle size={20} className="text-brand-orange" />
-            <div>
-              <p className="text-sm font-bold text-brand-brown">Help &amp; Support</p>
-              <p className="text-[10px] text-stone-400">Chat with us on WhatsApp</p>
-            </div>
-          </a>
-        </div>
+    <div className="space-y-5 pb-24 sm:pb-8">
+      <div>
+        <h1 className="font-display text-2xl font-extrabold text-brand-brown">Profile</h1>
+        <p className="text-sm text-stone-500">Member since {since}</p>
       </div>
 
-      <button
-        onClick={handleSignOut}
-        className="w-full flex items-center justify-center gap-2 rounded-2xl bg-red-50 border border-red-200 text-red-600 py-3 text-sm font-bold hover:bg-red-100 transition"
-      >
-        <LogOut size={16} /> Sign Out
-      </button>
+      <section className="rounded-3xl bg-white p-5 shadow-sm ring-1 ring-stone-100 sm:p-6">
+        <h2 className="mb-4 font-display text-lg font-bold text-brand-brown">Your details</h2>
+        <DetailsForm fullName={profile.full_name} phone={profile.phone ?? ""} />
+        <div className="mt-5 border-t border-stone-100 pt-4">
+          <p className="label !mb-0.5">Email</p>
+          <p className="flex flex-wrap items-center gap-2 text-stone-700">
+            {user.email}
+            {user.email_confirmed_at && <span className="flex items-center gap-1 rounded-full bg-green-50 px-2 py-0.5 text-[11px] font-bold text-green-700"><BadgeCheck size={12} /> Verified</span>}
+          </p>
+          <p className="mt-1 text-xs text-stone-400">Need to change your email? Message us and we&apos;ll do it for you.</p>
+        </div>
+      </section>
 
-      <p className="text-center text-[10px] text-stone-300">Thelawalaa · Made in Nepal</p>
+      <section className="rounded-3xl bg-white p-5 shadow-sm ring-1 ring-stone-100 sm:p-6">
+        <h2 className="mb-4 font-display text-lg font-bold text-brand-brown">Password</h2>
+        <PasswordForm email={user.email ?? ""} />
+      </section>
+
+      <section className="divide-y divide-stone-100 overflow-hidden rounded-3xl bg-white shadow-sm ring-1 ring-stone-100">
+        {[
+          { href: "/account/addresses", icon: MapPin, title: "Saved addresses", body: "For home delivery" },
+          { href: "/whatsapp", icon: MessageCircle, title: "Help & support", body: "Chat with us on WhatsApp" },
+        ].map((l) => (
+          <Link key={l.href} href={l.href} className="flex items-center gap-3 px-5 py-4 transition hover:bg-stone-50">
+            <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-orange-50 text-brand-orange"><l.icon size={18} /></span>
+            <span className="flex-1"><span className="block text-sm font-bold text-brand-brown">{l.title}</span><span className="block text-xs text-stone-500">{l.body}</span></span>
+            <ChevronRight size={18} className="text-stone-300" />
+          </Link>
+        ))}
+      </section>
+
+      <SignOutButton />
     </div>
   );
 }

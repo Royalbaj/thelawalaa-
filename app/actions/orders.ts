@@ -3,15 +3,15 @@
 import crypto from "crypto";
 import { after } from "next/server";
 import { checkStockAfterSale } from "@/lib/stock-alerts";
-import { Resend } from "resend";
 import { orderSchema } from "@/lib/validations/order";
 import { getVerifiedUser } from "@/lib/supabase/server";
-import { supabaseAdmin, audit, resolveStaffBranchId } from "@/lib/supabase/admin";
+import { supabaseAdmin, audit, resolveStaffBranchId, getRewardSettings } from "@/lib/supabase/admin";
+import { redeemPlan, pointsForTotal, fmtPoints, fmtRupees } from "@/lib/rewards";
+import { sendEmail, FROM_ORDERS } from "@/lib/email";
+import { orderConfirmedEmail } from "@/lib/account-emails";
 import { applyOpeningPromoPrice } from "@/lib/promo";
 import { pushToStaff } from "@/lib/push";
 import { npr } from "@/lib/utils";
-
-const resend = process.env.RESEND_API_KEY ? new Resend(process.env.RESEND_API_KEY) : null;
 
 function hashOtp(otp: string, orderId: string) {
   return crypto
@@ -143,7 +143,36 @@ export async function createOrder(input: unknown) {
     if (!bumped?.length) return { error: "Promo code just ran out — try again" };
   }
 
-  const total = Math.max(0, subtotal + delivery_fee - discount_amount);
+  // ── Rewards (signed-in customers): points as a discount, and the free item ──
+  // Only the plan is made here; the balance is taken atomically just before the
+  // order is written (loyalty_take), and given back if writing it fails.
+  let points_redeemed = 0;
+  let points_discount = 0;
+  let free_item_redeemed = false;
+  let rewardNote = "";
+  if (isSelfCheckout && (data.use_points || data.use_free_item)) {
+    const rewards = await getRewardSettings();
+    const { data: bal } = await supabaseAdmin.from("loyalty_points").select("points, free_items").eq("customer_id", user.id).maybeSingle();
+    if (!rewards.enabled) return { error: "Rewards are paused right now — please order without them" };
+    if (data.use_free_item) {
+      if (!rewards.free_item_enabled || !rewards.free_item_product_id) return { error: "The free item reward isn't available right now" };
+      if ((bal?.free_items ?? 0) < 1) return { error: "You don't have a free item to claim yet" };
+      const { data: fp } = await supabaseAdmin.from("products").select("id, name, is_available").eq("id", rewards.free_item_product_id).single();
+      if (!fp?.is_available) return { error: `Your free ${fp?.name ?? "item"} is sold out right now — it'll wait for your next order` };
+      itemRows.push({ product_id: fp.id, product_name: `${fp.name} (free reward)`, product_price: 0, quantity: 1, customization_notes: null, line_total: 0 });
+      free_item_redeemed = true;
+      rewardNote += `\nFree ${fp.name} (reward)`;
+    }
+    if (data.use_points) {
+      const plan = redeemPlan(bal?.points ?? 0, subtotal + delivery_fee - discount_amount, rewards);
+      if (!plan.points) return { error: `You need at least ${fmtPoints(rewards.min_redeem_points)} points to use them` };
+      points_redeemed = plan.points;
+      points_discount = plan.rupees;
+      rewardNote += `\n${fmtPoints(plan.points)} points used (−${fmtRupees(plan.rupees)})`;
+    }
+  }
+
+  const total = Math.max(0, subtotal + delivery_fee - discount_amount - points_discount);
   
   let finalNotes = data.notes ? data.notes.trim() : "";
   let extractedAddress = "";
@@ -157,7 +186,12 @@ export async function createOrder(input: unknown) {
   } else if (isAnonymous) {
     finalNotes = `[Guest Checkout]\nName: ${data.guest_name}\nPhone: ${data.guest_phone}${data.type === 'delivery' ? `\nAddress: ${data.guest_address}` : ""}\n\n${finalNotes}`.trim();
   } else if (isSelfCheckout) {
-    finalNotes = `[Registered User]\nName: ${profile.full_name}\nPhone: ${profile.phone ?? "N/A"}${data.type === 'delivery' && extractedAddress ? `\nAddress: ${extractedAddress}` : ""}\n\n${finalNotes}`.trim();
+    finalNotes = `[Registered User]\nName: ${profile.full_name}\nPhone: ${profile.phone ?? "N/A"}${data.type === 'delivery' && extractedAddress ? `\nAddress: ${extractedAddress}` : ""}${rewardNote ? `\n[Rewards]${rewardNote}` : ""}\n\n${finalNotes}`.trim();
+  }
+
+  if (isSelfCheckout && (points_redeemed > 0 || free_item_redeemed)) {
+    const { data: took } = await supabaseAdmin.rpc("loyalty_take", { p_customer: user.id, p_points: points_redeemed, p_free: free_item_redeemed });
+    if (!took) return { error: "Your rewards balance just changed — please check and try again" };
   }
 
   // ── Insert order + items ─────────────────────────────────────
@@ -179,11 +213,25 @@ export async function createOrder(input: unknown) {
       payment_status: "pending", // admin confirms cash/QR manually
       promo_code_id,
       notes: finalNotes || null,
+      points_redeemed,
+      points_discount,
+      free_item_redeemed,
     })
     .select("id, order_number, total, daily_number")
     .single();
 
-  if (orderErr || !order) return { error: "Could not place the order. Try again." };
+  if (orderErr || !order) {
+    if (isSelfCheckout && (points_redeemed > 0 || free_item_redeemed)) {
+      await supabaseAdmin.rpc("loyalty_give_back", { p_customer: user.id, p_points: points_redeemed, p_free: free_item_redeemed });
+    }
+    return { error: "Could not place the order. Try again." };
+  }
+  if (isSelfCheckout && (points_redeemed > 0 || free_item_redeemed)) {
+    await supabaseAdmin.from("loyalty_transactions").insert([
+      ...(points_redeemed > 0 ? [{ customer_id: user.id, order_id: order.id, points_change: -points_redeemed, reason: "redemption" }] : []),
+      ...(free_item_redeemed ? [{ customer_id: user.id, order_id: order.id, points_change: 0, reason: "free_item_used" }] : []),
+    ]);
+  }
 
   await supabaseAdmin
     .from("order_items")
@@ -207,25 +255,23 @@ export async function createOrder(input: unknown) {
     new_data: { total, type: data.type, payment_method: data.payment_method },
   });
 
-  if (resend && user?.email) {
-    try {
-      await resend.emails.send({
-        from: "Thelawalaa <orders@thelawalaa.com>",
-        to: user.email,
-        subject: `Order confirmed — ${order.order_number}`,
-        html: `
-          <div style="font-family:sans-serif;max-width:560px;margin:auto">
-            <h1 style="color:#F97316">Order confirmed! 🎉</h1>
-            <p>Your order <b>${order.order_number}</b> for <b>Rs ${order.total}</b> is in.</p>
-            <p>${data.payment_method === "qr"
-              ? "Pay by scanning our QR code when you receive your order — our team will confirm it."
-              : "Please keep <b>Rs " + order.total + "</b> in cash ready — our team will confirm the payment."}</p>
-            ${otpForEmail ? `<p style="font-size:24px;letter-spacing:6px;background:#FFFBEB;padding:16px;border-radius:12px;text-align:center"><b>${otpForEmail}</b></p><p>Share this OTP with your delivery driver to confirm delivery.</p>` : ""}
-            <a href="${process.env.NEXT_PUBLIC_SITE_URL}/track/${order.id}"
-               style="display:inline-block;background:#F97316;color:#fff;padding:12px 24px;border-radius:999px;text-decoration:none;font-weight:bold">Track your order</a>
-          </div>`,
+  // The confirmation email (signed-in customers only — never the staff member
+  // placing a POS order). Sent after the response, so checkout never waits on it.
+  if (isSelfCheckout && user.email) {
+    const to = user.email;
+    after(async () => {
+      const rewards = await getRewardSettings();
+      await sendEmail({
+        to, from: FROM_ORDERS,
+        ...orderConfirmedEmail({
+          name: profile.full_name, orderId: order.id, orderNumber: order.order_number, dailyNumber: order.daily_number,
+          type: data.type, paymentMethod: data.payment_method,
+          items: itemRows.map((r) => ({ name: r.product_name, qty: r.quantity, lineTotal: r.line_total })),
+          subtotal, deliveryFee: delivery_fee, promoDiscount: discount_amount, pointsDiscount: points_discount, pointsUsed: points_redeemed,
+          total, pointsToEarn: rewards.enabled ? pointsForTotal(total, rewards) : 0, otp: otpForEmail,
+        }),
       });
-    } catch { /* email failure must not fail the order */ }
+    });
   }
 
   // An online order: alert the POS devices (Web Push, with sound) — after the

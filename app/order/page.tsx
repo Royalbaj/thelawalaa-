@@ -1,15 +1,19 @@
 "use client";
+import Link from "next/link";
 
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 import toast from "react-hot-toast";
 import { createClient } from "@/lib/supabase/client";
+import { signOutTo } from "@/lib/sign-out";
 import { useCart } from "@/lib/store/cart";
 import { createOrder, validatePromoCode } from "@/app/actions/orders";
+import { getCheckoutRewards } from "@/app/actions/customer";
+import { redeemPlan, fmtPoints, fmtRupees, pointsToRupees } from "@/lib/rewards";
 import { getEsewaPaymentForm } from "@/app/actions/payments";
 import { npr } from "@/lib/utils";
-import { UtensilsCrossed } from "lucide-react";
+import { UtensilsCrossed, Sparkles, CupSoda } from "lucide-react";
 import AddToCartButton from "@/components/add-to-cart-button";
 import { applyOpeningPromoPrice, isOpeningPromoActive, type OpeningPromoSettings } from "@/lib/promo";
 
@@ -56,6 +60,8 @@ export default function OrderPage() {
   const [checkingPromo, setCheckingPromo] = useState(false);
 
   const [isGuest, setIsGuest] = useState(false);
+  // Who this device is signed in as — shown at checkout with "Not you?", since phones get shared.
+  const [account, setAccount] = useState<{ name: string; email: string } | null>(null);
   const [guestName, setGuestName] = useState("");
   const [guestPhone, setGuestPhone] = useState("");
 
@@ -63,6 +69,10 @@ export default function OrderPage() {
   const [settings, setSettings] = useState({ esewa_enabled: false, delivery_enabled: false });
   const [openingPromo, setOpeningPromo] = useState<OpeningPromoSettings | null>(null);
   const [menuLoading, setMenuLoading] = useState(true);
+  // Signed-in customers: their points and free item, and whether to use them on this order.
+  const [rewards, setRewards] = useState<Awaited<ReturnType<typeof getCheckoutRewards>>>(null);
+  const [usePoints, setUsePoints] = useState(false);
+  const [useFree, setUseFree] = useState(false);
 
   useEffect(() => {
     const supabase = createClient();
@@ -71,8 +81,10 @@ export default function OrderPage() {
       if (data.user) {
         // Contact name is left blank on purpose — the account holder often
         // isn't who's actually picking up or receiving the order.
-        const { data: profile } = await supabase.from("profiles").select("phone").eq("id", data.user.id).single();
+        const { data: profile } = await supabase.from("profiles").select("full_name, phone").eq("id", data.user.id).single();
         if (profile) setGuestPhone(profile.phone || "");
+        setAccount({ name: profile?.full_name ?? "", email: data.user.email ?? "" });
+        getCheckoutRewards().then(setRewards).catch(() => null);
         supabase.from("customer_favorites").select("product_id").eq("customer_id", data.user.id).then((res) => {
           setFavorites(res.data?.map(f => f.product_id) ?? []);
         });
@@ -104,7 +116,9 @@ export default function OrderPage() {
 
   const subtotal = useMemo(() => items.reduce((t, i) => t + i.price * i.quantity, 0), [items]);
   const deliveryFee = type === "delivery" ? 20 : 0;
-  const finalTotal = Math.max(0, subtotal + deliveryFee - promoDiscount);
+  // Same plan createOrder makes on the server (lib/rewards.ts) — this is only the preview.
+  const pointsPlan = usePoints && rewards ? redeemPlan(rewards.points, subtotal + deliveryFee - promoDiscount, rewards.settings) : { points: 0, rupees: 0 };
+  const finalTotal = Math.max(0, subtotal + deliveryFee - promoDiscount - pointsPlan.rupees);
 
   const visible = activeCat ? products.filter((p) => p.category_id === activeCat) : products;
 
@@ -176,6 +190,8 @@ export default function OrderPage() {
         delivery_address_id: delivery_address_id ?? undefined,
         payment_method: payment,
         promo_code: promo || undefined,
+        use_points: pointsPlan.points > 0 || undefined,
+        use_free_item: useFree || undefined,
         guest_name: guestName.trim() || undefined,
         guest_phone: guestPhone.trim() || undefined,
         guest_address: isGuest && type === "delivery" ? newAddress.trim() : undefined,
@@ -334,6 +350,16 @@ export default function OrderPage() {
           <div className="mt-6 max-w-xl space-y-6">
             <div className="card p-5">
               <h2 className="font-display text-xl font-bold border-b pb-2 mb-4">Checkout Details</h2>
+              {account ? (
+                <p className="mb-4 flex flex-wrap items-center justify-between gap-x-3 gap-y-1 rounded-xl bg-stone-50 px-3 py-2.5 text-sm text-stone-600">
+                  <span className="min-w-0">Ordering as <b className="text-stone-800">{account.name || account.email}</b>{account.name && account.email ? <span className="text-stone-400"> · {account.email}</span> : null}</span>
+                  <button type="button" onClick={() => signOutTo("/order")} className="font-bold text-brand-orange">Not you? Sign out</button>
+                </p>
+              ) : !isGuest ? null : (
+                <p className="mb-4 rounded-xl bg-orange-50 px-3 py-2.5 text-sm text-brand-brown">
+                  Ordering as a guest. <Link href="/auth/login?redirect=/order" className="font-bold text-brand-orange">Sign in</Link> or <Link href="/auth/signup" className="font-bold text-brand-orange">create an account</Link> to earn points on this order.
+                </p>
+              )}
               
               <div className="space-y-5">
                   <div className="grid sm:grid-cols-2 gap-4">
@@ -397,6 +423,35 @@ export default function OrderPage() {
             <div className="card p-5 space-y-4">
               <h2 className="font-display text-xl font-bold border-b pb-2">Payment</h2>
 
+              {rewards && (rewards.points > 0 || rewards.freeItems > 0) && (
+                <div className="rounded-2xl bg-gradient-to-br from-amber-50 to-orange-50 p-4 ring-1 ring-orange-100">
+                  <p className="flex items-center gap-1.5 text-sm font-bold text-brand-brown"><Sparkles size={15} className="text-amber-500" /> Your rewards</p>
+                  {(() => {
+                    const avail = redeemPlan(rewards.points, subtotal + deliveryFee - promoDiscount, rewards.settings);
+                    return avail.points > 0 ? (
+                      <label className="mt-3 flex cursor-pointer items-center justify-between gap-3">
+                        <span className="text-sm text-stone-700">Use <b>{fmtPoints(avail.points)} points</b> — <b className="text-brand-green">−{fmtRupees(avail.rupees)}</b></span>
+                        <input type="checkbox" checked={usePoints} onChange={(e) => setUsePoints(e.target.checked)} className="h-5 w-5 accent-brand-orange" />
+                      </label>
+                    ) : (
+                      <p className="mt-2 text-xs text-stone-600">
+                        You have {fmtPoints(rewards.points)} points ({fmtRupees(pointsToRupees(rewards.points, rewards.settings))}). Use them once you reach {fmtPoints(rewards.settings.min_redeem_points)} — this order gets you closer.
+                      </p>
+                    );
+                  })()}
+                  {rewards.freeItems > 0 && rewards.freeItem && (
+                    <label className={`mt-3 flex items-center justify-between gap-3 ${rewards.freeItem.available ? "cursor-pointer" : "opacity-50"}`}>
+                      <span className="flex items-center gap-1.5 text-sm text-stone-700"><CupSoda size={15} className="text-brand-green" /> Add my free <b>{rewards.freeItem.name}</b>{!rewards.freeItem.available && " (sold out today)"}</span>
+                      <input type="checkbox" disabled={!rewards.freeItem.available} checked={useFree} onChange={(e) => setUseFree(e.target.checked)} className="h-5 w-5 accent-brand-orange" />
+                    </label>
+                  )}
+                  {(pointsPlan.rupees > 0 || useFree) && (
+                    <p className="mt-3 border-t border-orange-100 pt-2 text-xs font-bold text-brand-green">
+                      {[pointsPlan.rupees > 0 && `−${fmtRupees(pointsPlan.rupees)} from points`, useFree && `free ${rewards.freeItem?.name} added`].filter(Boolean).join(" · ")}
+                    </p>
+                  )}
+                </div>
+              )}
               <div>
                 <label className="label" htmlFor="promo">Voucher / Promo Code (optional)</label>
                 <div className="flex gap-2">

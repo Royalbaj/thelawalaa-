@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { decodeEsewaRedirect, verifyEsewaTransaction } from "@/lib/payments/esewa";
-import { supabaseAdmin, audit, awardOrderLoyaltyPoints } from "@/lib/supabase/admin";
+import { supabaseAdmin, audit, loyaltyAward } from "@/lib/supabase/admin";
 
 /**
  * eSewa's success_url. The redirect payload is just what the customer's
@@ -48,7 +48,7 @@ export async function GET(request: NextRequest) {
     })
     .eq("id", order.id);
 
-  await awardOrderLoyaltyPoints(order.customer_id, Number(order.total));
+  await loyaltyAward(order.id);
 
   // actor_id null = confirmed by the system (gateway), not a human admin —
   // stays distinguishable from an admin's manual markOrderPaid.

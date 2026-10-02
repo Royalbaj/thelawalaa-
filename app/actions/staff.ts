@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { Resend } from "resend";
 import { inviteStaffSchema } from "@/lib/validations/staff";
 import { requireRole } from "@/lib/supabase/server";
-import { supabaseAdmin, audit, awardOrderLoyaltyPoints } from "@/lib/supabase/admin";
+import { supabaseAdmin, audit, loyaltyAward, loyaltyUnaward, loyaltyOnCancel } from "@/lib/supabase/admin";
 import { fetchLiveOrders } from "@/lib/live-orders";
 
 const resend = process.env.RESEND_API_KEY ? new Resend(process.env.RESEND_API_KEY) : null;
@@ -187,6 +187,8 @@ export async function adminUpdateOrderStatus(orderId: string, status: string) {
   if (!ALLOWED_STATUSES.includes(status)) return { error: "Invalid status" };
   const { error } = await supabaseAdmin.from("orders").update({ status }).eq("id", orderId);
   if (error) return { error: "Couldn't update the order — try again" };
+  // Cancelled: the customer gets back any points / free item it used, and loses what it earned.
+  if (status === "cancelled") await loyaltyOnCancel(orderId);
   await audit({ actor_id: user.id, action: "UPDATE_ORDER_STATUS", target_table: "orders", target_id: orderId, new_data: { status } });
   revalidatePath("/admin/orders");
   return { ok: true };
@@ -249,7 +251,7 @@ export async function markOrderPaid(orderId: string) {
     })
     .eq("id", orderId);
 
-  await awardOrderLoyaltyPoints(order.customer_id, Number(order.total));
+  await loyaltyAward(orderId);
 
   await audit({
     actor_id: user.id, action: "MARK_ORDER_PAID", target_table: "orders",
@@ -267,6 +269,7 @@ export async function markOrderUnpaid(orderId: string) {
     .from("orders")
     .update({ payment_status: "pending", paid_confirmed_by: null, paid_confirmed_at: null })
     .eq("id", orderId);
+  await loyaltyUnaward(orderId);
   await audit({ actor_id: user.id, action: "MARK_ORDER_UNPAID", target_table: "orders", target_id: orderId });
   revalidatePath("/admin/orders"); revalidatePath("/admin");
   return { ok: true };

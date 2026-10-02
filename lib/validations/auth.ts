@@ -10,13 +10,13 @@ export const passwordSchema = z.string()
   .regex(/[^A-Za-z0-9]/, "Add a special character");
 
 export const signupSchema = z.object({
-  full_name: z.string().trim().min(2).max(100),
-  email: z.string().trim().email().max(254),
+  full_name: z.string().trim().min(2, "Enter your full name").max(100, "That name is too long"),
+  email: z.string().trim().email("Enter a valid email address").max(254, "That email is too long"),
   phone: phoneNP,
   password: passwordSchema,
 });
 
 export const loginSchema = z.object({
-  email: z.string().trim().email(),
-  password: z.string().min(1).max(72),
+  email: z.string().trim().email("Enter a valid email address"),
+  password: z.string().min(1, "Enter your password").max(72),
 });

@@ -18,7 +18,10 @@
 export const SITE = {
   name: "Thelawalaa",
   legalName: "Thelawalaa Street Food",
-  url: process.env.NEXT_PUBLIC_SITE_URL ?? "https://thelawalaa.com",
+  // The real domain for canonical links and the sitemap. A *.vercel.app
+  // NEXT_PUBLIC_SITE_URL (as production has) would tell Google the site lives there.
+  url: process.env.NEXT_PUBLIC_SITE_URL && !process.env.NEXT_PUBLIC_SITE_URL.includes("vercel.app")
+    ? process.env.NEXT_PUBLIC_SITE_URL : "https://www.thelawalaa.com",
   description:
     "Thelawalaa serves Banepa's most flavourful chatpate and momo — hygienic, freshly made, and delivered hot to your door within 5km of Godam Chowk for just Nrs 20. Classic, Gilo, Mint & Spicy Ramen chatpate, plus Veg, Chicken & Buff momo.",
   tagline: "Banepa's Most Flavourful Chatpate & Momo",

@@ -37,7 +37,7 @@ export default function MobileNav() {
   }, []);
 
   // Hide mobile nav entirely in staff-facing portals
-  if (pathname.startsWith("/admin") || pathname.startsWith("/pos") || pathname.startsWith("/delivery") || pathname.startsWith("/staff")) {
+  if (pathname.startsWith("/admin") || pathname.startsWith("/pos") || pathname.startsWith("/delivery") || pathname.startsWith("/staff") || pathname.startsWith("/auth")) {
     return null;
   }
 

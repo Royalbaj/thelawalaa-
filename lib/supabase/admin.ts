@@ -2,6 +2,7 @@
 // Import ONLY from server actions / route handlers, never client components.
 // "server-only" makes the build FAIL if this leaks into client code.
 import "server-only";
+import { normaliseRewards } from "@/lib/rewards";
 import { createClient } from "@supabase/supabase-js";
 
 export const supabaseAdmin = createClient(
@@ -22,40 +23,29 @@ export async function audit(entry: {
   await supabaseAdmin.from("audit_logs").insert(entry as never);
 }
 
-const LOYALTY_TIERS = [
-  { name: "bronze", min: 0 },
-  { name: "silver", min: 500 },
-  { name: "gold", min: 2000 },
-  { name: "platinum", min: 5000 },
-] as const;
+// ── Rewards (migration 027) ──────────────────────────────────────
+// Balances only ever change inside the loyalty_* SQL functions, which are
+// keyed on the order (retries and double clicks can't pay out twice).
 
-/**
- * 1 point per Rs 10 on a completed order — the Rewards page advertises
- * this, but nothing ever actually granted it. Call once, exactly when
- * payment_status flips to 'paid' (both markOrderPaid and the eSewa
- * callback already guard against re-processing an already-paid order,
- * so this is safe to call unconditionally from either).
- */
-export async function awardOrderLoyaltyPoints(customerId: string | null, orderTotal: number) {
-  if (!customerId) return; // guest/POS orders have no persistent identity to credit
-  const points = Math.floor(orderTotal / 10);
-  if (points <= 0) return;
+/** An order became paid: its points + one stamp towards the free item. */
+export async function loyaltyAward(orderId: string) {
+  const { error } = await supabaseAdmin.rpc("loyalty_award", { p_order: orderId });
+  if (error) console.error("loyalty_award failed:", error.message);
+}
+/** "Paid" was undone (mis-click): take back what that order earned. */
+export async function loyaltyUnaward(orderId: string) {
+  const { error } = await supabaseAdmin.rpc("loyalty_unaward", { p_order: orderId });
+  if (error) console.error("loyalty_unaward failed:", error.message);
+}
+/** Cancelled: give back the points / free item it used, and undo what it earned. */
+export async function loyaltyOnCancel(orderId: string) {
+  const { error } = await supabaseAdmin.rpc("loyalty_on_cancel", { p_order: orderId });
+  if (error) console.error("loyalty_on_cancel failed:", error.message);
+}
 
-  const { data: existing } = await supabaseAdmin
-    .from("loyalty_points").select("points, total_earned").eq("customer_id", customerId).maybeSingle();
-  const newPoints = (existing?.points ?? 0) + points;
-  const newTotalEarned = (existing?.total_earned ?? 0) + points;
-  const tier = [...LOYALTY_TIERS].reverse().find((t) => newTotalEarned >= t.min)!.name;
-
-  if (existing) {
-    await supabaseAdmin.from("loyalty_points")
-      .update({ points: newPoints, total_earned: newTotalEarned, tier }).eq("customer_id", customerId);
-  } else {
-    await supabaseAdmin.from("loyalty_points")
-      .insert({ customer_id: customerId, points: newPoints, total_earned: newTotalEarned, tier });
-  }
-  await supabaseAdmin.from("loyalty_transactions")
-    .insert({ customer_id: customerId, points_change: points, reason: "order_reward" });
+export async function getRewardSettings() {
+  const { data } = await supabaseAdmin.from("reward_settings").select("*").eq("id", 1).maybeSingle();
+  return normaliseRewards(data);
 }
 
 /**

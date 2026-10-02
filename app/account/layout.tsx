@@ -1,34 +1,31 @@
 import { redirect } from "next/navigation";
-import { getVerifiedUser } from "@/lib/supabase/server";
 import Link from "next/link";
-import { createClient } from "@/lib/supabase/server";
+import { getVerifiedUser } from "@/lib/supabase/server";
 import SessionGuard from "@/components/session-guard";
+import AccountNav from "@/components/account/account-nav";
 
 export const dynamic = "force-dynamic";
 
 export default async function AccountLayout({ children }: { children: React.ReactNode }) {
   const { user, profile } = await getVerifiedUser();
   if (!user || !profile) redirect("/auth/login?redirect=/account");
+  const initials = (profile.full_name as string).split(/\s+/).map((w: string) => w[0]).slice(0, 2).join("").toUpperCase() || "?";
 
   return (
-    <div className="min-h-screen bg-brand-cream">
+    <div className="min-h-dvh bg-stone-50">
       <SessionGuard userId={profile.id} />
-      {/* App-like sticky header */}
-      <header className="sticky top-0 z-30 bg-brand-dark text-white">
-        <div className="max-w-lg mx-auto px-4 py-3 flex items-center justify-between">
-          <Link href="/account" className="font-display text-lg font-bold brand-gradient-text">
-            Thelawalaa
-          </Link>
-          <div className="flex items-center gap-3">
-            <Link href="/order" className="rounded-full bg-brand-orange px-3 py-1.5 text-xs font-bold hover:brightness-110 transition">
-              Order Now
-            </Link>
+      <header className="sticky top-0 z-30 border-b border-stone-200/70 bg-white/95 backdrop-blur-md">
+        <div className="mx-auto flex max-w-5xl items-center justify-between gap-3 px-4 py-3">
+          <Link href="/" className="font-display text-xl font-extrabold brand-gradient-text">Thelawalaa</Link>
+          <AccountNav />
+          <div className="flex items-center gap-2">
+            <Link href="/order" className="rounded-full bg-brand-orange px-4 py-2 text-sm font-bold text-white shadow-sm shadow-orange-500/30 transition hover:brightness-110">Order now</Link>
+            <Link href="/account/profile" aria-label="Your profile"
+              className="flex h-9 w-9 items-center justify-center rounded-full bg-brand-brown text-xs font-extrabold text-amber-50">{initials}</Link>
           </div>
         </div>
       </header>
-
-      <main className="max-w-lg mx-auto">{children}</main>
-
+      <main className="mx-auto max-w-5xl px-4 py-5 sm:py-8">{children}</main>
     </div>
   );
 }
