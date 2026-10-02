@@ -64,7 +64,7 @@ export default function AdminShell({
         </header>
         <main className="flex-1 p-3 sm:p-6">{children}</main>
         {/* Little footer — above the phone tab bar */}
-        <footer className="border-t border-stone-200 px-4 pb-24 pt-4 text-xs text-stone-400 sm:px-6 lg:pb-4">
+        <footer className="border-t border-stone-200 px-4 pb-32 pt-4 text-xs text-stone-400 sm:px-6 lg:pb-4">
           <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1">
             <span>© {new Date().getFullYear()} Thelawalaa · Admin panel</span>
             <span className="flex flex-wrap gap-x-4 gap-y-1 font-bold">
@@ -76,22 +76,25 @@ export default function AdminShell({
         </footer>
       </div>
 
-      <nav className="fixed inset-x-0 bottom-0 z-30 border-t border-stone-200 bg-white/95 backdrop-blur-md lg:hidden"
-        style={{ paddingBottom: "env(safe-area-inset-bottom)" }} aria-label="Main">
-        <div className="grid grid-cols-5">
+      {/* Floating, lifted off the screen edge — easy to reach and tap with a thumb. */}
+      <nav className="fixed inset-x-3 z-30 rounded-3xl bg-white/95 p-1.5 shadow-[0_8px_30px_rgba(28,10,0,0.18)] ring-1 ring-stone-200 backdrop-blur-md lg:hidden"
+        style={{ bottom: "calc(env(safe-area-inset-bottom) + 0.75rem)" }} aria-label="Main">
+        <div className="grid grid-cols-5 gap-1">
           {TABS.map(({ href, label, icon: Icon }) => {
             const active = pathname.startsWith(href);
             return (
-              <Link key={href} href={href}
-                className={cn("flex flex-col items-center gap-0.5 py-2.5 text-[11px] font-bold", active ? "text-brand-orange" : "text-stone-500")}>
-                <Icon size={21} /> {label}
+              <Link key={href} href={href} aria-current={active ? "page" : undefined}
+                className={cn("flex min-h-[60px] flex-col items-center justify-center gap-1 rounded-2xl text-xs font-bold transition active:scale-95",
+                  active ? "bg-orange-50 text-brand-orange" : "text-stone-500")}>
+                <Icon size={24} /> {label}
               </Link>
             );
           })}
           <button onClick={() => setOpen(true)}
-            className={cn("flex flex-col items-center gap-0.5 py-2.5 text-[11px] font-bold", !inTabs ? "text-brand-orange" : "text-stone-500")}>
+            className={cn("flex min-h-[60px] flex-col items-center justify-center gap-1 rounded-2xl text-xs font-bold transition active:scale-95",
+              !inTabs ? "bg-orange-50 text-brand-orange" : "text-stone-500")}>
             <span className="relative">
-              <MoreHorizontal size={21} />
+              <MoreHorizontal size={24} />
               {moreBadge > 0 && <span className="absolute -right-2 -top-1.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-brand-red px-1 text-[10px] font-extrabold text-white">{moreBadge}</span>}
             </span>
             More

@@ -31,7 +31,7 @@ export default function ProfilePage() {
               <p className="text-[10px] text-stone-400">Manage delivery addresses</p>
             </div>
           </Link>
-          <a href="https://wa.me/9779801011111" target="_blank" rel="noopener noreferrer" className="w-full flex items-center gap-3 rounded-xl bg-stone-50 p-3 hover:bg-stone-100 transition text-left">
+          <a href="/whatsapp" target="_blank" rel="noopener noreferrer" className="w-full flex items-center gap-3 rounded-xl bg-stone-50 p-3 hover:bg-stone-100 transition text-left">
             <MessageCircle size={20} className="text-brand-orange" />
             <div>
               <p className="text-sm font-bold text-brand-brown">Help &amp; Support</p>

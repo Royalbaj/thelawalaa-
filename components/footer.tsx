@@ -1,6 +1,7 @@
 import { Facebook, Instagram, Link2 } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import TikTokIcon from "@/components/icons/tiktok";
+import { getSiteText } from "@/lib/site-content";
 
 function platformIcon(platform: string) {
   const p = platform.toLowerCase();
@@ -12,17 +13,17 @@ function platformIcon(platform: string) {
 
 export default async function Footer() {
   const supabase = await createClient();
-  const { data: socialLinks } = await supabase
-    .from("social_links").select("id, platform, url").order("sort_order");
+  const [{ data: socialLinks }, t] = await Promise.all([
+    supabase.from("social_links").select("id, platform, url").order("sort_order"),
+    getSiteText(),
+  ]);
 
   return (
     <footer className="bg-brand-brown px-4 py-12 text-white">
       <div className="mx-auto grid max-w-6xl gap-8 md:grid-cols-3">
         <div>
           <p className="font-display text-2xl font-bold brand-gradient-text">Thelawalaa</p>
-          <p className="mt-2 text-sm text-orange-100/80">
-            Crispy, spicy, straight from the thela — now at your door.
-          </p>
+          <p className="mt-2 text-sm text-orange-100/80">{t["footer.tagline"]}</p>
           {(socialLinks ?? []).length > 0 && (
             <div className="mt-4">
               <p className="text-xs font-bold uppercase tracking-wide text-orange-100/60">Follow Us</p>

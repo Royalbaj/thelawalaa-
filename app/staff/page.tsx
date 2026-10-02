@@ -1,6 +1,7 @@
 import { requireRole } from "@/lib/supabase/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import TrainingList from "@/components/staff/training-list";
+import { getSiteText, whatsappHref } from "@/lib/site-content";
 import { Megaphone, MessageCircle, GraduationCap } from "lucide-react";
 
 export const dynamic = "force-dynamic";
@@ -9,6 +10,7 @@ const STAFF_ROLES = ["pos_user", "delivery_driver", "super_admin"];
 
 export default async function StaffPortalPage() {
   const { user, profile } = await requireRole(STAFF_ROLES);
+  const siteText = await getSiteText();
 
   const [{ data: videos }, { data: progress }, { data: announcements }] = await Promise.all([
     supabaseAdmin.from("training_videos").select("id, title, youtube_url").eq("is_active", true).order("sort_order"),
@@ -49,7 +51,7 @@ export default async function StaffPortalPage() {
       </section>
 
       <a
-        href="https://wa.me/9779801011111"
+        href={whatsappHref(siteText)}
         target="_blank"
         rel="noopener noreferrer"
         className="btn-outline flex w-full items-center justify-center gap-2 !border-stone-300 !text-brand-brown hover:!bg-stone-100"

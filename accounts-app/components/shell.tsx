@@ -63,8 +63,10 @@ export default function Shell({ person, lowStock, children }: { person: string; 
   const tab = (href: string) => {
     const item = NAV.find((n) => n.href === href)!;
     return (
-      <Link key={href} href={href} className={cn("flex flex-col items-center gap-0.5 py-2.5 text-[11px] font-bold", isActive(href) ? "text-brand-orange" : "text-stone-500")}>
-        <span className="relative"><item.icon size={21} />{href === "/stock" && <Badge n={lowStock} />}</span> {item.label}
+      <Link key={href} href={href} aria-current={isActive(href) ? "page" : undefined}
+        className={cn("flex min-h-[60px] flex-col items-center justify-center gap-1 rounded-2xl text-xs font-bold transition active:scale-95",
+          isActive(href) ? "bg-orange-50 text-brand-orange" : "text-stone-500")}>
+        <span className="relative"><item.icon size={24} />{href === "/stock" && <Badge n={lowStock} />}</span> {item.label}
       </Link>
     );
   };
@@ -101,13 +103,13 @@ export default function Shell({ person, lowStock, children }: { person: string; 
         </div>
       </header>
 
-      <main className="mx-auto max-w-6xl p-4 pb-28 sm:p-6 md:pb-10">{children}</main>
+      <main className="mx-auto max-w-6xl p-4 pb-36 sm:p-6 sm:pb-36 md:pb-10">{children}</main>
 
       {!onForm && <>
         {/* Phones and tablets: bottom tabs with a big "+" in the middle. */}
         {adding && <div className="fixed inset-0 z-40 bg-black/30 md:hidden" onClick={() => setAdding(false)} />}
         {adding && (
-          <div className="fixed inset-x-4 bottom-24 z-50 grid grid-cols-2 gap-3 md:hidden" style={{ marginBottom: "env(safe-area-inset-bottom)" }}>
+          <div className="fixed inset-x-4 z-50 grid grid-cols-2 gap-3 md:hidden" style={{ bottom: "calc(env(safe-area-inset-bottom) + 7rem)" }}>
             <Link href="/entries/new?kind=in" onClick={() => setAdding(false)}
               className="flex flex-col items-center gap-1 rounded-2xl bg-white p-4 font-bold text-brand-brown shadow-xl">
               <ArrowDownLeft size={22} className="text-[#2a78d6]" /> Money in
@@ -118,12 +120,17 @@ export default function Shell({ person, lowStock, children }: { person: string; 
             </Link>
           </div>
         )}
-        <nav className="fixed inset-x-0 bottom-0 z-50 border-t border-stone-200 bg-white md:hidden print:hidden" style={{ paddingBottom: "env(safe-area-inset-bottom)" }}>
-          <div className="grid grid-cols-5">
+        <nav className="fixed z-50 rounded-3xl bg-white/95 p-1.5 shadow-[0_8px_30px_rgba(28,10,0,0.18)] ring-1 ring-stone-200 backdrop-blur-md md:hidden print:hidden"
+          style={{
+            bottom: "calc(env(safe-area-inset-bottom) + 0.75rem)",
+            left: "max(0.75rem, env(safe-area-inset-left))",
+            right: "max(0.75rem, env(safe-area-inset-right))",
+          }}>
+          <div className="grid grid-cols-5 items-center gap-1">
             {tab("/")}
             {tab("/entries")}
             <button onClick={() => setAdding((v) => !v)} aria-label="Add money in or out" className="flex items-center justify-center">
-              <span className={cn("-mt-6 flex h-14 w-14 items-center justify-center rounded-full bg-brand-orange text-white shadow-lg shadow-orange-500/40 transition", adding && "rotate-45")}>
+              <span className={cn("-mt-8 flex h-16 w-16 items-center justify-center rounded-full bg-brand-orange text-white shadow-lg shadow-orange-500/40 ring-4 ring-white transition active:scale-95", adding && "rotate-45")}>
                 {adding ? <X size={26} className="-rotate-45" /> : <Plus size={28} />}
               </span>
             </button>

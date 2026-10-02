@@ -7,6 +7,7 @@ import { SITE } from "@/lib/seo";
 import { applyOpeningPromoPrice, isOpeningPromoActive } from "@/lib/promo";
 import ContactForm from "@/components/contact-form";
 import heroImage from "@/public/images/hero/thelawalaa-chatpate-momo.webp";
+import { getSiteText, whatsappHref } from "@/lib/site-content";
 import Faq from "@/components/faq";
 import AddToCartButton from "@/components/add-to-cart-button";
 import StructuredData from "@/components/structured-data";
@@ -47,6 +48,8 @@ export default async function HomePage() {
     supabase.from("faqs").select("question, answer").eq("is_active", true).order("sort_order"),
   ]);
   const faqs = (faqRows ?? []).map((f) => ({ q: f.question, a: f.answer }));
+  // Every bit of wording below is editable in Admin → Website text (lib/site-content.ts).
+  const t = await getSiteText();
   const deliveryEnabled = settings?.delivery_enabled ?? false;
   const promoActive = isOpeningPromoActive(settings);
   const priceOf = (p: { price: number; categories?: { name: string } | { name: string }[] | null }) => {
@@ -103,30 +106,29 @@ export default async function HomePage() {
 
           {/* Words */}
           <div className="relative z-10 -mt-10 px-4 pb-14 text-center sm:-mt-16 lg:mt-0 lg:w-[44%] lg:py-20 lg:pl-8 lg:text-left xl:w-[46%] xl:pl-4">
-            <p className="text-xs font-bold uppercase tracking-[0.2em] text-brand-orange">Godam Chowk · Banepa</p>
+            <p className="text-xs font-bold uppercase tracking-[0.2em] text-brand-orange">{t["hero.eyebrow"]}</p>
             <h1 className="mt-3 font-display text-4xl font-extrabold leading-tight text-amber-50 sm:text-5xl md:text-6xl xl:text-7xl">
-              Hygienic Street Food,
-              <span className="brand-gradient-text"> Bold Flavour</span>
+              {t["hero.title"]}
+              <span className="brand-gradient-text"> {t["hero.highlight"]}</span>
             </h1>
-            <p className="mx-auto mt-5 max-w-lg text-lg leading-relaxed text-amber-100/75 lg:mx-0">
-              Chatpate in 4 signature varieties, momo &amp; ice-cold drinks —
-              prepared in our clean kitchen with fresh ingredients, delivered hot to your door.
+            <p className="mx-auto mt-5 max-w-lg whitespace-pre-line text-lg leading-relaxed text-amber-100/75 lg:mx-0">
+              {t["hero.text"]}
             </p>
             <div className="mt-8 flex flex-wrap justify-center gap-4 lg:justify-start">
               <Link href="/order" className="btn-primary px-8 py-3.5 text-lg shadow-lg shadow-orange-600/40">
-                Order Now →
+                {t["hero.button"]}
               </Link>
               <a href="#menu" className="rounded-full border-2 border-amber-100/40 px-8 py-3.5 text-lg font-bold text-amber-50 transition hover:border-amber-100/70 hover:bg-white/10">
-                See Menu
+                {t["hero.button2"]}
               </a>
             </div>
             {/* Trust badges */}
             <div className="mt-10 flex flex-wrap justify-center gap-2.5 text-xs font-bold text-amber-100/80 lg:justify-start">
               {[
-                [SprayCan, "Kitchen Hygiene Certified"],
-                [Salad, "Fresh Ingredients Daily"],
-                deliveryEnabled ? [Bike, "Nrs 20 Home Delivery"] : [Store, "Order Ahead for Pickup"],
-                [Zap, "Ready in 10–15 mins"],
+                [SprayCan, t["hero.badge1"]],
+                [Salad, t["hero.badge2"]],
+                deliveryEnabled ? [Bike, t["hero.badge3_delivery"]] : [Store, t["hero.badge3_pickup"]],
+                [Zap, t["hero.badge4"]],
               ].map(([Icon, text]: any) => (
                 <span key={text} className="flex items-center gap-1.5 rounded-full bg-white/[0.06] px-3 py-1.5 ring-1 ring-white/10 backdrop-blur-sm">
                   <Icon size={14} className="text-brand-orange" /> {text}
@@ -142,27 +144,25 @@ export default async function HomePage() {
       <section id="about" className="bg-white px-4 py-12 md:py-20">
         <div className="mx-auto max-w-6xl">
           <div className="text-center mb-12">
-            <p className="font-bold tracking-widest text-brand-orange text-xs mb-2 uppercase">Why Choose Us</p>
-            <h2 className="font-display text-4xl font-bold text-brand-brown">Where Hygiene Meets Flavour</h2>
-            <p className="mt-4 max-w-2xl mx-auto text-stone-600 leading-relaxed">
-              Thelawalaa brings the excitement of street food into a modern, hygienic format. 
-              Every dish is prepared fresh in our certified kitchen with premium ingredients — 
-              no shortcuts, no compromises. Just bold taste you can trust.
+            <p className="font-bold tracking-widest text-brand-orange text-xs mb-2 uppercase">{t["about.eyebrow"]}</p>
+            <h2 className="font-display text-4xl font-bold text-brand-brown">{t["about.title"]}</h2>
+            <p className="mt-4 max-w-2xl mx-auto whitespace-pre-line text-stone-600 leading-relaxed">
+              {t["about.text"]}
             </p>
           </div>
           <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
             {[
-              [SprayCan, "Certified Hygiene", "Prepared in a clean, sanitized kitchen with food-grade packaging for every order."],
-              [Flame, "4 Chatpate Varieties", "Classic, Gilo, Mint & Spicy Ramen — each with our signature house masala."],
-              [Salad, "Fresh Ingredients", "Locally sourced vegetables, premium spices, and quality proteins — no preservatives."],
+              [SprayCan, t["about.card1_title"], t["about.card1_text"]],
+              [Flame, t["about.card2_title"], t["about.card2_text"]],
+              [Salad, t["about.card3_title"], t["about.card3_text"]],
               deliveryEnabled
-                ? [Bike, "Quick Delivery", "Hot to your door within 5km of Godam Chowk for just Nrs 20 — or pickup for free."]
-                : [Store, "Easy Pickup", "Order ahead and collect it hot from our Godam Chowk kitchen — no waiting in line."],
+                ? [Bike, t["about.card4_delivery_title"], t["about.card4_delivery_text"]]
+                : [Store, t["about.card4_pickup_title"], t["about.card4_pickup_text"]],
             ].map(([Icon, title, body]: any) => (
               <div key={title} className="card p-6 text-center hover:shadow-xl transition-shadow duration-300 border border-orange-50">
                 <div className="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-2xl bg-orange-50 text-brand-orange"><Icon size={24} /></div>
                 <p className="font-display text-lg font-bold text-brand-brown">{title}</p>
-                <p className="mt-2 text-sm text-stone-600 leading-relaxed">{body}</p>
+                <p className="mt-2 whitespace-pre-line text-sm text-stone-600 leading-relaxed">{body}</p>
               </div>
             ))}
           </div>
@@ -173,8 +173,8 @@ export default async function HomePage() {
       <section id="menu" className="bg-brand-cream px-4 py-12 md:py-20">
         <div className="mx-auto max-w-6xl">
           <div className="text-center mb-10">
-            <p className="font-bold tracking-widest text-brand-orange text-xs mb-2 uppercase">Our Bestsellers</p>
-            <h2 className="font-display text-3xl font-extrabold text-brand-brown md:text-4xl">Most Loved by Our Customers</h2>
+            <p className="font-bold tracking-widest text-brand-orange text-xs mb-2 uppercase">{t["menu.eyebrow"]}</p>
+            <h2 className="font-display text-3xl font-extrabold text-brand-brown md:text-4xl">{t["menu.title"]}</h2>
           </div>
           <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
             {(bestsellers ?? []).map((p) => (
@@ -215,7 +215,7 @@ export default async function HomePage() {
           </div>
           <div className="mt-12 text-center">
             <Link href="/order" className="btn-primary text-lg px-10 py-3.5 shadow-lg shadow-orange-500/20">
-              View Full Menu & Order →
+              {t["menu.button"]}
             </Link>
           </div>
         </div>
@@ -224,28 +224,28 @@ export default async function HomePage() {
       {/* HOW TO ORDER */}
       <section id="order" className="bg-brand-dark px-4 py-12 md:py-20 text-white">
         <div className="mx-auto max-w-6xl text-center">
-          <p className="font-bold tracking-widest text-brand-orange text-xs mb-2 uppercase">Simple Process</p>
-          <h2 className="font-display text-4xl font-bold">How to Order</h2>
-          <p className="mt-3 text-orange-100/70 max-w-lg mx-auto">Fresh food, ready in minutes. No app download required.</p>
+          <p className="font-bold tracking-widest text-brand-orange text-xs mb-2 uppercase">{t["order.eyebrow"]}</p>
+          <h2 className="font-display text-4xl font-bold">{t["order.title"]}</h2>
+          <p className="mt-3 whitespace-pre-line text-orange-100/70 max-w-lg mx-auto">{t["order.text"]}</p>
           <div className="mt-12 grid gap-8 sm:grid-cols-3">
             {[
-              ["1", "Browse & Add", "Pick your favourites from our menu and add them to your cart."],
+              ["1", t["order.step1_title"], t["order.step1_text"]],
               deliveryEnabled
-                ? ["2", "Choose Pickup or Delivery", "Collect from our Godam Chowk kitchen or get it delivered within 5km for Nrs 20."]
-                : ["2", "Choose Pickup", "Collect it hot and fresh from our Godam Chowk kitchen."],
-              ["3", "Pay on Arrival", "Pay cash or scan our eSewa/FonePay QR when your order arrives. Simple."],
+                ? ["2", t["order.step2_delivery_title"], t["order.step2_delivery_text"]]
+                : ["2", t["order.step2_pickup_title"], t["order.step2_pickup_text"]],
+              ["3", t["order.step3_title"], t["order.step3_text"]],
             ].map(([n, title, body]) => (
               <div key={n} className="rounded-2xl bg-white/5 p-8 backdrop-blur-sm border border-white/10">
                 <p className="font-display text-5xl font-bold text-brand-orange">{n}</p>
                 <p className="mt-3 font-display text-xl font-bold">{title}</p>
-                <p className="mt-2 text-sm text-orange-100/60 leading-relaxed">{body}</p>
+                <p className="mt-2 whitespace-pre-line text-sm text-orange-100/60 leading-relaxed">{body}</p>
               </div>
             ))}
           </div>
           <div className="mt-12 flex flex-wrap justify-center gap-4">
-            <Link href="/order" className="btn-primary text-lg px-8 py-3.5">Order for Pickup</Link>
+            <Link href="/order" className="btn-primary text-lg px-8 py-3.5">{t["order.button_pickup"]}</Link>
             {deliveryEnabled && (
-              <Link href="/order" className="btn-outline text-lg px-8 py-3.5">Order for Delivery</Link>
+              <Link href="/order" className="btn-outline text-lg px-8 py-3.5">{t["order.button_delivery"]}</Link>
             )}
           </div>
         </div>
@@ -255,8 +255,8 @@ export default async function HomePage() {
       <section id="faq" className="bg-white px-4 py-12 md:py-20">
         <div className="mx-auto max-w-3xl">
           <div className="text-center mb-8">
-            <p className="font-bold tracking-widest text-brand-orange text-xs mb-2 uppercase">Got Questions?</p>
-            <h2 className="font-display text-4xl font-bold text-brand-brown">Frequently Asked Questions</h2>
+            <p className="font-bold tracking-widest text-brand-orange text-xs mb-2 uppercase">{t["faq.eyebrow"]}</p>
+            <h2 className="font-display text-4xl font-bold text-brand-brown">{t["faq.title"]}</h2>
           </div>
           <Faq faqs={faqs} />
         </div>
@@ -266,25 +266,25 @@ export default async function HomePage() {
       <section id="contact" className="bg-brand-cream px-4 py-12 md:py-20">
         <div className="mx-auto grid max-w-6xl gap-10 md:grid-cols-2">
           <div>
-            <p className="font-bold tracking-widest text-brand-orange text-xs mb-2 uppercase">Get In Touch</p>
-            <h2 className="font-display text-4xl font-bold text-brand-brown">Say Hello</h2>
+            <p className="font-bold tracking-widest text-brand-orange text-xs mb-2 uppercase">{t["contact.eyebrow"]}</p>
+            <h2 className="font-display text-4xl font-bold text-brand-brown">{t["contact.title"]}</h2>
             <ContactForm />
           </div>
           <div>
-            <h3 className="font-display text-xl font-bold text-brand-brown">Visit or Order From</h3>
+            <h3 className="font-display text-xl font-bold text-brand-brown">{t["contact.place_title"]}</h3>
             <div className="mt-4 card p-5 space-y-3">
               <div className="flex items-start gap-3">
                 <MapPin size={20} className="mt-0.5 shrink-0 text-brand-orange" />
                 <div>
-                  <p className="font-bold text-brand-brown">Thelawalaa Kitchen</p>
-                  <p className="text-sm text-stone-600">Godam Chowk, Banepa, Kavrepalanchok</p>
+                  <p className="font-bold text-brand-brown">{t["contact.kitchen"]}</p>
+                  <p className="text-sm text-stone-600">{t["contact.address"]}</p>
                 </div>
               </div>
               <div className="flex items-start gap-3">
                 <Clock size={20} className="mt-0.5 shrink-0 text-brand-orange" />
                 <div>
-                  <p className="font-bold text-brand-brown">Operating Hours</p>
-                  <p className="text-sm text-stone-600">10:00 AM – 8:00 PM · Every Day</p>
+                  <p className="font-bold text-brand-brown">{t["contact.hours_title"]}</p>
+                  <p className="text-sm text-stone-600">{t["contact.hours"]}</p>
                 </div>
               </div>
               {deliveryEnabled && (
@@ -292,19 +292,18 @@ export default async function HomePage() {
                   <Bike size={20} className="mt-0.5 shrink-0 text-brand-orange" />
                   <div>
                     <p className="font-bold text-brand-brown">Delivery</p>
-                    <p className="text-sm text-stone-600">Within 5km · Flat Nrs 20 · Free above Rs 500</p>
+                    <p className="text-sm text-stone-600">{t["contact.delivery"]}</p>
                   </div>
                 </div>
               )}
             </div>
             <div className="mt-4 card p-5 bg-gradient-to-br from-orange-50 to-amber-50 border border-orange-100">
-              <p className="text-sm text-stone-700">
-                <b>Franchise enquiries welcome.</b> We&apos;re building Thelawalaa into a
-                trusted street-food brand across Nepal — reach out to partner with us.
+              <p className="whitespace-pre-line text-sm text-stone-700">
+                <b>{t["contact.franchise_title"]}</b> {t["contact.franchise_text"]}
               </p>
             </div>
             <a
-              href="https://wa.me/9779801011111"
+              href={whatsappHref(t)}
               target="_blank"
               rel="noopener noreferrer"
               className="fixed bottom-24 right-4 z-40 flex h-14 w-14 sm:bottom-6 sm:right-6 items-center justify-center rounded-full bg-brand-green text-white shadow-lg shadow-green-500/30 transition hover:scale-110"

@@ -1,10 +1,14 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Poppins, Nunito } from "next/font/google";
 import { Toaster } from "react-hot-toast";
 import "./globals.css";
 
 const display = Poppins({ subsets: ["latin"], weight: ["500", "600", "700", "800"], variable: "--font-display", display: "swap" });
 const body = Nunito({ subsets: ["latin"], weight: ["400", "600", "700", "800"], variable: "--font-body", display: "swap" });
+
+// viewportFit cover: env(safe-area-inset-*) then reports the iPhone home bar, so the
+// floating bottom bar can sit above it (components/shell.tsx).
+export const viewport: Viewport = { viewportFit: "cover", themeColor: "#ffffff" };
 
 export const metadata: Metadata = {
   title: "Thelawalaa Accounts",

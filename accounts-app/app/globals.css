@@ -4,6 +4,12 @@
 
 html { scroll-behavior: smooth; }
 body { @apply font-body bg-stone-50 text-stone-900 antialiased; }
+/* With viewport-fit=cover, keep content clear of the notch when a phone is turned sideways. */
+body { padding-left: env(safe-area-inset-left); padding-right: env(safe-area-inset-right); }
+/* iPhone Safari zooms into any field under 16px when it's tapped. */
+@media (max-width: 639px) {
+  input:not([type="checkbox"]):not([type="radio"]):not([type="range"]), select, textarea { font-size: 16px; }
+}
 
 .brand-gradient-text {
   @apply bg-gradient-to-r from-brand-orange via-brand-yellow to-brand-green bg-clip-text text-transparent;
