@@ -6,6 +6,7 @@ import { npr } from "@/lib/utils";
 import { SITE } from "@/lib/seo";
 import { applyOpeningPromoPrice, isOpeningPromoActive } from "@/lib/promo";
 import ContactForm from "@/components/contact-form";
+import heroImage from "@/public/images/hero/thelawalaa-chatpate-momo.webp";
 import Faq from "@/components/faq";
 import AddToCartButton from "@/components/add-to-cart-button";
 import StructuredData from "@/components/structured-data";
@@ -57,45 +58,69 @@ export default async function HomePage() {
     <>
       <StructuredData faqs={faqs} menu={(menuItems ?? []).map((m) => ({ name: m.name, description: m.description, price: Number(m.price) }))} />
       
-      {/* HERO */}
-      <section id="home" className="relative flex min-h-[85vh] flex-col items-center justify-center bg-brand-cream px-4 text-center overflow-hidden">
-        <div className="absolute top-0 right-0 h-96 w-96 -translate-y-1/4 translate-x-1/4 rounded-full bg-yellow-100/60 blur-3xl" />
-        <div className="absolute bottom-0 left-0 h-80 w-80 translate-y-1/4 -translate-x-1/4 rounded-full bg-orange-100/60 blur-3xl" />
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 h-[500px] w-[500px] rounded-full bg-amber-50/40 blur-3xl" />
-        
-        <div className="absolute top-0 w-full bg-brand-dark py-2.5 text-sm font-bold text-amber-100">
+      {/* HERO — the dark product photo melts into a background matched to its
+          own edges (#0e0805, warm light from the left like the photo), via
+          overlays in the same colour. Phones: photo on top, text below.
+          Wide screens: text on the left, photo bleeding off the right edge. */}
+      <section id="home" className="relative overflow-hidden bg-[#0e0805] text-amber-50">
+        <div className="relative z-20 border-b border-white/10 bg-black/40 py-2.5 text-center text-sm font-bold text-amber-100">
           {announcement?.message ?? (deliveryEnabled ? "Now open — order online for pickup or home delivery" : "Now open — order online for pickup")}
         </div>
-        
-        <div className="relative z-10 mt-12">
-          <h1 className="font-display text-5xl font-extrabold text-brand-brown md:text-7xl max-w-3xl mx-auto leading-tight">
-            Hygienic Street Food,
-            <span className="brand-gradient-text"> Bold Flavour</span>
-          </h1>
-          <p className="mx-auto mt-6 max-w-lg text-stone-600 text-lg leading-relaxed">
-            Chatpate in 4 signature varieties, momo &amp; ice-cold drinks —
-            prepared in our clean kitchen with fresh ingredients, delivered hot to your door.
-          </p>
-          <div className="mt-8 flex flex-wrap justify-center gap-4">
-            <Link href="/order" className="btn-primary text-lg px-8 py-3.5 rounded-full shadow-lg shadow-orange-500/30">
-              Order Now →
-            </Link>
-            <a href="#menu" className="text-lg px-8 py-3.5 rounded-full bg-white border-2 border-brand-orange text-brand-orange font-bold transition hover:bg-orange-50 shadow-sm">
-              See Menu
-            </a>
+
+        <div className="relative mx-auto max-w-7xl lg:flex lg:min-h-[620px] lg:items-center lg:static">
+          {/* Photo. Phones/tablets: full width on top. Wide screens: whole 3:2 shot
+              on the right, reaching the screen edge, faded on its other sides. */}
+          <div className="lg:absolute lg:inset-y-0 lg:right-0 lg:flex lg:w-[60%] lg:max-w-[1100px] lg:items-center">
+            {/* hero-photo-fade (globals.css) fades the photo itself out at its edges,
+                so the background shows through — no seam, whatever the colours. */}
+            <div className="hero-photo-fade relative aspect-[3/2] w-full">
+              <Image
+                src={heroImage}
+                alt="Thelawalaa chatpate and steaming momo in branded takeaway boxes"
+                fill
+                priority
+                placeholder="blur"
+                sizes="(min-width: 1834px) 1100px, (min-width: 1024px) 60vw, 100vw"
+                className="object-cover"
+              />
+            </div>
           </div>
-          {/* Trust badges */}
-          <div className="mt-10 flex flex-wrap justify-center gap-6 text-xs font-bold text-stone-500">
-            {[
-              [SprayCan, "Kitchen Hygiene Certified"],
-              [Salad, "Fresh Ingredients Daily"],
-              deliveryEnabled ? [Bike, "Nrs 20 Home Delivery"] : [Store, "Order Ahead for Pickup"],
-              [Zap, "Ready in 10–15 mins"],
-            ].map(([Icon, text]: any) => (
-              <span key={text} className="flex items-center gap-1.5 bg-white/60 rounded-full px-3 py-1.5 backdrop-blur-sm">
-                <Icon size={14} /> {text}
-              </span>
-            ))}
+
+          {/* Warm glow over everything (text side and photo alike, so no seam), like the photo's own light */}
+          <div aria-hidden className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_70%_60%_at_15%_55%,rgba(235,104,52,0.14),transparent_70%)]" />
+
+          {/* Words */}
+          <div className="relative z-10 -mt-10 px-4 pb-14 text-center sm:-mt-16 lg:mt-0 lg:w-[44%] lg:py-20 lg:pl-8 lg:text-left xl:w-[46%] xl:pl-4">
+            <p className="text-xs font-bold uppercase tracking-[0.2em] text-brand-orange">Godam Chowk · Banepa</p>
+            <h1 className="mt-3 font-display text-4xl font-extrabold leading-tight text-amber-50 sm:text-5xl md:text-6xl xl:text-7xl">
+              Hygienic Street Food,
+              <span className="brand-gradient-text"> Bold Flavour</span>
+            </h1>
+            <p className="mx-auto mt-5 max-w-lg text-lg leading-relaxed text-amber-100/75 lg:mx-0">
+              Chatpate in 4 signature varieties, momo &amp; ice-cold drinks —
+              prepared in our clean kitchen with fresh ingredients, delivered hot to your door.
+            </p>
+            <div className="mt-8 flex flex-wrap justify-center gap-4 lg:justify-start">
+              <Link href="/order" className="btn-primary px-8 py-3.5 text-lg shadow-lg shadow-orange-600/40">
+                Order Now →
+              </Link>
+              <a href="#menu" className="rounded-full border-2 border-amber-100/40 px-8 py-3.5 text-lg font-bold text-amber-50 transition hover:border-amber-100/70 hover:bg-white/10">
+                See Menu
+              </a>
+            </div>
+            {/* Trust badges */}
+            <div className="mt-10 flex flex-wrap justify-center gap-2.5 text-xs font-bold text-amber-100/80 lg:justify-start">
+              {[
+                [SprayCan, "Kitchen Hygiene Certified"],
+                [Salad, "Fresh Ingredients Daily"],
+                deliveryEnabled ? [Bike, "Nrs 20 Home Delivery"] : [Store, "Order Ahead for Pickup"],
+                [Zap, "Ready in 10–15 mins"],
+              ].map(([Icon, text]: any) => (
+                <span key={text} className="flex items-center gap-1.5 rounded-full bg-white/[0.06] px-3 py-1.5 ring-1 ring-white/10 backdrop-blur-sm">
+                  <Icon size={14} className="text-brand-orange" /> {text}
+                </span>
+              ))}
+            </div>
           </div>
         </div>
       </section>

@@ -28,6 +28,22 @@ body { @apply font-body bg-brand-cream text-stone-900 antialiased; }
 .label { @apply mb-1 block text-sm font-bold text-stone-700; }
 .badge { @apply inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-bold; }
 
+/* Homepage hero photo: fade the photo itself to transparent at its edges so it
+   melts into the dark hero behind it. Phones: top and bottom. Wide screens
+   (photo on the right): left, top and bottom. */
+.hero-photo-fade {
+  -webkit-mask-image: linear-gradient(to bottom, transparent 0%, #000 14%, #000 62%, transparent 100%);
+          mask-image: linear-gradient(to bottom, transparent 0%, #000 14%, #000 62%, transparent 100%);
+}
+@media (min-width: 1024px) {
+  .hero-photo-fade {
+    -webkit-mask-image: linear-gradient(to right, transparent 0%, #000 42%), linear-gradient(to bottom, transparent 0%, #000 16%, #000 72%, transparent 100%);
+    -webkit-mask-composite: source-in;
+            mask-image: linear-gradient(to right, transparent 0%, #000 42%), linear-gradient(to bottom, transparent 0%, #000 16%, #000 72%, transparent 100%);
+            mask-composite: intersect;
+  }
+}
+
 /* Smooth page transitions */
 main {
   animation: fadeInUp 0.3s ease-out;
