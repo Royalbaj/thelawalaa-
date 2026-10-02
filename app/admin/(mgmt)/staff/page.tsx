@@ -3,6 +3,7 @@ import { requireRole } from "@/lib/supabase/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { cn } from "@/lib/utils";
 import { InviteStaffForm, StaffRowActions } from "@/components/admin/staff-controls";
+import AccountsPeople from "@/components/admin/accounts-people";
 
 export const dynamic = "force-dynamic";
 
@@ -10,6 +11,7 @@ const ROLE_BADGE: Record<string, string> = {
   super_admin: "bg-brand-red/10 text-brand-red",
   pos_user: "bg-blue-100 text-blue-800",
   delivery_driver: "bg-purple-100 text-purple-800",
+  accountant: "bg-amber-100 text-amber-800",
 };
 
 export default async function StaffPage(props: { searchParams: Promise<{ q?: string }> }) {
@@ -24,9 +26,10 @@ export default async function StaffPage(props: { searchParams: Promise<{ q?: str
     .order("created_at", { ascending: false })
     .limit(200);
   if (q) query = query.ilike("full_name", `%${q}%`);
-  const [{ data: staff }, { data: branches }] = await Promise.all([
+  const [{ data: staff }, { data: branches }, { data: accountsPeople }] = await Promise.all([
     query,
     supabaseAdmin.from("branches").select("id, name").eq("is_active", true),
+    supabaseAdmin.from("account_users").select("id, name, is_active, created_at").order("is_active", { ascending: false }).order("name"),
   ]);
 
   return (
@@ -69,7 +72,10 @@ export default async function StaffPage(props: { searchParams: Promise<{ q?: str
           </div>
         </section>
       </div>
-      <InviteStaffForm branches={(branches ?? []) as never} />
+      <div className="space-y-6">
+        <InviteStaffForm branches={(branches ?? []) as never} />
+        <AccountsPeople people={accountsPeople ?? []} />
+      </div>
     </div>
   );
 }

@@ -107,7 +107,7 @@ export function ChangePinForm() {
         if (r?.error) toast.error(r.error); else { toast.success("PIN changed — use the new one next time"); form.reset(); }
       });
     }}>
-      {([["current", "Current PIN"], ["next", "New PIN"], ["confirm", "New PIN again"]] as const).map(([name, label]) => (
+      {([["current", "Your PIN now"], ["next", "New PIN"], ["confirm", "New PIN again"]] as const).map(([name, label]) => (
         <label key={name}>
           <span className="label">{label}</span>
           <input name={name} type="password" inputMode="numeric" pattern="\d{4}" maxLength={4} required autoComplete="off"

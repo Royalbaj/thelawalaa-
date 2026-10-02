@@ -15,6 +15,7 @@ export async function GET(request: Request) {
     categoryId: /^[0-9a-f-]{36}$/.test(sp.cat ?? "") ? sp.cat : undefined,
     q: (sp.q ?? "").trim().slice(0, 60) || undefined,
     missingBill: sp.nobill === "1",
+    personId: /^[0-9a-f-]{36}$/.test(sp.by ?? "") ? sp.by : undefined,
   };
   const [categories, entries, before] = await Promise.all([
     getCategories(), getEntries(range.from, range.to, filter), getBalance(range.from),

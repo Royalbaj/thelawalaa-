@@ -1,5 +1,3 @@
-import Link from "next/link";
-import { Package, ChevronRight } from "lucide-react";
 import { requireAuth } from "@/lib/supabase/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { getCategories } from "@/lib/ledger";
@@ -8,7 +6,7 @@ import { OpeningBalanceForm, CategoriesManager, ChangePinForm } from "@/componen
 export const dynamic = "force-dynamic";
 
 export default async function SettingsPage() {
-  await requireAuth();
+  const { person } = await requireAuth();
   const [categories, { data: settings }] = await Promise.all([
     getCategories(),
     supabaseAdmin.from("account_settings").select("opening_balance").eq("id", 1).single(),
@@ -30,16 +28,14 @@ export default async function SettingsPage() {
       </section>
 
       <section className="card p-5">
-        <h2 className="font-bold text-brand-brown">PIN</h2>
-        <p className="mb-3 text-xs text-stone-500">Asked after signing in, and again after 15 minutes without use or when someone taps Lock. Same PIN for everyone who uses Accounts.</p>
+        <h2 className="font-bold text-brand-brown">Your PIN, {person.name}</h2>
+        <p className="mb-3 text-xs text-stone-500">
+          Everyone has their own PIN — it&apos;s how Accounts knows who entered what. Asked after signing in, after 15 minutes
+          without use, and when someone taps their name to lock. New people and forgotten PINs: the admin, in the admin panel
+          → Staff &amp; Users → Accounts people.
+        </p>
         <ChangePinForm />
       </section>
-
-      <Link href="/stock" className="card flex items-center gap-3 p-5 transition hover:shadow-md md:hidden">
-        <Package size={18} className="text-brand-brown" />
-        <span className="flex-1 font-bold text-brand-brown">Stock</span>
-        <ChevronRight size={18} className="text-stone-400" />
-      </Link>
     </div>
   );
 }

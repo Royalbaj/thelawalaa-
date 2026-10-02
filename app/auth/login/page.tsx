@@ -11,6 +11,7 @@ function LoginForm() {
   const router = useRouter();
   const params = useSearchParams();
   const [busy, setBusy] = useState(false);
+  const [accountsOnly, setAccountsOnly] = useState(false);
 
   async function onSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -28,11 +29,12 @@ function LoginForm() {
     const { data: profile } = await supabase
       .from("profiles").select("role, is_active").eq("id", data.user.id).single();
     if (!profile?.is_active) { await supabase.auth.signOut({ scope: "local" }); setBusy(false); return router.push("/auth/suspended"); }
-    // Accounts logins have nothing on this site — send them to the Accounts app's own sign-in.
+    // Accounts logins only work on the Accounts site — never signed in here.
     if (profile.role === "accountant") {
       await supabase.auth.signOut({ scope: "local" });
-      toast("Accounts has its own sign-in — taking you there", { icon: "📒" });
-      return window.location.replace(ACCOUNTS_LOGIN);
+      setBusy(false);
+      setAccountsOnly(true);
+      return;
     }
 
     const redirect = params.get("redirect");
@@ -46,6 +48,12 @@ function LoginForm() {
 
   return (
     <form onSubmit={onSubmit} className="space-y-4">
+      {accountsOnly && (
+        <div role="alert" className="rounded-xl bg-orange-50 p-3 text-sm text-brand-brown ring-1 ring-orange-200">
+          <b>This is an Accounts login.</b> It only works on the Accounts site:{" "}
+          <a href={ACCOUNTS_LOGIN} className="font-bold text-brand-orange underline">accounts.thelawalaa.com</a>
+        </div>
+      )}
       <div><label className="label" htmlFor="email">Email</label><input id="email" name="email" type="email" required className="input" /></div>
       <div><label className="label" htmlFor="password">Password</label><input id="password" name="password" type="password" required className="input" /></div>
       <button disabled={busy} className="btn-primary w-full">{busy ? "Signing in…" : "Sign in"}</button>

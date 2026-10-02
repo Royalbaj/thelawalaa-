@@ -2,6 +2,7 @@
 
 import crypto from "crypto";
 import { after } from "next/server";
+import { checkStockAfterSale } from "@/lib/stock-alerts";
 import { Resend } from "resend";
 import { orderSchema } from "@/lib/validations/order";
 import { getVerifiedUser } from "@/lib/supabase/server";
@@ -238,6 +239,9 @@ export async function createOrder(input: unknown) {
       url: "/admin",
     }));
   }
+
+  // Linked stock (Accounts → Stock) counts down with every sale; warn staff if it's running out.
+  after(() => checkStockAfterSale(itemRows.map((r) => r.product_id)));
 
   return { orderId: order.id, orderNumber: order.order_number, dailyNumber: order.daily_number, total };
 }

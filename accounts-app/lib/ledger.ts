@@ -11,13 +11,23 @@ export type Category = { id: string; kind: Kind; name: string; sort_order: numbe
 export type Entry = {
   id: string; kind: Kind; amount: number; category_id: string; description: string | null;
   occurred_on: Ymd; method: Method; bill_path: string | null; created_at: string;
+  // Who typed it: the person who unlocked with their PIN (entries from
+  // before per-person PINs only have the login's name).
+  person?: { name: string } | null;
   creator?: { full_name: string } | null;
 };
+export const enteredBy = (e: Pick<Entry, "person" | "creator">) => e.person?.name ?? e.creator?.full_name ?? "—";
 
 export const METHOD_LABELS: Record<Method, string> = { cash: "Cash", bank: "Bank", qr: "QR / eSewa" };
 export const KIND_LABELS: Record<Kind, string> = { in: "Money in", out: "Money out" };
 // Chart series colours (validated pair: blue = money in, orange = money out).
 export const SERIES = { in: "#2a78d6", out: "#eb6834" } as const;
+
+/** Everyone who has ever been set up (switched-off people still own their old entries). */
+export async function getPeople(): Promise<{ id: string; name: string; is_active: boolean }[]> {
+  const { data } = await supabaseAdmin.from("account_users").select("id, name, is_active").order("name");
+  return data ?? [];
+}
 
 export async function getCategories(): Promise<Category[]> {
   const { data } = await supabaseAdmin.from("account_categories")
@@ -25,14 +35,14 @@ export async function getCategories(): Promise<Category[]> {
   return (data ?? []) as Category[];
 }
 
-export type EntryFilter = { kind?: Kind; categoryId?: string; q?: string; missingBill?: boolean };
+export type EntryFilter = { kind?: Kind; categoryId?: string; q?: string; missingBill?: boolean; personId?: string };
 
 /** Entries in a date range, newest first. Pages through Supabase's 1,000-row cap. */
 export async function getEntries(from: Ymd, to: Ymd, f: EntryFilter = {}, max = 20_000): Promise<Entry[]> {
   const out: Entry[] = [];
   for (let offset = 0; offset < max; offset += 1000) {
     let q = supabaseAdmin.from("account_transactions")
-      .select("id, kind, amount, category_id, description, occurred_on, method, bill_path, created_at, creator:profiles!account_transactions_created_by_fkey(full_name)")
+      .select("id, kind, amount, category_id, description, occurred_on, method, bill_path, created_at, person:account_users!account_transactions_entered_by_fkey(name), creator:profiles!account_transactions_created_by_fkey(full_name)")
       .gte("occurred_on", from).lte("occurred_on", to)
       .order("occurred_on", { ascending: false }).order("created_at", { ascending: false })
       .range(offset, Math.min(offset + 999, max - 1));
@@ -40,6 +50,7 @@ export async function getEntries(from: Ymd, to: Ymd, f: EntryFilter = {}, max = 
     if (f.categoryId) q = q.eq("category_id", f.categoryId);
     if (f.q) q = q.ilike("description", `%${f.q.replace(/[%_\\]/g, (c) => `\\${c}`)}%`);
     if (f.missingBill) q = q.is("bill_path", null);
+    if (f.personId) q = q.eq("entered_by", f.personId);
     const { data, error } = await q;
     if (error) throw new Error(`Couldn't load entries: ${error.message}`);
     out.push(...((data ?? []) as unknown as Entry[]).map((e) => ({ ...e, amount: Number(e.amount) })));

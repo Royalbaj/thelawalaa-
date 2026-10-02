@@ -7,7 +7,9 @@ import { cn } from "@/lib/utils";
 type Cat = { id: string; kind: "in" | "out"; name: string };
 
 /** Type / category / text / missing-bill filters — kept in the URL next to the date range. */
-export default function EntryFilters({ params, categories }: { params: Record<string, string | undefined>; categories: Cat[] }) {
+export default function EntryFilters({ params, categories, people }: {
+  params: Record<string, string | undefined>; categories: Cat[]; people: { id: string; name: string }[];
+}) {
   const router = useRouter();
   const pathname = usePathname();
   const [q, setQ] = useState(params.q ?? "");
@@ -34,6 +36,13 @@ export default function EntryFilters({ params, categories }: { params: Record<st
         <option value="">All categories</option>
         {cats.map((c) => <option key={c.id} value={c.id}>{c.name}{kind ? "" : c.kind === "in" ? " (in)" : " (out)"}</option>)}
       </select>
+      {people.length > 1 && (
+        <select value={params.by ?? ""} onChange={(e) => go({ by: e.target.value || undefined })}
+          className="input !w-auto min-w-[9rem] !py-2 text-base sm:text-sm" aria-label="Entered by">
+          <option value="">Anyone</option>
+          {people.map((p) => <option key={p.id} value={p.id}>By {p.name}</option>)}
+        </select>
+      )}
       <form onSubmit={(e) => { e.preventDefault(); go({ q: q.trim() || undefined }); }} className="relative min-w-[12rem] flex-1">
         <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-stone-400" />
         <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search notes" maxLength={60}

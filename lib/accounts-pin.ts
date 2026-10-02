@@ -1,10 +1,8 @@
 import "server-only";
 import { randomBytes, scrypt, scryptSync, timingSafeEqual } from "node:crypto";
 
-// Each person who uses Accounts has their own 4-digit PIN (account_users),
-// stored only as a scrypt hash: "scrypt$N$r$p$salt$hash", base64 parts.
-// Admin → Staff & Users (main site) adds people; lib/accounts-pin.ts there
-// is a copy of hashPin — change both.
+// PINs for the people who use the Accounts app (account_users, migration 024).
+// Copy of accounts-app/lib/pin.ts, which checks them — change both.
 
 export const isPin = (s: unknown): s is string => typeof s === "string" && /^\d{4}$/.test(s);
 
@@ -14,7 +12,6 @@ export function hashPin(pin: string): string {
   return ["scrypt", 16384, 8, 1, salt.toString("base64"), hash.toString("base64")].join("$");
 }
 
-/** Async (runs on the thread pool), so several people's PINs can be checked at once. */
 export function verifyPin(pin: string, stored: string): Promise<boolean> {
   const [scheme, N, r, p, salt, hash] = stored.split("$");
   if (scheme !== "scrypt" || !salt || !hash) return Promise.resolve(false);
@@ -24,10 +21,4 @@ export function verifyPin(pin: string, stored: string): Promise<boolean> {
       resolve(!err && actual.length === expected.length && timingSafeEqual(actual, expected));
     });
   });
-}
-
-/** The person (if any) whose PIN this is. */
-export async function whosePin<T extends { pin_hash: string }>(pin: string, people: T[]): Promise<T | null> {
-  const matches = await Promise.all(people.map((p) => verifyPin(pin, p.pin_hash)));
-  return people[matches.indexOf(true)] ?? null;
 }

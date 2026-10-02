@@ -19,7 +19,8 @@ export default async function PinPage({ searchParams }: { searchParams: Promise<
         <div className="mx-auto mt-4 flex h-12 w-12 items-center justify-center rounded-full bg-orange-50 text-brand-orange">
           <Lock size={22} />
         </div>
-        <p className="mt-2 font-bold text-brand-brown">Hi {profile.full_name.split(" ")[0]}</p>
+        <p className="mt-2 font-bold text-brand-brown">Who&apos;s using Accounts?</p>
+        <p className="text-xs text-stone-500">Enter your own PIN — your name goes on everything you enter.</p>
         <PinPad next={safeNext} />
       </div>
     </div>

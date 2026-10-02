@@ -5,17 +5,17 @@ import { cookies } from "next/headers";
 import { getVerifiedUser, requireAuth } from "@/lib/supabase/server";
 import { supabaseAdmin, audit } from "@/lib/supabase/admin";
 import { PIN_COOKIE, PIN_TTL_SECONDS, signUnlock } from "@/lib/pin-cookie";
-import { hashPin, isPin, verifyPin } from "@/lib/pin";
+import { hashPin, isPin, verifyPin, whosePin } from "@/lib/pin";
 
 const MAX_TRIES = 5;
 const LOCKOUT_MINUTES = 15;
 
-async function storedPinHash() {
-  const { data } = await supabaseAdmin.from("account_settings").select("pin_hash").eq("id", 1).single();
-  return data?.pin_hash as string | undefined;
+async function activePeople() {
+  const { data } = await supabaseAdmin.from("account_users").select("id, name, pin_hash").eq("is_active", true);
+  return data ?? [];
 }
 
-/** Wrong PINs are counted per account in the audit log: 5 in 15 minutes locks the PIN screen for a while. */
+/** Wrong PINs are counted per sign-in in the audit log: 5 in 15 minutes locks the PIN screen for a while. */
 async function recentFailures(userId: string) {
   const since = new Date(Date.now() - LOCKOUT_MINUTES * 60_000).toISOString();
   const { count } = await supabaseAdmin.from("audit_logs").select("id", { count: "exact", head: true })
@@ -23,28 +23,31 @@ async function recentFailures(userId: string) {
   return count ?? 0;
 }
 
+/** The PIN says who is at the keyboard — each person has their own. */
 export async function unlockWithPin(pin: string) {
   const { user } = await getVerifiedUser();
   if (!user) return { error: "Please sign in again" };
   if (!isPin(pin)) return { error: "Enter the PIN" };
 
-  const failures = await recentFailures(user.id);
+  const [failures, people] = await Promise.all([recentFailures(user.id), activePeople()]);
   if (failures >= MAX_TRIES) return { error: `Too many wrong tries — wait ${LOCKOUT_MINUTES} minutes` };
+  if (!people.length) return { error: "No one is set up yet — ask the admin to add you (Staff & Users → Accounts people)" };
 
-  const hash = await storedPinHash();
-  if (!hash || !verifyPin(pin, hash)) {
-    await audit({ actor_id: user.id, action: "ACCOUNTS_PIN_FAILED", target_table: "account_settings" });
+  const person = await whosePin(pin, people);
+  if (!person) {
+    await audit({ actor_id: user.id, action: "ACCOUNTS_PIN_FAILED", target_table: "account_users" });
     const left = MAX_TRIES - failures - 1;
     return { error: left > 0 ? `Wrong PIN — ${left} ${left === 1 ? "try" : "tries"} left` : `Wrong PIN — locked for ${LOCKOUT_MINUTES} minutes` };
   }
 
-  (await cookies()).set(PIN_COOKIE, await signUnlock(user.id), {
+  (await cookies()).set(PIN_COOKIE, await signUnlock(user.id, person.id), {
     httpOnly: true, secure: process.env.NODE_ENV === "production", sameSite: "lax", path: "/", maxAge: PIN_TTL_SECONDS,
   });
-  return { ok: true };
+  await audit({ actor_id: user.id, action: "ACCOUNTS_UNLOCK", target_table: "account_users", target_id: person.id, new_data: { person: person.name } });
+  return { ok: true, name: person.name };
 }
 
-/** "Lock" button, the idle timer, and sign-out all come through here. */
+/** "Lock" / "Switch person", the idle timer, and sign-out all come through here. */
 export async function lockAccounts() {
   (await cookies()).delete(PIN_COOKIE);
   return { ok: true };
@@ -56,17 +59,23 @@ const changePinSchema = z.object({
   confirm: z.string(),
 }).refine((v) => v.next === v.confirm, { message: "The two new PINs don't match", path: ["confirm"] });
 
+/** A person changes their OWN PIN. (Adding people and resetting PINs is in the admin panel.) */
 export async function changePin(input: unknown) {
-  const { user } = await requireAuth();
+  const { user, person } = await requireAuth();
   const parsed = changePinSchema.safeParse(input);
   if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Check the PINs" };
-  const hash = await storedPinHash();
-  if (!hash || !isPin(parsed.data.current) || !verifyPin(parsed.data.current, hash)) {
-    return { error: "The current PIN is wrong" };
+  const people = await activePeople();
+  const me = people.find((p) => p.id === person.id);
+  if (!me || !isPin(parsed.data.current) || !(await verifyPin(parsed.data.current, me.pin_hash))) {
+    return { error: "Your current PIN is wrong" };
   }
-  const { error } = await supabaseAdmin.from("account_settings")
-    .update({ pin_hash: hashPin(parsed.data.next), updated_by: user.id, updated_at: new Date().toISOString() }).eq("id", 1);
+  // The PIN alone says who someone is, so no two people can share one.
+  if (await whosePin(parsed.data.next, people.filter((p) => p.id !== me.id))) {
+    return { error: "Someone else already uses that PIN — pick another" };
+  }
+  const { error } = await supabaseAdmin.from("account_users")
+    .update({ pin_hash: hashPin(parsed.data.next), updated_at: new Date().toISOString() }).eq("id", me.id);
   if (error) return { error: "Couldn't change the PIN" };
-  await audit({ actor_id: user.id, action: "ACCOUNTS_PIN_CHANGED", target_table: "account_settings" });
+  await audit({ actor_id: user.id, action: "ACCOUNTS_PIN_CHANGED", target_table: "account_users", target_id: me.id, new_data: { person: me.name } });
   return { ok: true };
 }

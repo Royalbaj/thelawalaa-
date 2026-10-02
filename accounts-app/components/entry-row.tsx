@@ -2,7 +2,7 @@ import Link from "next/link";
 import { ArrowDownLeft, ArrowUpRight, Paperclip } from "lucide-react";
 import { npr } from "@/lib/utils";
 import { shortDate } from "@/lib/dates";
-import { METHOD_LABELS, SERIES, type Entry } from "@/lib/ledger";
+import { METHOD_LABELS, SERIES, enteredBy, type Entry } from "@/lib/ledger";
 
 /** One line of the money book — tap to edit. Money in shows "+" (green), money out "−". */
 export default function EntryRow({ e, category, showDate = false }: { e: Entry; category: string; showDate?: boolean }) {
@@ -19,6 +19,8 @@ export default function EntryRow({ e, category, showDate = false }: { e: Entry; 
           {e.description && <span className="truncate">{e.description}</span>}
           {e.description && <span aria-hidden>·</span>}
           <span className="shrink-0">{METHOD_LABELS[e.method]}</span>
+          <span aria-hidden>·</span>
+          <span className="shrink-0">{enteredBy(e)}</span>
           {e.bill_path && <Paperclip size={12} className="shrink-0 text-stone-400" aria-label="Bill attached" />}
         </span>
       </span>

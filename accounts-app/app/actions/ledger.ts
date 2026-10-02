@@ -44,7 +44,7 @@ const entrySchema = z.object({
 });
 
 export async function saveEntry(id: string | null, input: unknown) {
-  const { user } = await requireAuth();
+  const { user, person } = await requireAuth();
   if (id !== null && !z.string().uuid().safeParse(id).success) return { error: "Bad entry" };
   const parsed = entrySchema.safeParse(input);
   if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Check the form" };
@@ -58,9 +58,9 @@ export async function saveEntry(id: string | null, input: unknown) {
   if (id === null) {
     if (!cat.is_active) return { error: "That category is hidden — pick another" };
     const { data, error } = await supabaseAdmin.from("account_transactions")
-      .insert({ ...d, bill_path: d.bill_path ?? null, created_by: user.id }).select("id").single();
+      .insert({ ...d, bill_path: d.bill_path ?? null, created_by: user.id, entered_by: person.id }).select("id").single();
     if (error || !data) return { error: "Couldn't save the entry" };
-    await audit({ actor_id: user.id, action: "ACCOUNT_ENTRY_ADD", target_table: "account_transactions", target_id: data.id, new_data: d });
+    await audit({ actor_id: user.id, action: "ACCOUNT_ENTRY_ADD", target_table: "account_transactions", target_id: data.id, new_data: { ...d, person: person.name } });
     refresh();
     return { ok: true, id: data.id };
   }
@@ -73,16 +73,16 @@ export async function saveEntry(id: string | null, input: unknown) {
   // bill_path undefined = leave the bill alone; null = remove it; a path = the new bill.
   const billPath = d.bill_path === undefined ? old.bill_path : d.bill_path;
   const { error } = await supabaseAdmin.from("account_transactions")
-    .update({ ...d, bill_path: billPath, updated_by: user.id, updated_at: new Date().toISOString() }).eq("id", id);
+    .update({ ...d, bill_path: billPath, updated_by: user.id, edited_by: person.id, updated_at: new Date().toISOString() }).eq("id", id);
   if (error) return { error: "Couldn't save the entry" };
   if (old.bill_path && old.bill_path !== billPath) await removeBill(old.bill_path);
-  await audit({ actor_id: user.id, action: "ACCOUNT_ENTRY_EDIT", target_table: "account_transactions", target_id: id, old_data: old, new_data: { ...d, bill_path: billPath } });
+  await audit({ actor_id: user.id, action: "ACCOUNT_ENTRY_EDIT", target_table: "account_transactions", target_id: id, old_data: old, new_data: { ...d, bill_path: billPath, person: person.name } });
   refresh();
   return { ok: true, id };
 }
 
 export async function deleteEntry(id: string) {
-  const { user } = await requireAuth();
+  const { user, person } = await requireAuth();
   if (!z.string().uuid().safeParse(id).success) return { error: "Bad entry" };
   const { data: old } = await supabaseAdmin.from("account_transactions")
     .select("kind, amount, category_id, description, occurred_on, method, bill_path").eq("id", id).single();
@@ -90,7 +90,7 @@ export async function deleteEntry(id: string) {
   const { error } = await supabaseAdmin.from("account_transactions").delete().eq("id", id);
   if (error) return { error: "Couldn't delete the entry" };
   await removeBill(old.bill_path);
-  await audit({ actor_id: user.id, action: "ACCOUNT_ENTRY_DELETE", target_table: "account_transactions", target_id: id, old_data: old });
+  await audit({ actor_id: user.id, action: "ACCOUNT_ENTRY_DELETE", target_table: "account_transactions", target_id: id, old_data: old, new_data: { deleted_by: person.name } });
   refresh();
   return { ok: true };
 }

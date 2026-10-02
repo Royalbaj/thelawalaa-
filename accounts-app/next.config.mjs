@@ -8,6 +8,9 @@ const nextConfig = {
   outputFileTracingRoot: fileURLToPath(new URL(".", import.meta.url)),
   eslint: { ignoreDuringBuilds: true },
   typescript: { ignoreBuildErrors: false }, // type errors must fail the deploy
+  // Going back to a tab within 30s shows it straight away (any save clears
+  // this — every action calls revalidatePath).
+  experimental: { staleTimes: { dynamic: 30 } },
   // The old Expenses and Orders pages became Entries (money in/out, typed in by hand).
   async redirects() {
     return [

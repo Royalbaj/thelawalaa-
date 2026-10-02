@@ -1,13 +1,13 @@
 import "server-only";
 import ExcelJS from "exceljs";
 import { prettyDate, nepalToday, type Range } from "@/lib/dates";
-import { totals, byCategory, byMethod, byPeriod, METHOD_LABELS, KIND_LABELS, type Category, type Entry, type Kind } from "@/lib/ledger";
+import { totals, byCategory, byMethod, byPeriod, enteredBy, METHOD_LABELS, KIND_LABELS, type Category, type Entry, type Kind } from "@/lib/ledger";
 
 // The money-book downloads, built from entries already loaded and checked
 // by the caller (app/export/route.ts).
 export type ExportInput = {
   range: Range; categories: Category[]; entries: Entry[];
-  balanceBefore: number; filter: { kind?: Kind; categoryId?: string; q?: string; missingBill?: boolean };
+  balanceBefore: number; filter: { kind?: Kind; categoryId?: string; q?: string; missingBill?: boolean; personId?: string };
 };
 
 export const exportFileBase = (r: Range) => `thelawalaa-accounts_${r.from}_to_${r.to}`;
@@ -25,7 +25,7 @@ export function buildCsv({ categories, entries }: ExportInput): string {
     ["Date", "Type", "Category", "Description", "Paid by", "Money in", "Money out", "Bill", "Entered by"].join(","),
     ...rows.map((e) => [
       e.occurred_on, KIND_LABELS[e.kind], catName.get(e.category_id) ?? "", e.description ?? "", METHOD_LABELS[e.method],
-      e.kind === "in" ? e.amount : "", e.kind === "out" ? e.amount : "", e.bill_path ? "Yes" : "No", e.creator?.full_name ?? "",
+      e.kind === "in" ? e.amount : "", e.kind === "out" ? e.amount : "", e.bill_path ? "Yes" : "No", enteredBy(e),
     ].map(cell).join(",")),
   ].join("\r\n");
 }
@@ -36,7 +36,7 @@ export async function buildWorkbook({ range, categories, entries, balanceBefore,
   const catName = new Map(categories.map((c) => [c.id, c.name]));
   const rows = [...entries].reverse(); // oldest first reads better in a sheet
   const t = totals(entries);
-  const filtered = Boolean(kind || categoryId || q || filter.missingBill);
+  const filtered = Boolean(kind || categoryId || q || filter.missingBill || filter.personId);
   const wb = new ExcelJS.Workbook();
   wb.creator = "Thelawalaa Accounts";
   wb.created = new Date();
@@ -55,7 +55,7 @@ export async function buildWorkbook({ range, categories, entries, balanceBefore,
     ["Thelawalaa — money book"],
     ["Period", `${prettyDate(range.from)} – ${prettyDate(range.to)}`],
     ["Downloaded", prettyDate(nepalToday())],
-    ...(filtered ? [["Filter", [kind && KIND_LABELS[kind], categoryId && catName.get(categoryId), q && `"${q}"`, filter.missingBill && "No bill attached"].filter(Boolean).join(" · ")]] : []),
+    ...(filtered ? [["Filter", [kind && KIND_LABELS[kind], categoryId && catName.get(categoryId), q && `"${q}"`, filter.missingBill && "No bill attached", filter.personId && `Entered by ${entries[0] ? enteredBy(entries[0]) : "one person"}`].filter(Boolean).join(" · ")]] : []),
     [],
     ...(!filtered ? [["Balance at start of period", before.balance]] : []),
     ["Money in", t.moneyIn],
@@ -90,7 +90,7 @@ export async function buildWorkbook({ range, categories, entries, balanceBefore,
     date: new Date(`${e.occurred_on}T00:00:00Z`), type: KIND_LABELS[e.kind], cat: catName.get(e.category_id) ?? "",
     desc: e.description ?? "", method: METHOD_LABELS[e.method],
     in: e.kind === "in" ? e.amount : null, out: e.kind === "out" ? e.amount : null,
-    bill: e.bill_path ? "Yes" : "No", by: e.creator?.full_name ?? "",
+    bill: e.bill_path ? "Yes" : "No", by: enteredBy(e),
   }));
   ws.getColumn("date").numFmt = "dd mmm yyyy";
   const totalRow = ws.addRow({ desc: "Total", in: t.moneyIn, out: t.moneyOut });

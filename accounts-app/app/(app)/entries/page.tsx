@@ -2,7 +2,7 @@ import Link from "next/link";
 import { ArrowDownLeft, ArrowUpRight, FileSpreadsheet, FileText } from "lucide-react";
 import { requireAuth } from "@/lib/supabase/server";
 import { resolveRange, rangeQuery, longDate, type RangeKey } from "@/lib/dates";
-import { getCategories, getEntries, totals, SERIES, type Entry, type Kind } from "@/lib/ledger";
+import { getCategories, getEntries, getPeople, totals, SERIES, type Entry, type Kind } from "@/lib/ledger";
 import RangePicker from "@/components/range-picker";
 import EntryFilters from "@/components/entry-filters";
 import EntryRow from "@/components/entry-row";
@@ -21,19 +21,21 @@ export default async function EntriesPage({ searchParams }: { searchParams: Prom
   const cat = /^[0-9a-f-]{36}$/.test(sp.cat ?? "") ? sp.cat : undefined;
   const q = (sp.q ?? "").trim().slice(0, 60) || undefined;
   const nobill = sp.nobill === "1" ? "1" : undefined;
+  const by = /^[0-9a-f-]{36}$/.test(sp.by ?? "") ? sp.by : undefined;
 
-  const [categories, entries] = await Promise.all([
+  const [categories, people, entries] = await Promise.all([
     getCategories(),
-    getEntries(range.from, range.to, { kind, categoryId: cat, q, missingBill: !!nobill }, LIMIT),
+    getPeople(),
+    getEntries(range.from, range.to, { kind, categoryId: cat, q, missingBill: !!nobill, personId: by }, LIMIT),
   ]);
   const catName = new Map(categories.map((c) => [c.id, c.name]));
   const t = totals(entries);
   const days = new Map<string, Entry[]>();
   for (const e of entries) days.set(e.occurred_on, [...(days.get(e.occurred_on) ?? []), e]);
 
-  const filters = { kind, cat, q, nobill };
+  const filters = { kind, cat, q, nobill, by };
   const exportQuery = new URLSearchParams(rangeQuery(range));
-  Object.entries({ kind, cat, q, nobill }).forEach(([k, v]) => { if (v) exportQuery.set(k, v); });
+  Object.entries({ kind, cat, q, nobill, by }).forEach(([k, v]) => { if (v) exportQuery.set(k, v); });
 
   return (
     <div className="space-y-4">
@@ -46,7 +48,7 @@ export default async function EntriesPage({ searchParams }: { searchParams: Prom
       </div>
 
       <RangePicker current={range.key} from={range.from} to={range.to} keys={KEYS} keep={filters} />
-      <EntryFilters params={{ ...filters, ...Object.fromEntries(new URLSearchParams(rangeQuery(range))) }} categories={categories} />
+      <EntryFilters params={{ ...filters, ...Object.fromEntries(new URLSearchParams(rangeQuery(range))) }} categories={categories} people={people} />
 
       <div className="card grid grid-cols-3 gap-2 p-4 text-center sm:text-left">
         <div><p className="text-xs font-bold text-stone-400">Money in</p><p className="font-bold tabular-nums">{npr(t.moneyIn)}</p></div>

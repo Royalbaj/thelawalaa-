@@ -1,6 +1,8 @@
 "use server";
 
+import { after } from "next/server";
 import { posOrderSchema } from "@/lib/validations/order";
+import { checkStockAfterSale } from "@/lib/stock-alerts";
 import { requireRole } from "@/lib/supabase/server";
 import { supabaseAdmin, audit, resolveStaffBranchId } from "@/lib/supabase/admin";
 import { applyOpeningPromoPrice } from "@/lib/promo";
@@ -73,5 +75,7 @@ export async function createPosOrder(input: unknown) {
     actor_id: user.id, action: "POS_ORDER", target_table: "orders", target_id: order.id,
     new_data: { total: order.total, ...(discount ? { discount, discount_label: discountLabel } : {}) },
   });
+  // Linked stock (Accounts → Stock) counts down with every sale; warn staff if it's running out.
+  after(() => checkStockAfterSale(rows.map((r) => r.product_id)));
   return { ok: true, orderNumber: order.order_number, dailyNumber: order.daily_number, total: order.total, discount, discountLabel };
 }
