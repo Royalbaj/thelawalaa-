@@ -3,7 +3,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
   LayoutDashboard, ShoppingBag, UtensilsCrossed, Gift, UserPlus,
-  Megaphone, Truck, Users, GraduationCap, BarChart3, Settings, LogOut, ExternalLink, HelpCircle, BookOpen,
+  Megaphone, Truck, Users, GraduationCap, BarChart3, Settings, LogOut, ExternalLink, HelpCircle, BookOpen, MessageSquareHeart,
 } from "lucide-react";
 import { signOutHere } from "@/lib/sign-out";
 import { ACCOUNTS_URL } from "@/lib/role-home";
@@ -20,6 +20,7 @@ export const NAV = [
   { href: "/admin/signups", label: "Signups", icon: UserPlus, section: "marketing" },
   { href: "/admin/announcements", label: "Announcements", icon: Megaphone, section: "marketing" },
   { href: "/admin/faqs", label: "FAQs", icon: HelpCircle, section: "marketing" },
+  { href: "/admin/feedback", label: "Feedback", icon: MessageSquareHeart, section: "marketing" },
   { href: "/admin/delivery", label: "Deliveries", icon: Truck, section: "operations" },
   { href: "/admin/staff", label: "Staff & Users", icon: Users, section: "operations" },
   { href: "/admin/training", label: "Staff Training", icon: GraduationCap, section: "operations" },
@@ -34,7 +35,10 @@ const sectionLabels: Record<string, string> = {
   settings: "Configuration",
 };
 
-export default function AdminSidebar({ onNavigate }: { onNavigate?: () => void }) {
+/** Little counts beside a menu item, e.g. new feedback. */
+export type NavBadges = Partial<Record<string, number>>;
+
+export default function AdminSidebar({ onNavigate, badges = {} }: { onNavigate?: () => void; badges?: NavBadges }) {
   const pathname = usePathname();
 
   const sections: Record<string, typeof NAV> = {};
@@ -66,6 +70,9 @@ export default function AdminSidebar({ onNavigate }: { onNavigate?: () => void }
               >
                 <Icon size={18} />
                 <span>{label}</span>
+                {!!badges[href] && (
+                  <span className="ml-auto rounded-full bg-brand-red px-2 py-0.5 text-[10px] font-extrabold text-white">{badges[href]}</span>
+                )}
               </Link>
             );
           })}

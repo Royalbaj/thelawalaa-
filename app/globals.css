@@ -44,6 +44,11 @@ body { @apply font-body bg-brand-cream text-stone-900 antialiased; }
   }
 }
 
+/* iPhone Safari zooms the whole page into any field under 16px when it's tapped. */
+@media (max-width: 639px) {
+  input:not([type="checkbox"]):not([type="radio"]):not([type="range"]), select, textarea { font-size: 16px; }
+}
+
 /* Smooth page transitions */
 main {
   animation: fadeInUp 0.3s ease-out;

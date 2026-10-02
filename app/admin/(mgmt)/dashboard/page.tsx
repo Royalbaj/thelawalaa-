@@ -5,7 +5,7 @@ import { npr } from "@/lib/utils";
 import { getTrainingStatus } from "@/lib/training-status";
 import RealtimeFeed from "@/components/admin/realtime-feed";
 import Link from "next/link";
-import { Package, Wallet, Clock, Bell, Bike, XCircle, ClipboardList, UtensilsCrossed, Megaphone, GraduationCap } from "lucide-react";
+import { Package, Wallet, Clock, Bell, Bike, XCircle, ClipboardList, UtensilsCrossed, Megaphone, GraduationCap, MessageSquareHeart } from "lucide-react";
 
 export const dynamic = "force-dynamic";
 
@@ -20,6 +20,10 @@ export default async function DashboardPage() {
     supabaseAdmin.from("orders").select("id", { count: "exact", head: true }).eq("status", "pending"),
     getTrainingStatus(),
   ]);
+  const { data: feedbackRows } = await supabaseAdmin.from("feedback").select("rating, is_read");
+  const feedbackCount = feedbackRows?.length ?? 0;
+  const feedbackAvg = feedbackCount ? feedbackRows!.reduce((s, f) => s + f.rating, 0) / feedbackCount : 0;
+  const feedbackNew = (feedbackRows ?? []).filter((f) => !f.is_read).length;
   const stillTraining = training.team.filter((t) => t.missing.length > 0);
 
   const revenue = (todays ?? [])
@@ -77,6 +81,23 @@ export default async function DashboardPage() {
           <Megaphone size={16} /> Announcements
         </Link>
       </div>
+
+      {/* Customer feedback from /feedback */}
+      <Link
+        href={feedbackNew ? "/admin/feedback?show=new" : "/admin/feedback"}
+        className={`flex items-center gap-3 rounded-2xl border p-4 transition hover:shadow-md ${feedbackNew ? "border-orange-300 bg-orange-50" : "border-orange-100 bg-white"}`}
+      >
+        <MessageSquareHeart size={20} className="shrink-0 text-brand-orange" />
+        <div className="min-w-0 flex-1">
+          <p className="text-sm font-bold text-brand-brown">
+            Customer feedback: {feedbackCount ? `${feedbackAvg.toFixed(1)} / 5 from ${feedbackCount}` : "none yet"}
+          </p>
+          <p className="truncate text-xs text-stone-500">
+            {feedbackNew ? `${feedbackNew} new to read` : feedbackCount ? "All read" : "Share thelawalaa.com/feedback with customers"}
+          </p>
+        </div>
+        <span className="shrink-0 text-sm font-bold text-brand-orange">{feedbackNew ? "Read →" : "Open →"}</span>
+      </Link>
 
       {/* Staff training — who still has to finish the videos on the Staff Portal */}
       {training.activeCount > 0 && training.team.length > 0 && (

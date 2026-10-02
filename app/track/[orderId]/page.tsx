@@ -164,6 +164,9 @@ function TrackContent() {
                   </button>
                 ))}
               </div>
+              <p className="mt-3 text-center text-sm">
+                <a href={`/feedback?order=${encodeURIComponent(order.order_number)}`} className="font-bold text-brand-orange">Want to tell us more? Leave feedback →</a>
+              </p>
             </div>
           )}
         </div>

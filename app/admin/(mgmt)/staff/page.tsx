@@ -35,10 +35,31 @@ export default async function StaffPage(props: { searchParams: Promise<{ q?: str
   return (
     <div className="grid gap-6 lg:grid-cols-3">
       <div className="space-y-6 lg:col-span-2">
-        <form action="/admin/staff"><input name="q" defaultValue={q} placeholder="Search by name…" className="input !w-64" /></form>
+        <form action="/admin/staff"><input name="q" defaultValue={q} placeholder="Search by name…" className="input text-base sm:!w-64 sm:text-sm" /></form>
         <section>
           <h2 className="mb-2 font-display font-bold text-brand-brown">Staff</h2>
-          <div className="card overflow-x-auto">
+          {/* Phones: one card per person */}
+          <div className="space-y-2.5 md:hidden">
+            {(staff ?? []).map((p: any) => (
+              <div key={p.id} className="card space-y-2 p-3.5">
+                <div className="flex items-start justify-between gap-2">
+                  <div className="min-w-0">
+                    <p className="font-bold">{p.full_name}</p>
+                    <p className="text-xs text-stone-500">{p.phone ?? "No phone"} · {p.branches?.name ?? "No branch"} · joined {format(new Date(p.created_at), "d MMM yyyy")}</p>
+                  </div>
+                  <span className={cn("badge shrink-0", ROLE_BADGE[p.role])}>{p.role}</span>
+                </div>
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  {!p.is_active ? <span className="badge bg-red-100 text-red-800">Suspended</span>
+                    : !p.invite_accepted_at ? <span className="badge bg-yellow-100 text-yellow-800">Invite pending</span>
+                    : <span className="badge bg-green-100 text-green-800">Active</span>}
+                  <StaffRowActions userId={p.id} isActive={p.is_active} role={p.role} branches={(branches ?? []) as never} inviteAccepted={!!p.invite_accepted_at} />
+                </div>
+              </div>
+            ))}
+            {(staff ?? []).length === 0 && <div className="card px-4 py-8 text-center text-stone-500">No staff yet.</div>}
+          </div>
+          <div className="card hidden overflow-x-auto md:block">
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-orange-100 text-left text-xs uppercase text-stone-500">

@@ -34,7 +34,29 @@ export default function RealtimeFeed({ initial }: { initial: Row[] }) {
   }, []);
 
   return (
-    <div className="card overflow-x-auto">
+    <>
+    <div className="space-y-2.5 md:hidden">
+      {orders.map((o) => (
+        <div key={o.id} className="card p-3.5">
+          <div className="flex items-start justify-between gap-3">
+            <p className="flex flex-wrap items-center gap-1.5">
+              {o.daily_number != null && o.type === "pickup" && (
+                <span className="rounded-full bg-brand-orange/10 px-2 py-0.5 text-xs font-extrabold text-brand-orange">#{String(o.daily_number).padStart(2, "0")}</span>
+              )}
+              <span className="font-mono text-sm font-bold">{o.order_number}</span>
+              <span className="text-xs capitalize text-stone-500">· {o.type.replace("_", " ")} · {format(new Date(o.created_at), "h:mm a")}</span>
+            </p>
+            <p className="shrink-0 font-bold">{npr(Number(o.total))}</p>
+          </div>
+          <div className="mt-2.5 flex flex-wrap items-center gap-2">
+            <MarkPaidButton orderId={o.id} total={Number(o.total)} paid={o.payment_status === "paid"} method={o.payment_method} />
+            <span className="ml-auto"><OrderStatusSelect orderId={o.id} status={o.status} type={o.type} /></span>
+          </div>
+        </div>
+      ))}
+      {orders.length === 0 && <div className="card px-4 py-8 text-center text-sm text-stone-500">No orders yet today.</div>}
+    </div>
+    <div className="card hidden overflow-x-auto md:block">
       <table className="w-full text-sm">
         <thead>
           <tr className="border-b border-orange-100 text-left text-xs uppercase text-stone-500">
@@ -67,5 +89,6 @@ export default function RealtimeFeed({ initial }: { initial: Row[] }) {
         </tbody>
       </table>
     </div>
+    </>
   );
 }

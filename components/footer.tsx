@@ -44,11 +44,12 @@ export default async function Footer() {
           )}
         </div>
         <nav className="flex flex-wrap gap-x-6 gap-y-2 text-sm font-bold text-orange-100/90">
-          <a href="#home" className="hover:text-white">Home</a>
-          <a href="#menu" className="hover:text-white">Menu</a>
-          <a href="#order" className="hover:text-white">Order</a>
-          <a href="#faq" className="hover:text-white">FAQ</a>
-          <a href="#contact" className="hover:text-white">Contact</a>
+          <a href="/#home" className="hover:text-white">Home</a>
+          <a href="/#menu" className="hover:text-white">Menu</a>
+          <a href="/order" className="hover:text-white">Order</a>
+          <a href="/#faq" className="hover:text-white">FAQ</a>
+          <a href="/#contact" className="hover:text-white">Contact</a>
+          <a href="/feedback" className="hover:text-white">Feedback</a>
         </nav>
         <div className="text-sm text-orange-100/70">
           <p>Privacy Policy · Terms of Service</p>

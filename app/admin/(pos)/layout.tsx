@@ -7,6 +7,7 @@ import { POS_THEME_COOKIE } from "@/lib/pos-theme";
 import PosHeader from "@/components/admin/pos-header";
 import SessionGuard from "@/components/session-guard";
 import { PosThemeRoot } from "@/components/pos/pos-theme";
+import PosFooter from "@/components/pos/pos-footer";
 
 export const dynamic = "force-dynamic";
 
@@ -47,6 +48,7 @@ export default async function PosLayout({ children }: { children: React.ReactNod
       <SessionGuard userId={profile.id} />
       <PosHeader fullName={profile.full_name} />
       <main className="min-h-0 flex-1">{children}</main>
+      <PosFooter />
     </PosThemeRoot>
   );
 }

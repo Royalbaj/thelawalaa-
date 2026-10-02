@@ -62,7 +62,19 @@ export default async function HomePage() {
           own edges (#0e0805, warm light from the left like the photo), via
           overlays in the same colour. Phones: photo on top, text below.
           Wide screens: text on the left, photo bleeding off the right edge. */}
-      <section id="home" className="relative overflow-hidden bg-[#0e0805] text-amber-50">
+      {/* White behind the hero's rounded bottom corners, so they meet the next section cleanly. */}
+      <div className="bg-white">
+      <section id="home" className="relative overflow-hidden rounded-b-[2rem] bg-[#0e0805] text-amber-50 md:rounded-b-[3rem]">
+        {/* Ambient backdrop: the photo's own tiny blur preview, stretched over the whole
+            hero and darkened — everything around the photo is made of its colours,
+            so the sharp photo sits in it with no visible "photo area". */}
+        <div aria-hidden className="pointer-events-none absolute inset-0">
+          <div className="absolute -inset-16 scale-110 bg-cover bg-center opacity-70 blur-3xl"
+            style={{ backgroundImage: `url(${heroImage.blurDataURL})` }} />
+          <div className="absolute inset-0 bg-[#0e0805]/55" />
+          {/* Text side: darker for reading (phones: lower part, under the photo) */}
+          <div className="absolute inset-0 bg-gradient-to-b from-transparent via-[#0e0805]/70 to-[#0e0805] lg:bg-gradient-to-r lg:from-[#0e0805] lg:via-[#0e0805]/80 lg:to-transparent" />
+        </div>
         <div className="relative z-20 border-b border-white/10 bg-black/40 py-2.5 text-center text-sm font-bold text-amber-100">
           {announcement?.message ?? (deliveryEnabled ? "Now open — order online for pickup or home delivery" : "Now open — order online for pickup")}
         </div>
@@ -70,7 +82,7 @@ export default async function HomePage() {
         <div className="relative mx-auto max-w-7xl lg:flex lg:min-h-[620px] lg:items-center lg:static">
           {/* Photo. Phones/tablets: full width on top. Wide screens: whole 3:2 shot
               on the right, reaching the screen edge, faded on its other sides. */}
-          <div className="lg:absolute lg:inset-y-0 lg:right-0 lg:flex lg:w-[60%] lg:max-w-[1100px] lg:items-center">
+          <div className="relative lg:absolute lg:inset-y-0 lg:right-0 lg:flex lg:w-[60%] lg:max-w-[1100px] lg:items-center">
             {/* hero-photo-fade (globals.css) fades the photo itself out at its edges,
                 so the background shows through — no seam, whatever the colours. */}
             <div className="hero-photo-fade relative aspect-[3/2] w-full">
@@ -124,6 +136,7 @@ export default async function HomePage() {
           </div>
         </div>
       </section>
+      </div>
 
       {/* WHY THELAWALAA */}
       <section id="about" className="bg-white px-4 py-12 md:py-20">
