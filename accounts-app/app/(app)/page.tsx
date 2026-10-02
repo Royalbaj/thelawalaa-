@@ -1,95 +1,140 @@
-import { startOfDay, startOfWeek, startOfMonth } from "date-fns";
-import { requireAuth } from "@/lib/supabase/server";
-import { supabaseAdmin } from "@/lib/supabase/admin";
-import { npr } from "@/lib/utils";
 import Link from "next/link";
-import { Wallet, TrendingDown, AlertTriangle, Package, Receipt } from "lucide-react";
+import { ArrowDownLeft, ArrowUpRight, Paperclip, Lightbulb } from "lucide-react";
+import { requireAuth } from "@/lib/supabase/server";
+import { nepalToday, startOfWeek, startOfMonth, resolveRange, rangeQuery, longDate, dayCount, type RangeKey } from "@/lib/dates";
+import { getCategories, getEntries, getBalance, totals, within, byCategory, byPeriod, SERIES } from "@/lib/ledger";
+import { InOutColumns } from "@/components/charts";
+import BarList from "@/components/bar-list";
+import RangePicker from "@/components/range-picker";
+import EntryRow from "@/components/entry-row";
+import { npr, cn } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
 
-export default async function DashboardPage() {
+const KEYS: RangeKey[] = ["today", "week", "month", "last-month", "3-months", "year", "custom"];
+
+const signed = (n: number) => `${n > 0 ? "+" : n < 0 ? "−" : ""}${npr(Math.abs(n))}`;
+const Dot = ({ color }: { color: string }) => <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ background: color }} />;
+
+export default async function Dashboard({ searchParams }: { searchParams: Promise<Record<string, string | undefined>> }) {
   const { profile } = await requireAuth();
-  const now = new Date();
-  const dayStart = startOfDay(now).toISOString();
-  const weekStart = startOfWeek(now).toISOString();
-  const monthStart = startOfMonth(now).toISOString();
+  const sp = await searchParams;
+  const today = nepalToday();
+  const weekFrom = startOfWeek(today);
+  const monthFrom = startOfMonth(today);
+  const range = resolveRange(sp, "month");
+  const fetchFrom = [range.from, weekFrom, monthFrom].sort()[0];
+  const fetchTo = range.to > today ? range.to : today;
 
-  const [{ data: monthOrders }, { data: monthExpenses }, { data: lowStock }] = await Promise.all([
-    supabaseAdmin.from("orders").select("total, payment_status, status, created_at").gte("created_at", monthStart),
-    supabaseAdmin.from("expenses").select("amount, spent_at").gte("spent_at", monthStart.slice(0, 10)),
-    supabaseAdmin.from("stock_items").select("id, name, quantity, reorder_level, unit").eq("is_active", true),
-  ]);
+  const [categories, entries, bal] = await Promise.all([getCategories(), getEntries(fetchFrom, fetchTo), getBalance()]);
+  const catName = new Map(categories.map((c) => [c.id, c.name]));
 
-  const revenueOf = (since: string) =>
-    (monthOrders ?? [])
-      .filter((o) => o.created_at >= since && o.payment_status === "paid" && o.status !== "cancelled")
-      .reduce((s, o) => s + Number(o.total), 0);
-
-  const todayRevenue = revenueOf(dayStart);
-  const weekRevenue = revenueOf(weekStart);
-  const monthRevenue = revenueOf(monthStart);
-  const monthExpenseTotal = (monthExpenses ?? []).reduce((s, e) => s + Number(e.amount), 0);
-  const netThisMonth = monthRevenue - monthExpenseTotal;
-  const lowStockItems = (lowStock ?? []).filter((i) => Number(i.quantity) <= Number(i.reorder_level));
-
-  const stats = [
-    { label: "Today's Revenue", value: npr(todayRevenue), icon: Wallet, iconBg: "bg-green-100 text-brand-green" },
-    { label: "This Week", value: npr(weekRevenue), icon: Wallet, iconBg: "bg-blue-100 text-blue-600" },
-    { label: "This Month", value: npr(monthRevenue), icon: Wallet, iconBg: "bg-orange-100 text-brand-orange" },
-    { label: "Expenses (Month)", value: npr(monthExpenseTotal), icon: TrendingDown, iconBg: "bg-red-100 text-brand-red" },
+  const periods = [
+    { label: "Today", q: "range=today", ...totals(within(entries, today, today)) },
+    { label: "This week", q: "range=week", ...totals(within(entries, weekFrom, today)) },
+    { label: "This month", q: "range=month", ...totals(within(entries, monthFrom, today)) },
   ];
+
+  const inRange = within(entries, range.from, range.to);
+  const t = totals(inRange);
+  const { unit, buckets } = byPeriod(inRange, range.from, range.to);
+  const outCats = byCategory(inRange, categories, "out");
+  const inCats = byCategory(inRange, categories, "in");
+  const missingBills = inRange.filter((e) => e.kind === "out" && !e.bill_path).length;
+  const days = dayCount(range.from, range.to > today ? today : range.to);
+  const rq = rangeQuery(range);
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="font-display text-2xl font-bold text-brand-brown">Welcome, {profile.full_name.split(" ")[0]}</h1>
-        <p className="text-sm text-stone-500">Here&apos;s how the business is doing.</p>
-      </div>
-
-      <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-        {stats.map((s) => (
-          <div key={s.label} className="card p-5">
-            <div className={`flex h-10 w-10 items-center justify-center rounded-xl ${s.iconBg}`}>
-              <s.icon size={19} strokeWidth={2.3} />
-            </div>
-            <p className="mt-3 text-xs font-bold uppercase tracking-wide text-stone-400">{s.label}</p>
-            <p className="mt-1 font-display text-xl font-bold text-brand-brown">{s.value}</p>
-          </div>
-        ))}
-      </div>
-
-      <div className="card p-5">
-        <p className="text-xs font-bold uppercase tracking-wide text-stone-400">Net this month</p>
-        <p className={`mt-1 font-display text-3xl font-bold ${netThisMonth >= 0 ? "text-brand-green" : "text-brand-red"}`}>
-          {netThisMonth >= 0 ? "+" : ""}{npr(netThisMonth)}
-        </p>
-        <p className="mt-1 text-xs text-stone-400">Revenue minus logged expenses, month to date</p>
-      </div>
-
-      {lowStockItems.length > 0 && (
-        <div className="card border-amber-200 bg-amber-50 p-5">
-          <div className="flex items-center gap-2">
-            <AlertTriangle size={18} className="text-amber-600" />
-            <p className="font-display font-bold text-amber-800">Low stock</p>
-          </div>
-          <ul className="mt-2 space-y-1">
-            {lowStockItems.map((i) => (
-              <li key={i.id} className="text-sm text-amber-800">
-                <span className="font-bold">{i.name}</span> — {Number(i.quantity)} {i.unit} left (reorder at {Number(i.reorder_level)})
-              </li>
-            ))}
-          </ul>
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <h1 className="font-display text-2xl font-bold text-brand-brown">Hi {profile.full_name.split(" ")[0]}</h1>
+          <p className="text-sm text-stone-500">{longDate(today)}</p>
         </div>
-      )}
-
-      <div className="flex flex-wrap gap-3">
-        <Link href="/stock" className="inline-flex items-center gap-2 rounded-xl bg-white px-4 py-2.5 text-sm font-bold text-brand-brown shadow-sm border border-orange-100 hover:bg-orange-50 transition">
-          <Package size={16} /> Manage Stock
-        </Link>
-        <Link href="/expenses" className="inline-flex items-center gap-2 rounded-xl bg-white px-4 py-2.5 text-sm font-bold text-brand-brown shadow-sm border border-orange-100 hover:bg-orange-50 transition">
-          <Receipt size={16} /> Log Expense
-        </Link>
+        <div className="hidden gap-2 md:flex">
+          <Link href="/entries/new?kind=in" className="btn-outline !px-4 !py-2.5 text-sm"><ArrowDownLeft size={16} style={{ color: SERIES.in }} /> Money in</Link>
+          <Link href="/entries/new?kind=out" className="btn-primary !px-4 !py-2.5 text-sm"><ArrowUpRight size={16} /> Money out</Link>
+        </div>
       </div>
+
+      {/* The one number this screen leads with. */}
+      <section className="card p-5 sm:p-6">
+        <p className="text-sm font-bold text-stone-500">Balance left</p>
+        <p className={cn("mt-1 font-display text-5xl font-bold tracking-tight", bal.balance < 0 ? "text-brand-red" : "text-stone-900")}>{npr(bal.balance)}</p>
+        <p className="mt-2 text-xs text-stone-500">
+          Starting money {npr(bal.opening)} + all money in {npr(bal.totalIn)} − all money out {npr(bal.totalOut)}
+          {" · "}<Link href="/settings" className="font-bold text-brand-orange">Set starting money</Link>
+        </p>
+      </section>
+
+      <section className="grid gap-3 sm:grid-cols-3">
+        {periods.map((p) => (
+          <Link key={p.label} href={`/entries?${p.q}`} className="card block p-4 transition hover:shadow-md">
+            <p className="flex items-baseline justify-between">
+              <span className="text-xs font-bold uppercase tracking-wide text-stone-400">{p.label}</span>
+              <span className="text-xs text-stone-400">{p.count} {p.count === 1 ? "entry" : "entries"}</span>
+            </p>
+            <p className={cn("mt-1 font-display text-2xl font-bold", p.net < 0 ? "text-brand-red" : p.net > 0 ? "text-green-700" : "text-stone-900")}>{signed(p.net)}</p>
+            <div className="mt-2 space-y-1 text-sm">
+              <p className="flex items-center justify-between gap-2"><span className="flex items-center gap-1.5 text-stone-600"><Dot color={SERIES.in} /> In</span><b className="tabular-nums">{npr(p.moneyIn)}</b></p>
+              <p className="flex items-center justify-between gap-2"><span className="flex items-center gap-1.5 text-stone-600"><Dot color={SERIES.out} /> Out</span><b className="tabular-nums">{npr(p.moneyOut)}</b></p>
+            </div>
+          </Link>
+        ))}
+      </section>
+
+      <section className="space-y-3">
+        <h2 className="font-display text-lg font-bold text-brand-brown">Money in and out — {range.label}</h2>
+        <RangePicker current={range.key} from={range.from} to={range.to} keys={KEYS} />
+        <div className="card p-4 sm:p-5">
+          <div className="mb-3 grid grid-cols-3 gap-2 text-center sm:text-left">
+            <div><p className="text-xs font-bold text-stone-400">Money in</p><p className="font-bold tabular-nums">{npr(t.moneyIn)}</p></div>
+            <div><p className="text-xs font-bold text-stone-400">Money out</p><p className="font-bold tabular-nums">{npr(t.moneyOut)}</p></div>
+            <div><p className="text-xs font-bold text-stone-400">Net</p><p className={cn("font-bold tabular-nums", t.net < 0 ? "text-brand-red" : "text-green-700")}>{signed(t.net)}</p></div>
+          </div>
+          <InOutColumns data={buckets.map((b) => ({ label: b.label, in: b.in, out: b.out }))} />
+          <p className="mt-1 text-[11px] text-stone-400">One pair of bars per {unit}.</p>
+        </div>
+
+        <div className="grid gap-4 lg:grid-cols-2">
+          <div className="card p-5">
+            <h3 className="mb-3 font-bold text-brand-brown">Where the money went</h3>
+            <BarList color={SERIES.out} empty="No money out in this period."
+              rows={outCats.map((c) => ({ ...c, href: `/entries?${rq}&kind=out&cat=${c.id}` }))} />
+          </div>
+          <div className="card p-5">
+            <h3 className="mb-3 font-bold text-brand-brown">Where the money came from</h3>
+            <BarList color={SERIES.in} empty="No money in for this period — add the day's sales with “+ Money in”."
+              rows={inCats.map((c) => ({ ...c, href: `/entries?${rq}&kind=in&cat=${c.id}` }))} />
+          </div>
+        </div>
+
+        {(t.count > 0) && (
+          <div className="card space-y-2 p-4 text-sm">
+            <p className="flex items-center gap-1.5 font-bold text-brand-brown"><Lightbulb size={16} /> Worth knowing</p>
+            {outCats[0] && <p className="text-stone-600">Biggest spend: <b>{outCats[0].name}</b> — {npr(outCats[0].amount)} ({Math.round(outCats[0].share * 100)}% of money out).</p>}
+            {t.moneyIn > 0 && days > 1 && <p className="text-stone-600">Money in averages <b>{npr(t.moneyIn / days)}</b> a day over {days} days.</p>}
+            {missingBills > 0 && (
+              <p className="text-amber-800">
+                <Paperclip size={13} className="mr-1 inline" />
+                {missingBills} money-out {missingBills === 1 ? "entry has" : "entries have"} no bill attached.{" "}
+                <Link href={`/entries?${rq}&kind=out&nobill=1`} className="font-bold underline">Add bills</Link>
+              </p>
+            )}
+          </div>
+        )}
+      </section>
+
+      <section>
+        <div className="mb-2 flex items-center justify-between">
+          <h2 className="font-display text-lg font-bold text-brand-brown">Latest entries</h2>
+          <Link href={`/entries?${rq}`} className="text-sm font-bold text-brand-orange">See all →</Link>
+        </div>
+        <div className="card divide-y divide-stone-100 overflow-hidden">
+          {inRange.slice(0, 8).map((e) => <EntryRow key={e.id} e={e} category={catName.get(e.category_id) ?? "—"} showDate />)}
+          {inRange.length === 0 && <p className="px-4 py-8 text-center text-sm text-stone-400">No entries in this period yet.</p>}
+        </div>
+      </section>
     </div>
   );
 }

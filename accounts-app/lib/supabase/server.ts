@@ -2,6 +2,7 @@
 // Still anon key + RLS — acts AS the user, not above them.
 import { createServerClient, type CookieOptions } from "@supabase/ssr";
 import { cookies } from "next/headers";
+import { PIN_COOKIE, verifyUnlock } from "@/lib/pin-cookie";
 
 const ALLOWED_ROLES = ["super_admin", "accountant"];
 
@@ -42,8 +43,16 @@ export async function getVerifiedUser() {
   return { user, profile, supabase };
 }
 
-export async function requireAuth() {
+/** Signed in with an allowed role — enough for the PIN screen, nothing else. */
+export async function requireSignedIn() {
   const ctx = await getVerifiedUser();
   if (!ctx.user || !ctx.profile) throw new Error("Forbidden");
   return ctx as { user: NonNullable<typeof ctx.user>; profile: NonNullable<typeof ctx.profile>; supabase: typeof ctx.supabase };
+}
+
+/** Signed in AND unlocked with the PIN — every page, action and download. */
+export async function requireAuth() {
+  const ctx = await requireSignedIn();
+  if (!(await verifyUnlock(ctx.user.id, (await cookies()).get(PIN_COOKIE)?.value))) throw new Error("Locked");
+  return ctx;
 }

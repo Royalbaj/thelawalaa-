@@ -1,113 +1,123 @@
-import { subDays, format, startOfDay } from "date-fns";
+import { FileSpreadsheet, FileText } from "lucide-react";
 import { requireAuth } from "@/lib/supabase/server";
-import { supabaseAdmin } from "@/lib/supabase/admin";
-import { npr } from "@/lib/utils";
-import { TrendingUp, PackageSearch } from "lucide-react";
+import { resolveRange, rangeQuery, prettyDate, dayCount, nepalToday, type RangeKey } from "@/lib/dates";
+import { getCategories, getEntries, getBalance, totals, byCategory, byMethod, byPeriod, runningBalance, SERIES, KIND_LABELS, type Kind } from "@/lib/ledger";
+import { InOutColumns, BalanceArea } from "@/components/charts";
+import BarList from "@/components/bar-list";
+import RangePicker from "@/components/range-picker";
+import PrintButton from "@/components/print-button";
+import { npr, cn } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
 
-export default async function ReportsPage() {
+const KEYS: RangeKey[] = ["week", "month", "last-month", "3-months", "year", "custom"];
+
+export default async function ReportsPage({ searchParams }: { searchParams: Promise<Record<string, string | undefined>> }) {
   await requireAuth();
-  const since30 = subDays(new Date(), 30).toISOString();
+  const range = resolveRange(await searchParams, "month");
+  const [categories, entries, before] = await Promise.all([getCategories(), getEntries(range.from, range.to), getBalance(range.from)]);
 
-  const [{ data: orders }, { data: items }, { data: movements }, { data: expenses }] = await Promise.all([
-    supabaseAdmin.from("orders").select("total, payment_status, status, created_at").gte("created_at", since30),
-    supabaseAdmin.from("stock_items").select("id, name, unit, quantity, reorder_level, cost_per_unit").eq("is_active", true),
-    supabaseAdmin.from("stock_movements").select("stock_item_id, type, quantity, created_at").gte("created_at", since30),
-    supabaseAdmin.from("expenses").select("amount, spent_at").gte("spent_at", since30.slice(0, 10)),
-  ]);
+  const t = totals(entries);
+  const today = nepalToday();
+  const days = dayCount(range.from, range.to > today ? today : range.to);
+  const { unit, buckets } = byPeriod(entries, range.from, range.to);
+  const balance = runningBalance(before.balance, buckets);
+  const closing = before.balance + t.net;
+  const rq = rangeQuery(range);
+  const cats = (["out", "in"] as Kind[]).flatMap((k) => byCategory(entries, categories, k).map((s) => ({
+    ...s, kind: k, count: entries.filter((e) => e.kind === k && e.category_id === s.id).length,
+  })));
 
-  // Daily revenue, last 14 days
-  const days = Array.from({ length: 14 }, (_, i) => startOfDay(subDays(new Date(), 13 - i)));
-  const daily = days.map((d) => {
-    const next = new Date(d.getTime() + 86400000);
-    const total = (orders ?? [])
-      .filter((o) => {
-        const t = new Date(o.created_at);
-        return t >= d && t < next && o.payment_status === "paid" && o.status !== "cancelled";
-      })
-      .reduce((s, o) => s + Number(o.total), 0);
-    return { label: format(d, "d MMM"), total };
-  });
-  const maxDaily = Math.max(1, ...daily.map((d) => d.total));
-
-  const revenue30 = (orders ?? [])
-    .filter((o) => o.payment_status === "paid" && o.status !== "cancelled")
-    .reduce((s, o) => s + Number(o.total), 0);
-  const expenses30 = (expenses ?? []).reduce((s, e) => s + Number(e.amount), 0);
-
-  // Stock forecast: avg daily usage over the last 30 days -> days remaining
-  const usageByItem = new Map<string, number>();
-  (movements ?? []).forEach((m) => {
-    if (m.type !== "usage" && m.type !== "wastage") return;
-    usageByItem.set(m.stock_item_id, (usageByItem.get(m.stock_item_id) ?? 0) + Math.abs(Number(m.quantity)));
-  });
-  const forecast = (items ?? []).map((i) => {
-    const used30 = usageByItem.get(i.id) ?? 0;
-    const perDay = used30 / 30;
-    const daysLeft = perDay > 0 ? Number(i.quantity) / perDay : null;
-    return { ...i, perDay, daysLeft };
-  }).sort((a, b) => (a.daysLeft ?? Infinity) - (b.daysLeft ?? Infinity));
+  const tiles = [
+    { label: "Money in", value: npr(t.moneyIn), sub: `${npr(t.moneyIn / Math.max(days, 1))} a day`, dot: SERIES.in },
+    { label: "Money out", value: npr(t.moneyOut), sub: `${npr(t.moneyOut / Math.max(days, 1))} a day`, dot: SERIES.out },
+    { label: "Net (in − out)", value: `${t.net < 0 ? "−" : "+"}${npr(Math.abs(t.net))}`, sub: `${t.count} entries`, tone: t.net < 0 ? "text-brand-red" : "text-green-700" },
+    { label: "Balance at the end", value: npr(closing), sub: `Started at ${npr(before.balance)}`, tone: closing < 0 ? "text-brand-red" : undefined },
+  ];
 
   return (
-    <div className="space-y-6">
-      <h1 className="font-display text-xl font-bold text-brand-brown">Reports</h1>
-
-      <div className="grid gap-4 sm:grid-cols-3">
-        <div className="card p-5">
-          <p className="text-xs font-bold uppercase tracking-wide text-stone-400">Revenue (30d)</p>
-          <p className="mt-1 font-display text-2xl font-bold text-brand-green">{npr(revenue30)}</p>
+    <div className="space-y-5">
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <h1 className="font-display text-2xl font-bold text-brand-brown">Reports</h1>
+          <p className="text-sm text-stone-500">{prettyDate(range.from)} – {prettyDate(range.to)}</p>
         </div>
-        <div className="card p-5">
-          <p className="text-xs font-bold uppercase tracking-wide text-stone-400">Expenses (30d)</p>
-          <p className="mt-1 font-display text-2xl font-bold text-brand-red">{npr(expenses30)}</p>
-        </div>
-        <div className="card p-5">
-          <p className="text-xs font-bold uppercase tracking-wide text-stone-400">Net (30d)</p>
-          <p className={`mt-1 font-display text-2xl font-bold ${revenue30 - expenses30 >= 0 ? "text-brand-brown" : "text-brand-red"}`}>{npr(revenue30 - expenses30)}</p>
+        <div className="flex flex-wrap gap-2 text-sm print:hidden">
+          <a href={`/export?${rq}&format=xlsx`} className="flex items-center gap-1.5 rounded-full bg-white px-3.5 py-2 font-bold text-green-800 ring-1 ring-stone-200 hover:bg-green-50"><FileSpreadsheet size={15} /> Excel</a>
+          <a href={`/export?${rq}&format=csv`} className="flex items-center gap-1.5 rounded-full bg-white px-3.5 py-2 font-bold text-stone-700 ring-1 ring-stone-200 hover:bg-stone-50"><FileText size={15} /> CSV</a>
+          <PrintButton />
         </div>
       </div>
 
-      <div className="card p-5">
-        <h2 className="mb-4 flex items-center gap-1.5 font-display font-bold text-brand-brown"><TrendingUp size={17} /> Daily revenue — last 14 days</h2>
-        <div className="flex h-40 items-end gap-2">
-          {daily.map((d) => (
-            <div key={d.label} className="group flex flex-1 flex-col items-center gap-1">
-              <div
-                className="w-full rounded-t-md bg-brand-orange/80 transition-colors group-hover:bg-brand-orange"
-                style={{ height: `${Math.max(4, (d.total / maxDaily) * 100)}%` }}
-                title={npr(d.total)}
-              />
-              <span className="hidden text-[10px] text-stone-400 sm:block">{d.label.split(" ")[0]}</span>
-            </div>
-          ))}
-        </div>
+      <div className="print:hidden"><RangePicker current={range.key} from={range.from} to={range.to} keys={KEYS} /></div>
+
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+        {tiles.map((s) => (
+          <div key={s.label} className="card p-4">
+            <p className="flex items-center gap-1.5 text-xs font-bold text-stone-500">
+              {s.dot && <span className="h-2.5 w-2.5 rounded-full" style={{ background: s.dot }} />}{s.label}
+            </p>
+            <p className={cn("mt-1 font-display text-xl font-bold sm:text-2xl", s.tone ?? "text-stone-900")}>{s.value}</p>
+            <p className="text-xs text-stone-400">{s.sub}</p>
+          </div>
+        ))}
       </div>
 
-      <div className="card p-5">
-        <h2 className="mb-3 flex items-center gap-1.5 font-display font-bold text-brand-brown"><PackageSearch size={17} /> Stock forecast</h2>
-        <p className="mb-3 text-xs text-stone-500">Estimated days remaining, based on average usage over the last 30 days.</p>
-        <table className="w-full text-sm">
+      <section className="card p-4 sm:p-5">
+        <h2 className="mb-3 font-bold text-brand-brown">Money in and out by {unit}</h2>
+        <InOutColumns data={buckets.map((b) => ({ label: b.label, in: b.in, out: b.out }))} height={260} />
+      </section>
+
+      <section className="card p-4 sm:p-5">
+        <h2 className="font-bold text-brand-brown">Balance over time</h2>
+        <p className="mb-3 text-xs text-stone-500">Money left at the end of each {unit}, counting the starting money and everything entered before.</p>
+        <BalanceArea data={balance} />
+      </section>
+
+      <div className="grid gap-4 lg:grid-cols-2">
+        <section className="card p-5">
+          <h2 className="mb-3 font-bold text-brand-brown">Money out by category</h2>
+          <BarList color={SERIES.out} max={10} empty="No money out in this period."
+            rows={byCategory(entries, categories, "out").map((c) => ({ ...c, href: `/entries?${rq}&kind=out&cat=${c.id}` }))} />
+        </section>
+        <section className="card p-5">
+          <h2 className="mb-3 font-bold text-brand-brown">Money in by category</h2>
+          <BarList color={SERIES.in} max={10} empty="No money in for this period."
+            rows={byCategory(entries, categories, "in").map((c) => ({ ...c, href: `/entries?${rq}&kind=in&cat=${c.id}` }))} />
+        </section>
+        <section className="card p-5">
+          <h2 className="mb-3 font-bold text-brand-brown">Money in — cash, bank or QR</h2>
+          <BarList color={SERIES.in} rows={byMethod(entries, "in")} empty="No money in for this period." />
+        </section>
+        <section className="card p-5">
+          <h2 className="mb-3 font-bold text-brand-brown">Money out — cash, bank or QR</h2>
+          <BarList color={SERIES.out} rows={byMethod(entries, "out")} empty="No money out in this period." />
+        </section>
+      </div>
+
+      <section className="card overflow-x-auto">
+        <h2 className="px-5 pt-5 font-bold text-brand-brown">All categories</h2>
+        <table className="mt-2 w-full text-sm">
           <thead>
-            <tr className="border-b border-orange-100 text-left text-xs uppercase text-stone-400">
-              <th className="py-2">Item</th><th className="py-2">On hand</th><th className="py-2">Avg use/day</th><th className="py-2">Est. days left</th>
+            <tr className="border-b border-stone-100 text-left text-xs text-stone-400">
+              <th className="px-5 py-2">Category</th><th className="py-2">Type</th>
+              <th className="py-2 text-right">Entries</th><th className="py-2 text-right">Share</th><th className="px-5 py-2 text-right">Amount</th>
             </tr>
           </thead>
-          <tbody>
-            {forecast.map((f) => (
-              <tr key={f.id} className="border-b border-orange-50 last:border-0">
-                <td className="py-2 font-bold text-brand-brown">{f.name}</td>
-                <td className="py-2 text-stone-600">{Number(f.quantity)} {f.unit}</td>
-                <td className="py-2 text-stone-500">{f.perDay > 0 ? `${f.perDay.toFixed(2)} ${f.unit}` : "—"}</td>
-                <td className={`py-2 font-bold ${f.daysLeft != null && f.daysLeft <= 3 ? "text-brand-red" : f.daysLeft != null && f.daysLeft <= 7 ? "text-amber-600" : "text-stone-600"}`}>
-                  {f.daysLeft != null ? `${Math.floor(f.daysLeft)} days` : "No recent usage"}
-                </td>
+          <tbody className="tabular-nums">
+            {cats.map((c) => (
+              <tr key={`${c.kind}-${c.id}`} className="border-b border-stone-50 last:border-0">
+                <td className="px-5 py-2 font-bold text-stone-800">{c.name}</td>
+                <td className="py-2 text-stone-500"><span className="mr-1.5 inline-block h-2 w-2 rounded-full" style={{ background: SERIES[c.kind] }} />{KIND_LABELS[c.kind]}</td>
+                <td className="py-2 text-right text-stone-500">{c.count}</td>
+                <td className="py-2 text-right text-stone-500">{Math.round(c.share * 100)}%</td>
+                <td className="px-5 py-2 text-right font-bold">{npr(c.amount)}</td>
               </tr>
             ))}
-            {forecast.length === 0 && <tr><td colSpan={4} className="py-6 text-center text-stone-400">No stock items yet.</td></tr>}
+            {cats.length === 0 && <tr><td colSpan={5} className="px-5 py-8 text-center text-stone-400">Nothing entered for this period.</td></tr>}
           </tbody>
         </table>
-      </div>
+      </section>
     </div>
   );
 }

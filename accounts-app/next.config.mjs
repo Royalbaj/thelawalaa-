@@ -8,6 +8,13 @@ const nextConfig = {
   outputFileTracingRoot: fileURLToPath(new URL(".", import.meta.url)),
   eslint: { ignoreDuringBuilds: true },
   typescript: { ignoreBuildErrors: false }, // type errors must fail the deploy
+  // The old Expenses and Orders pages became Entries (money in/out, typed in by hand).
+  async redirects() {
+    return [
+      { source: "/expenses", destination: "/entries?kind=out", permanent: false },
+      { source: "/orders/:path*", destination: "/", permanent: false },
+    ];
+  },
   async headers() {
     return [
       {
