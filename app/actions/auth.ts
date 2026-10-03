@@ -7,7 +7,7 @@ import { createClient as createPlainClient } from "@supabase/supabase-js";
 import { getVerifiedUser } from "@/lib/supabase/server";
 import { supabaseAdmin, audit, getRewardSettings } from "@/lib/supabase/admin";
 import { signupSchema } from "@/lib/validations/auth";
-import { sendEmail, EMAIL_SITE } from "@/lib/email";
+import { sendEmail, EMAIL_SITE, emailRecentlyWorking } from "@/lib/email";
 import { verifyEmail, welcomeEmail, resetEmail, alreadyRegisteredEmail } from "@/lib/account-emails";
 
 // Customer accounts, done on the server so the emails are ours (branded,
@@ -71,9 +71,10 @@ export async function signUpCustomer(input: unknown): Promise<Result> {
 
   const existing = await accountStatus(d.email);
   if (existing?.confirmed) {
-    // Don't reveal it here; tell the owner by email instead.
-    await sendEmail({ to: d.email, ...alreadyRegisteredEmail(existing.full_name ?? d.full_name) });
-    return { ok: true };
+    // Don't reveal it here; tell the owner by email instead. The answer looks
+    // like a new sign-up's (the page's backup send just does nothing here).
+    const sent = await sendEmail({ to: d.email, ...alreadyRegisteredEmail(existing.full_name ?? d.full_name) });
+    return { ok: true, fallback: !sent.ok };
   }
   if (!existing) {
     const { data: created, error } = await supabaseAdmin.auth.admin.createUser({
@@ -93,7 +94,8 @@ export async function resendVerification(email: unknown): Promise<Result> {
   if (!parsed.success) return { error: "Enter a valid email" };
   if (await throttled("verify", [await clientIp(), parsed.data], 4)) return { error: "We've sent a few already — please wait a few minutes" };
   const existing = await accountStatus(parsed.data);
-  if (!existing || existing.confirmed) return { ok: true };
+  // No such (unconfirmed) account: answer exactly as if there were one.
+  if (!existing || existing.confirmed) return { ok: true, fallback: !emailRecentlyWorking() };
   const sent = await sendVerification(parsed.data, existing.full_name ?? "");
   return { ok: true, fallback: !sent };
 }
@@ -103,7 +105,8 @@ export async function requestPasswordReset(email: unknown): Promise<Result> {
   if (!parsed.success) return { error: "Enter a valid email" };
   if (await throttled("reset", [await clientIp(), parsed.data], 4)) return { error: "We've sent a few already — please wait a few minutes" };
   const existing = await accountStatus(parsed.data);
-  if (!existing) return { ok: true };
+  // No account: answer exactly as if there were one, so nobody can fish for emails.
+  if (!existing) return { ok: true, fallback: !emailRecentlyWorking() };
   const { data, error } = await supabaseAdmin.auth.admin.generateLink({ type: "recovery", email: parsed.data });
   if (error || !data?.properties?.hashed_token) return { ok: true, fallback: true };
   const url = `${EMAIL_SITE}/auth/confirm?token_hash=${data.properties.hashed_token}&type=recovery`;
@@ -133,13 +136,15 @@ async function welcomeOnce(userId: string, email: string | undefined, fullName: 
  * revoked straight away — so no cookie ever reaches the device. They then
  * sign in themselves.
  */
-export async function confirmEmail(tokenHash: unknown): Promise<{ ok: true } | { error: string }> {
+export async function confirmEmail(tokenHash: unknown, kind: unknown = "magiclink"): Promise<{ ok: true } | { error: string }> {
   const parsed = z.string().min(10).max(200).regex(/^[A-Za-z0-9_-]+$/).safeParse(tokenHash);
   if (!parsed.success) return { error: "expired" };
+  // "magiclink": our own email; "email": Supabase's backup confirmation (Supabase template).
+  const type = kind === "email" ? "email" : "magiclink";
   const plain = createPlainClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!, {
     auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
   });
-  const { data, error } = await plain.auth.verifyOtp({ token_hash: parsed.data, type: "magiclink" });
+  const { data, error } = await plain.auth.verifyOtp({ token_hash: parsed.data, type });
   if (error || !data.user) return { error: "expired" };
   if (data.session) await supabaseAdmin.auth.admin.signOut(data.session.access_token, "local").catch(() => null);
 

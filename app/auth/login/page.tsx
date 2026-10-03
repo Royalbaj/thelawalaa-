@@ -8,8 +8,10 @@ import { createClient } from "@/lib/supabase/client";
 import { loginSchema } from "@/lib/validations/auth";
 import { ROLE_HOME } from "@/lib/role-home";
 import { completeSignup, resendVerification } from "@/app/actions/auth";
+import { sendBackupEmail } from "@/lib/auth-backup-email";
 import AuthShell from "@/components/auth/auth-shell";
 import PasswordInput from "@/components/auth/password-input";
+import SignedInNotice from "@/components/auth/signed-in-notice";
 
 function LoginForm() {
   const router = useRouter();
@@ -69,7 +71,8 @@ function LoginForm() {
     const r = await resendVerification(unverified);
     if ("error" in r) { setBusy(false); return toast.error(r.error); }
     if (r.fallback) {
-      await createClient().auth.resend({ type: "signup", email: unverified, options: { emailRedirectTo: `${window.location.origin}/auth/verify` } });
+      const backup = await sendBackupEmail("signup", unverified);
+      if (!backup.ok) { setBusy(false); return toast.error(backup.message); }
     }
     setBusy(false);
     toast.success("Sent — check your inbox (and spam folder)");
@@ -112,6 +115,7 @@ function LoginForm() {
 export default function LoginPage() {
   return (
     <AuthShell title="Welcome back" subtitle="Sign in to order faster, track your food and collect rewards.">
+      <SignedInNotice purpose="login" />
       <Suspense><LoginForm /></Suspense>
     </AuthShell>
   );

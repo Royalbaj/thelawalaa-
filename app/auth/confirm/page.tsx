@@ -15,7 +15,9 @@ import AuthShell from "@/components/auth/auth-shell";
 function Confirm() {
   const params = useSearchParams();
   const tokenHash = params.get("token_hash");
-  const type = params.get("type") === "recovery" ? "recovery" : "magiclink";
+  // recovery = password reset; email/signup = Supabase's backup confirmation; magiclink = ours.
+  const raw = params.get("type");
+  const type = raw === "recovery" ? "recovery" : raw === "email" || raw === "signup" ? "email" : "magiclink";
   const [busy, setBusy] = useState(false);
   const [failed, setFailed] = useState(!tokenHash);
   const [confirmed, setConfirmed] = useState(false);
@@ -29,7 +31,7 @@ function Confirm() {
       if (error) { setBusy(false); setFailed(true); return; }
       return window.location.replace("/auth/reset-password");
     }
-    const r = await confirmEmail(tokenHash).catch(() => ({ error: "expired" }));
+    const r = await confirmEmail(tokenHash, type).catch(() => ({ error: "expired" }));
     setBusy(false);
     if ("error" in r) return setFailed(true);
     setConfirmed(true);

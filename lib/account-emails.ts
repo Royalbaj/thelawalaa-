@@ -145,3 +145,39 @@ export function orderConfirmedEmail(o: {
     }),
   };
 }
+
+export function staffInviteEmail(name: string, roleLabel: string, url: string, fresh = false) {
+  return {
+    subject: fresh ? "Your Thelawalaa team invite" : "You're invited to the Thelawalaa team",
+    ...renderEmail({
+      preheader: `Join Thelawalaa as ${roleLabel} — accept your invite and choose a password.`,
+      heading: fresh ? "Here's a fresh invite link" : "Welcome to the team",
+      name,
+      blocks: [
+        p(`You've been invited to join Thelawalaa as <b>${roleLabel}</b>.`, `You've been invited to join Thelawalaa as ${roleLabel}.`),
+        p("Open this on the phone or tablet you'll actually work on, tap the button and choose your password."),
+      ],
+      cta: { label: "Accept invite", url },
+      reason: "You're getting this because a Thelawalaa manager invited this address to the team. If you weren't expecting it, just ignore this email.",
+    }),
+  };
+}
+
+// ── Supabase's own emails (the backup when ours can't be sent) ──────────
+// Same design, in Supabase's template language. Pasted into Supabase →
+// Authentication → Email Templates (Admin → Settings → Email setup has
+// copy buttons). Links go through /auth/confirm like ours, so a link never
+// signs anyone in and inbox scanners can't use it up.
+const NAME_SLOT = "XNAMEX";
+const goName = "{{ if .Data.full_name }}{{ .Data.full_name }}{{ else }}there{{ end }}";
+const confirmLink = (type: "email" | "recovery") => `${EMAIL_SITE}/auth/confirm?token_hash={{ .TokenHash }}&type=${type}`;
+
+export function supabaseTemplates(welcomePoints: number) {
+  const fill = (html: string) => html.split(NAME_SLOT).join(goName);
+  const confirm = verifyEmail(NAME_SLOT, confirmLink("email"), welcomePoints);
+  const reset = resetEmail(NAME_SLOT, confirmLink("recovery"));
+  return [
+    { key: "confirmation", label: "Confirm signup", subject: confirm.subject, html: fill(confirm.html) },
+    { key: "recovery", label: "Reset password", subject: reset.subject, html: fill(reset.html) },
+  ];
+}

@@ -2,7 +2,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { MailCheck } from "lucide-react";
-import { createClient } from "@/lib/supabase/client";
+import { sendBackupEmail } from "@/lib/auth-backup-email";
 import { requestPasswordReset } from "@/app/actions/auth";
 import AuthShell from "@/components/auth/auth-shell";
 
@@ -19,7 +19,10 @@ export default function ForgotPasswordPage() {
     const r = await requestPasswordReset(email);
     if ("error" in r) { setBusy(false); return setError(r.error); }
     // Our email service couldn't send — Supabase sends its own reset email instead.
-    if (r.fallback) await createClient().auth.resetPasswordForEmail(email, { redirectTo: `${window.location.origin}/auth/reset-password` });
+    if (r.fallback) {
+      const backup = await sendBackupEmail("reset", email);
+      if (!backup.ok) { setBusy(false); return setError(backup.message); }
+    }
     setBusy(false);
     // Same answer whether or not the account exists — no way to fish for emails.
     setSentTo(email);

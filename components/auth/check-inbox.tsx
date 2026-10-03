@@ -2,7 +2,7 @@
 import { useEffect, useState } from "react";
 import toast from "react-hot-toast";
 import { MailCheck } from "lucide-react";
-import { createClient } from "@/lib/supabase/client";
+import { sendBackupEmail } from "@/lib/auth-backup-email";
 import { resendVerification } from "@/app/actions/auth";
 
 /** After sign-up: where the email went, a way to open it, and a resend with a cooldown. */
@@ -19,7 +19,10 @@ export default function CheckInbox({ email, children }: { email: string; childre
     setBusy(true);
     const r = await resendVerification(email);
     if ("error" in r) { setBusy(false); return toast.error(r.error); }
-    if (r.fallback) await createClient().auth.resend({ type: "signup", email, options: { emailRedirectTo: `${window.location.origin}/auth/verify` } });
+    if (r.fallback) {
+      const backup = await sendBackupEmail("signup", email);
+      if (!backup.ok) { setBusy(false); return toast.error(backup.message); }
+    }
     setBusy(false);
     setWait(60);
     toast.success("Sent again — check your inbox");
@@ -38,7 +41,7 @@ export default function CheckInbox({ email, children }: { email: string; childre
           {wait > 0 ? `Resend in ${wait}s` : busy ? "Sending…" : "Resend the email"}
         </button>
       </div>
-      <p className="mt-4 text-xs text-stone-400">Not there? Check Spam or Promotions. The link only works once.</p>
+      <p className="mt-4 text-xs text-stone-400">It comes from <b>Thelawalaa</b>. Not there in a minute? Check Spam or Promotions. The link only works once.</p>
       {children}
     </div>
   );

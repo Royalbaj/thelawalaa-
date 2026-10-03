@@ -13,19 +13,35 @@ export const FROM_ORDERS = "Thelawalaa <orders@thelawalaa.com>";
 const REPLY_TO = "hello@thelawalaa.com";
 
 const resend = process.env.RESEND_API_KEY ? new Resend(process.env.RESEND_API_KEY) : null;
+/** For Admin → Settings → Email setup (domain status). Server-only, like the key. */
+export const resendClient = () => resend;
+/** The domain our emails are sent from — must be verified in Resend. */
+export const EMAIL_DOMAIN = "thelawalaa.com";
 
 export type SendResult = { ok: true } | { ok: false; error: string };
 
+// Whether the last send worked. Used so the sign-up / reset answers look the
+// same whether or not an account exists, even while email is failing.
+let lastSendOk = true;
+export const emailRecentlyWorking = () => lastSendOk;
+
 export async function sendEmail(msg: { to: string; subject: string; html: string; text: string; from?: string }): Promise<SendResult> {
-  if (!resend) return { ok: false, error: "No RESEND_API_KEY is set" };
+  const fail = (error: string): SendResult => {
+    lastSendOk = false;
+    // Shows up in Vercel's logs — the usual cause is thelawalaa.com not verified in Resend.
+    console.error(`[email] Not sent "${msg.subject}": ${error}`);
+    return { ok: false, error };
+  };
+  if (!resend) return fail("No RESEND_API_KEY is set");
   try {
     const { error } = await resend.emails.send({
       from: msg.from ?? FROM_ACCOUNT, replyTo: REPLY_TO, to: msg.to, subject: msg.subject, html: msg.html, text: msg.text,
     });
-    if (error) return { ok: false, error: error.message };
+    if (error) return fail(error.message);
+    lastSendOk = true;
     return { ok: true };
   } catch (e) {
-    return { ok: false, error: e instanceof Error ? e.message : "Couldn't reach Resend" };
+    return fail(e instanceof Error ? e.message : "Couldn't reach Resend");
   }
 }
 

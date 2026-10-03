@@ -4,8 +4,6 @@ import { z } from "zod";
 import { revalidatePath } from "next/cache";
 import { requireRole } from "@/lib/supabase/server";
 import { supabaseAdmin, audit } from "@/lib/supabase/admin";
-import { sendEmail } from "@/lib/email";
-import { testEmail } from "@/lib/account-emails";
 
 const settingsSchema = z.object({
   enabled: z.boolean(),
@@ -31,12 +29,4 @@ export async function saveRewardSettings(input: unknown) {
   revalidatePath("/admin/rewards");
   revalidatePath("/account", "layout");
   return { ok: true };
-}
-
-/** Admin → Settings: send the branded test email to yourself and report exactly what Resend says. */
-export async function sendTestEmail() {
-  const { user, profile } = await requireRole(["super_admin"]);
-  if (!user.email) return { error: "Your account has no email address" };
-  const r = await sendEmail({ to: user.email, ...testEmail(profile.full_name) });
-  return r.ok ? { ok: true, to: user.email } : { error: r.error };
 }

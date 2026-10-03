@@ -1,7 +1,7 @@
 "use client";
 import { useState } from "react";
 import Link from "next/link";
-import { createClient } from "@/lib/supabase/client";
+import { sendBackupEmail } from "@/lib/auth-backup-email";
 import { signupSchema } from "@/lib/validations/auth";
 import { signUpCustomer } from "@/app/actions/auth";
 import PasswordInput from "@/components/auth/password-input";
@@ -30,7 +30,8 @@ export default function SignupForm({ source = "web", afterSent }: { source?: "we
     if ("error" in r) { setBusy(false); return setError(r.error); }
     // Our email service couldn't send — Supabase sends its own confirmation instead.
     if (r.fallback) {
-      await createClient().auth.resend({ type: "signup", email: parsed.data.email, options: { emailRedirectTo: `${window.location.origin}/auth/verify` } });
+      const backup = await sendBackupEmail("signup", parsed.data.email);
+      if (!backup.ok) { setBusy(false); return setError(backup.message); }
     }
     setBusy(false);
     setSentTo(parsed.data.email.toLowerCase());

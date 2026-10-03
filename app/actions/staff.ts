@@ -1,24 +1,20 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { Resend } from "resend";
 import { inviteStaffSchema } from "@/lib/validations/staff";
 import { requireRole } from "@/lib/supabase/server";
 import { supabaseAdmin, audit, loyaltyAward, loyaltyUnaward, loyaltyOnCancel } from "@/lib/supabase/admin";
 import { fetchLiveOrders } from "@/lib/live-orders";
+import { sendEmail, EMAIL_SITE } from "@/lib/email";
+import { staffInviteEmail } from "@/lib/account-emails";
 
-const resend = process.env.RESEND_API_KEY ? new Resend(process.env.RESEND_API_KEY) : null;
-
-/** True only if Resend accepted it — Resend returns { error } rather than throwing. */
-async function sendEmail(to: string, subject: string, html: string): Promise<boolean> {
-  if (!resend) return false;
-  try {
-    const { error } = await resend.emails.send({ from: "Thelawalaa <orders@thelawalaa.com>", to, subject, html });
-    return !error;
-  } catch {
-    return false;
-  }
+/** Branded invite (lib/account-emails.ts); true only if Resend accepted it. */
+async function sendInvite(to: string, name: string, role: string, url: string, fresh = false) {
+  return (await sendEmail({ to, ...staffInviteEmail(name, ROLE_LABEL[role] ?? role.replace("_", " "), url, fresh) })).ok;
 }
+const ROLE_LABEL: Record<string, string> = { pos_user: "counter staff (POS)", delivery_driver: "delivery driver", super_admin: "manager", accountant: "accountant" };
+// Invite links always point at the real domain (NEXT_PUBLIC_SITE_URL is the vercel.app address in production).
+const inviteUrl = (hash: string) => `${EMAIL_SITE}/auth/invite?token_hash=${hash}&type=invite`;
 
 /**
  * Invite POS / driver / admin staff. The role travels in APP metadata
@@ -47,7 +43,7 @@ export async function inviteStaff(input: unknown) {
     type: "invite",
     email: d.email,
     options: {
-      redirectTo: `${process.env.NEXT_PUBLIC_SITE_URL}/auth/invite`,
+      redirectTo: `${EMAIL_SITE}/auth/invite`,
       data: { full_name: d.full_name, phone: d.phone }, // display-only metadata
     },
   });
@@ -71,17 +67,8 @@ export async function inviteStaff(input: unknown) {
     })
     .eq("id", generated.user.id);
 
-  const acceptUrl = `${process.env.NEXT_PUBLIC_SITE_URL}/auth/invite?token_hash=${generated.properties.hashed_token}&type=invite`;
-
-  const emailed = await sendEmail(d.email, "You're invited to the Thelawalaa team", `
-    <div style="font-family:sans-serif;max-width:560px;margin:auto">
-      <h1 style="color:#F97316">Welcome to the team 🥘</h1>
-      <p>${d.full_name}, you've been invited to join Thelawalaa as <b>${d.role.replace("_", " ")}</b>.</p>
-      <p>Open this on the device you'll actually use to work, then tap the button below.</p>
-      <a href="${acceptUrl}"
-         style="display:inline-block;background:#F97316;color:#fff;padding:12px 24px;border-radius:999px;text-decoration:none;font-weight:bold">Accept invite</a>
-      <p style="color:#78716c;font-size:12px;margin-top:24px">If you weren't expecting this, you can ignore this email.</p>
-    </div>`);
+  const acceptUrl = inviteUrl(generated.properties.hashed_token);
+  const emailed = await sendInvite(d.email, d.full_name, d.role, acceptUrl);
 
   await audit({
     actor_id: user.id,
@@ -113,19 +100,12 @@ export async function resendStaffInvite(targetId: string) {
   const { data: generated, error } = await supabaseAdmin.auth.admin.generateLink({
     type: "invite",
     email,
-    options: { redirectTo: `${process.env.NEXT_PUBLIC_SITE_URL}/auth/invite` },
+    options: { redirectTo: `${EMAIL_SITE}/auth/invite` },
   });
   if (error) return { error: error.message };
 
-  const acceptUrl = `${process.env.NEXT_PUBLIC_SITE_URL}/auth/invite?token_hash=${generated.properties.hashed_token}&type=invite`;
-
-  const emailed = await sendEmail(email, "Your Thelawalaa team invite", `
-    <div style="font-family:sans-serif;max-width:560px;margin:auto">
-      <h1 style="color:#F97316">Welcome to the team 🥘</h1>
-      <p>${profile.full_name}, here's a fresh invite link for your <b>${profile.role.replace("_", " ")}</b> account.</p>
-      <a href="${acceptUrl}"
-         style="display:inline-block;background:#F97316;color:#fff;padding:12px 24px;border-radius:999px;text-decoration:none;font-weight:bold">Accept invite</a>
-    </div>`);
+  const acceptUrl = inviteUrl(generated.properties.hashed_token);
+  const emailed = await sendInvite(email, profile.full_name, profile.role, acceptUrl, true);
 
   await audit({ actor_id: user.id, action: "RESEND_STAFF_INVITE", target_table: "profiles", target_id: targetId, new_data: { emailed } });
   return { ok: true, inviteUrl: emailed ? undefined : acceptUrl };
