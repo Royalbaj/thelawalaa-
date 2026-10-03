@@ -37,7 +37,7 @@ export function BrandSplash({ dark = false }: { dark?: boolean }) {
       className={cn("tw-loader-in fixed inset-0 z-[100] flex flex-col items-center justify-center", dark ? "bg-stone-950" : "bg-brand-cream")}>
       <Tile size={72} />
       <p className={cn("tw-loader-word mt-5 font-display text-3xl font-extrabold tracking-tight", dark ? "text-brand-cream" : "text-brand-brown")}>Thelawalaa</p>
-      <p className="tw-loader-tag mt-1.5 text-[10px] font-bold uppercase tracking-[0.3em] text-brand-orange">Where taste meets hygiene</p>
+      <p className="tw-loader-tag mt-1.5 text-[10px] font-bold uppercase tracking-[0.3em] text-brand-orange">Where flavour meets hygiene</p>
       <span aria-hidden className={cn("tw-loader-bar relative mt-6 h-1 w-40 overflow-hidden rounded-full", dark ? "bg-white/10" : "bg-orange-100")} />
     </div>
   );

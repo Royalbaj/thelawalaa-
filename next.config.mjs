@@ -32,6 +32,8 @@ const securityHeaders = [
   { key: "X-DNS-Prefetch-Control", value: "on" },
 ];
 
+const POS_HOST = "pos.thelawalaa.com";
+
 const nextConfig = {
   poweredByHeader: false, // don't advertise the framework
   images: {
@@ -52,14 +54,22 @@ const nextConfig = {
     ignoreBuildErrors: false,
   },
   async headers() {
-    return [{ source: "/(.*)", headers: securityHeaders }];
+    return [
+      { source: "/(.*)", headers: securityHeaders },
+      // pos.thelawalaa.com: the same app on its own address, so the counter's
+      // sign-in is separate from www's (a browser keeps one sign-in per address)
+      // and a manager or rider can be signed in on www in another tab. Not for Google.
+      { source: "/(.*)", has: [{ type: "host", value: POS_HOST }], headers: [{ key: "X-Robots-Tag", value: "noindex, nofollow" }] },
+    ];
   },
   async redirects() {
-    // Old business-card / QR link. Temporary, so it can point elsewhere later
-    // without browsers having cached a permanent redirect.
     return [
+      // Old business-card / QR link. Temporary, so it can point elsewhere later
+      // without browsers having cached a permanent redirect.
       { source: "/vcard", destination: "/", permanent: false },
       { source: "/vcard/:path*", destination: "/", permanent: false },
+      // The till's own address opens on the till.
+      { source: "/", has: [{ type: "host", value: POS_HOST }], destination: "/admin", permanent: false },
     ];
   },
 };

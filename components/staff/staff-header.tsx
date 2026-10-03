@@ -3,6 +3,7 @@ import Link from "next/link";
 import { ArrowLeft, LogOut } from "lucide-react";
 import { signOutHere } from "@/lib/sign-out";
 import BrandLogo from "@/components/brand-logo";
+import { ThemeToggle } from "@/components/theme-toggle";
 
 export default function StaffHeader({ backHref }: { backHref: string }) {
   return (
@@ -11,13 +12,16 @@ export default function StaffHeader({ backHref }: { backHref: string }) {
         <ArrowLeft size={16} /> Back
       </Link>
       <BrandLogo size="sm" tone="dark" label="Training" />
-      <button
-        onClick={signOutHere}
-        aria-label="Sign out"
-        className="flex items-center gap-1.5 text-sm font-bold text-white/60 hover:text-white"
-      >
-        <LogOut size={16} />
-      </button>
+      <div className="flex items-center gap-1.5">
+        <ThemeToggle />
+        <button
+          onClick={signOutHere}
+          aria-label="Sign out"
+          className="flex h-8 w-8 items-center justify-center rounded-full bg-white/10 text-white/70 transition hover:bg-red-500/20 hover:text-red-300"
+        >
+          <LogOut size={15} />
+        </button>
+      </div>
     </header>
   );
 }

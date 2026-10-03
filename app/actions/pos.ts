@@ -83,11 +83,17 @@ export async function createPosOrder(input: unknown) {
   if (error || !order) return { error: "Order failed" };
 
   await supabaseAdmin.from("order_items").insert(rows.map((r) => ({ ...r, order_id: order.id })));
+  // Card numbers come from the database (003, 004, … — migration 030). A clash
+  // with a number the admin typed by hand just takes the next one.
+  let savedMembers: { full_name: string; phone: string; card_number: string | null }[] = [];
   if (members.length) {
-    const { error: memberErr } = await supabaseAdmin.from("memberships").insert(members.map((m) => ({
-      full_name: m.full_name, phone: m.phone, card_number: m.card_number ?? null, order_id: order.id, sold_by: user.id,
-    })));
-    if (memberErr) console.error("Couldn't save membership details:", memberErr.message);
+    for (let attempt = 1; attempt <= 3; attempt++) {
+      const { data, error: memberErr } = await supabaseAdmin.from("memberships")
+        .insert(members.map((m) => ({ full_name: m.full_name, phone: m.phone, order_id: order.id, sold_by: user.id })))
+        .select("full_name, phone, card_number");
+      if (!memberErr) { savedMembers = data ?? []; break; }
+      if (memberErr.code !== "23505" || attempt === 3) { console.error("Couldn't save membership details:", memberErr.message); break; }
+    }
   }
   await audit({
     actor_id: user.id, action: "POS_ORDER", target_table: "orders", target_id: order.id,
@@ -97,7 +103,7 @@ export async function createPosOrder(input: unknown) {
   after(() => checkStockAfterSale(rows.map((r) => r.product_id)));
   return {
     ok: true, orderNumber: order.order_number, dailyNumber: order.daily_number, total: order.total, discount, discountLabel,
-    members: members.map((m) => ({ name: m.full_name, phone: m.phone, card: m.card_number ?? null })),
+    members: savedMembers.map((m) => ({ name: m.full_name, phone: m.phone, card: m.card_number })),
   };
 }
 

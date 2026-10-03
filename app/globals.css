@@ -25,7 +25,7 @@ body { @apply font-body bg-brand-cream text-stone-900 antialiased; }
   @apply w-full rounded-xl border border-stone-300 bg-white px-4 py-2.5 outline-none transition-all duration-200 focus:border-brand-orange focus:ring-2 focus:ring-brand-orange/30 dark:border-stone-700 dark:bg-stone-800 dark:text-stone-100 dark:placeholder:text-stone-500;
 }
 
-.label { @apply mb-1 block text-sm font-bold text-stone-700; }
+.label { @apply mb-1 block text-sm font-bold text-stone-700 dark:text-stone-300; }
 .badge { @apply inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-bold; }
 
 /* Homepage hero photo: fade the photo itself to transparent at its edges so it

@@ -34,12 +34,12 @@ export default function TrainingList({ videos, completedIds }: { videos: Video[]
   const doneCount = videos.filter((v) => completed.has(v.id)).length;
   return (
     <div className="space-y-5">
-      <p className="text-sm font-bold text-stone-500">
+      <p className="text-sm font-bold text-stone-500 dark:text-stone-400">
         {doneCount === videos.length ? "✅ All training watched — thank you!" : `${doneCount} of ${videos.length} watched`}
       </p>
       {videos.map((v) => (
         <div key={v.id} className="card p-4">
-          <p className="mb-2 font-bold text-brand-brown">{v.title}</p>
+          <p className="mb-2 font-bold text-brand-brown dark:text-orange-100">{v.title}</p>
           <UnskippableVideo
             id={v.id}
             youtubeUrl={v.youtube_url}

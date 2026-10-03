@@ -104,7 +104,7 @@ export function renderEmail(o: {
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:${C.cream}"><tr><td align="center" style="padding:28px 12px">
   <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:560px">
     <tr><td align="center" style="padding:4px 0 22px">
-      <a href="${EMAIL_SITE}" style="text-decoration:none"><img src="${EMAIL_SITE}/images/email/logo.png" width="220" height="60" alt="Thelawalaa — Where taste meets hygiene" style="display:block;border:0;width:220px;height:auto"></a>
+      <a href="${EMAIL_SITE}" style="text-decoration:none"><img src="${EMAIL_SITE}/images/email/logo.png" width="220" height="60" alt="Thelawalaa — Where flavour meets hygiene" style="display:block;border:0;width:220px;height:auto"></a>
     </td></tr>
     <tr><td style="background:#ffffff;border-radius:20px;border:1px solid ${C.line};padding:34px 30px 26px">
       <h1 style="margin:0 0 18px;font:bold 24px/1.3 ${FONT};color:${C.brown}">${esc(o.heading)}</h1>
@@ -114,7 +114,7 @@ export function renderEmail(o: {
     <tr><td align="center" style="padding:26px 16px 8px">
       <img src="${EMAIL_SITE}/images/email/mark.png" width="40" height="43" alt="Thelawalaa" style="display:block;border:0;width:40px;height:auto;margin:0 auto 10px">
       <p style="margin:0;font:bold 15px ${FONT};color:${C.brown}">Thelawalaa</p>
-      <p style="margin:2px 0 10px;font:11px ${FONT};letter-spacing:2px;color:${C.orange}">WHERE TASTE MEETS HYGIENE</p>
+      <p style="margin:2px 0 10px;font:11px ${FONT};letter-spacing:2px;color:${C.orange}">WHERE FLAVOUR MEETS HYGIENE</p>
       <p style="margin:0 0 10px;font:13px/1.6 ${FONT};color:${C.muted}">Godam Chowk, Banepa, Kavrepalanchok, Nepal</p>
       <p style="margin:0 0 14px;font:13px ${FONT}">
         <a href="${EMAIL_SITE}" style="color:${C.orange};text-decoration:none;font-weight:bold">Website</a> &nbsp;·&nbsp;
@@ -135,7 +135,7 @@ export function renderEmail(o: {
     o.cta ? `${o.cta.label}: ${o.cta.url}\n` : "",
     o.secondary ? `${o.secondary.label}: ${o.secondary.url}\n` : "",
     "With love from the kitchen,", "Team Thelawalaa", "",
-    "—", "Thelawalaa · Where taste meets hygiene", "Godam Chowk, Banepa, Kavrepalanchok, Nepal", EMAIL_SITE, "", o.reason,
+    "—", "Thelawalaa · Where flavour meets hygiene", "Godam Chowk, Banepa, Kavrepalanchok, Nepal", EMAIL_SITE, "", o.reason,
   ].join("\n");
   return { html, text };
 }

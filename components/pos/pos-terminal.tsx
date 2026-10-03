@@ -267,12 +267,9 @@ export default function PosTerminal({
                     </p>
                     <input id={`member-${i}-full_name`} value={m.full_name} onChange={(e) => setMember(i, { full_name: e.target.value })}
                       placeholder="Full name" aria-label="Member's full name" autoComplete="off" maxLength={100} className={field} />
-                    <div className="flex gap-1.5">
-                      <input id={`member-${i}-phone`} value={m.phone} onChange={(e) => setMember(i, { phone: e.target.value.replace(/[^\d+ -]/g, "").slice(0, 16) })}
-                        placeholder="Mobile 98XXXXXXXX" aria-label="Member's mobile number" inputMode="tel" autoComplete="off" className={field} />
-                      <input id={`member-${i}-card_number`} value={m.card_number} onChange={(e) => setMember(i, { card_number: e.target.value.slice(0, 30) })}
-                        placeholder="Card no." autoComplete="off" aria-label="Card number (optional)" className={cn(field, "!w-24 shrink-0")} />
-                    </div>
+                    <input id={`member-${i}-phone`} value={m.phone} onChange={(e) => setMember(i, { phone: e.target.value.replace(/[^\d+ -]/g, "").slice(0, 16) })}
+                      placeholder="Mobile 98XXXXXXXX" aria-label="Member's mobile number" inputMode="tel" autoComplete="off" className={field} />
+                    <p className="text-[11px] text-amber-700 dark:text-amber-400">The card number is given automatically when the order is placed.</p>
                   </div>
                 );
               })}
@@ -488,7 +485,7 @@ export default function PosTerminal({
             <p className="mt-1 font-bold">{npr(done.total)} · paid by {done.method === "cash" ? "cash" : "QR"}</p>
             {done.members.map((m, i) => (
               <p key={i} className="mt-1.5 flex items-center justify-center gap-1.5 text-sm text-amber-800 dark:text-amber-300">
-                <IdCard size={15} className="shrink-0" /> New member: <b>{m.name}</b> · {m.phone}{m.card ? ` · card ${m.card}` : ""}
+                <IdCard size={15} className="shrink-0" /> New member: <b>{m.name}</b> · {m.phone}{m.card ? <> · card no. <b className="text-base">{m.card}</b></> : ""}
               </p>
             ))}
             {/* Cash with an amount entered: what to hand back, big enough to read at arm's length. */}

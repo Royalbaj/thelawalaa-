@@ -45,7 +45,7 @@ export default function BrandLogo({
               tone === "dark" ? "bg-white/10 text-orange-200" : "bg-orange-50 text-brand-orange")}>{label}</span>
           )}
         </span>
-        {tagline && <span className={cn("mt-1 font-bold uppercase tracking-[0.22em] text-brand-orange", s.tag)}>Where taste meets hygiene</span>}
+        {tagline && <span className={cn("mt-1 font-bold uppercase tracking-[0.22em] text-brand-orange", s.tag)}>Where flavour meets hygiene</span>}
       </span>
     </span>
   );

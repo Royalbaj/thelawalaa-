@@ -148,15 +148,15 @@ export default function JobCard({ job }: { job: DriverJob }) {
         )}
         {job.status === "on_the_way" && codeOpen && (
           <div className="space-y-3 rounded-2xl bg-white/5 p-4 ring-1 ring-white/10">
-            <p className="text-center text-sm font-bold text-white">Ask the customer for their 4-digit delivery code</p>
+            <p className="text-center text-sm font-bold text-white">Ask the customer for their 2-digit delivery code</p>
             <p className="text-center text-xs text-white/45">It&apos;s on their order screen and in their email.{job.otpAttemptsLeft < 3 ? ` ${job.otpAttemptsLeft} ${job.otpAttemptsLeft === 1 ? "try" : "tries"} left.` : ""}</p>
-            <input value={code} inputMode="numeric" autoComplete="one-time-code" maxLength={4} autoFocus aria-label="Delivery code"
-              onChange={(e) => setCode(e.target.value.replace(/\D/g, "").slice(0, 4))}
-              onKeyDown={(e) => { if (e.key === "Enter" && code.length === 4) confirm(); }}
+            <input value={code} inputMode="numeric" autoComplete="one-time-code" maxLength={2} autoFocus aria-label="Delivery code"
+              onChange={(e) => setCode(e.target.value.replace(/\D/g, "").slice(0, 2))}
+              onKeyDown={(e) => { if (e.key === "Enter" && code.length === 2) confirm(); }}
               className="w-full rounded-2xl border border-white/15 bg-black/30 py-3 text-center font-mono text-3xl font-extrabold tracking-[0.6em] text-white outline-none focus:border-brand-orange" />
             <div className="flex gap-2">
               <button onClick={() => setCodeOpen(false)} className="flex-1 rounded-2xl bg-white/10 py-3 text-sm font-bold text-white">Back</button>
-              <button onClick={confirm} disabled={pending || code.length !== 4} className="flex-[2] rounded-2xl bg-brand-green py-3 text-sm font-extrabold text-white disabled:opacity-50">
+              <button onClick={confirm} disabled={pending || code.length !== 2} className="flex-[2] rounded-2xl bg-brand-green py-3 text-sm font-extrabold text-white disabled:opacity-50">
                 {pending ? "Checking…" : "Confirm delivery"}
               </button>
             </div>

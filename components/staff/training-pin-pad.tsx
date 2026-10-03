@@ -46,14 +46,14 @@ export default function TrainingPinPad() {
     return () => window.removeEventListener("keydown", onKey);
   }, [press]);
 
-  const key = "h-16 touch-manipulation rounded-2xl bg-stone-100 font-display text-2xl font-bold text-brand-brown transition active:scale-95 active:bg-orange-100 disabled:opacity-50";
+  const key = "h-16 touch-manipulation rounded-2xl bg-stone-100 font-display text-2xl font-bold text-brand-brown transition active:scale-95 active:bg-orange-100 disabled:opacity-50 dark:bg-stone-800 dark:text-orange-100 dark:active:bg-orange-950";
   return (
     <div className="card mx-auto max-w-sm p-6 text-center">
-      <p className="font-display text-lg font-bold text-brand-brown">Who&apos;s training?</p>
+      <p className="font-display text-lg font-bold text-brand-brown dark:text-orange-100">Who&apos;s training?</p>
       <p className="text-sm text-stone-500">Type your own training PIN — the manager gave it to you.</p>
       <div className={cn("my-5 flex justify-center gap-4", shake && "animate-[pin-shake_0.4s]")} aria-live="polite" aria-label={`${pin.length} of ${LENGTH} digits entered`}>
         {Array.from({ length: LENGTH }, (_, i) => (
-          <span key={i} className={cn("h-4 w-4 rounded-full border-2 transition", i < pin.length ? "border-brand-orange bg-brand-orange" : "border-stone-300")} />
+          <span key={i} className={cn("h-4 w-4 rounded-full border-2 transition", i < pin.length ? "border-brand-orange bg-brand-orange" : "border-stone-300 dark:border-stone-600")} />
         ))}
       </div>
       <p className={cn("mb-4 min-h-5 text-sm font-bold", error ? "text-brand-red" : "text-stone-400")}>

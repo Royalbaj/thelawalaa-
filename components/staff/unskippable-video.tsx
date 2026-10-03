@@ -156,7 +156,7 @@ export default function UnskippableVideo({
         </p>
       ) : (
         <div className="mt-2 space-y-1.5">
-          <div className="h-1.5 overflow-hidden rounded-full bg-stone-200">
+          <div className="h-1.5 overflow-hidden rounded-full bg-stone-200 dark:bg-stone-800">
             <div className="h-full rounded-full bg-brand-orange transition-[width] duration-500" style={{ width: `${pct}%` }} />
           </div>
           <p className="flex items-center justify-between gap-2 text-xs font-bold text-stone-400">

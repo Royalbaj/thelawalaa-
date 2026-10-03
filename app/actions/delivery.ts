@@ -55,7 +55,7 @@ const MAX_OTP_ATTEMPTS = 3;
 
 export async function verifyDeliveryOtp(orderId: string, otp: string) {
   const { user } = await requireRole(["delivery_driver"]);
-  if (!/^\d{4}$/.test(otp)) return { error: "The code is 4 digits" };
+  if (!/^\d{2}$/.test(otp)) return { error: "The code is 2 digits" };
 
   const { data: delivery } = await supabaseAdmin
     .from("deliveries")

@@ -5,6 +5,7 @@ import { Calculator, X, RefreshCw, AlertTriangle, CheckCircle2, Banknote, QrCode
 import { getDaySales, closeShift } from "@/app/actions/pos";
 import type { DaySales } from "@/lib/day-sales";
 import { npr, cn } from "@/lib/utils";
+import { fmtMinutes } from "@/lib/serving-time";
 
 const NOTES = ["1000", "500", "100", "50", "20", "10", "5"] as const;
 const FLOAT_KEY = "tw-pos-float"; // this till's usual opening float — a business number, not personal data
@@ -113,10 +114,12 @@ export function DaySalesSheet({ onClose, initial }: { onClose: () => void; initi
           {data && (
             <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_380px]">
               <div className="space-y-4">
-                <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
                   {[
                     { label: "Sales", value: npr(data.sales), tint: "text-brand-green" },
                     { label: "Orders", value: String(data.orders), tint: "" },
+                    { label: "Avg serving time", value: fmtMinutes(data.serving.avgServe), sub: data.serving.served ? `placed → handed over · ${data.serving.served} order${data.serving.served === 1 ? "" : "s"}` : "no orders handed over yet", tint: "text-brand-orange" },
+                    { label: "Kitchen ready in", value: fmtMinutes(data.serving.avgReady), sub: data.serving.readied ? `placed → ready · ${data.serving.readied} order${data.serving.readied === 1 ? "" : "s"}` : "—", tint: "" },
                     { label: "Still to collect", value: npr(data.toCollect.amount), sub: `${data.toCollect.count} unpaid`, tint: data.toCollect.count ? "text-amber-600" : "" },
                     { label: "Discounts given", value: npr(data.discounts), tint: "" },
                   ].map((t) => (

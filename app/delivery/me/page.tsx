@@ -34,7 +34,7 @@ export default async function DriverMePage() {
         <ul className="mt-2 list-disc space-y-1 pl-5">
           <li>Go offline when you finish, so the shop doesn&apos;t give you new deliveries.</li>
           <li>Check the bag against the list before you leave the shop.</li>
-          <li>Only hand over the food once the customer gives you their 4-digit code.</li>
+          <li>Only hand over the food once the customer gives you their 2-digit code.</li>
         </ul>
       </div>
 

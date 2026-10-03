@@ -1,9 +1,7 @@
 import type { Metadata, Viewport } from "next";
-import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { getVerifiedUser } from "@/lib/supabase/server";
 import { ROLE_HOME } from "@/lib/role-home";
-import { POS_THEME_COOKIE } from "@/lib/pos-theme";
 import PosHeader from "@/components/admin/pos-header";
 import SessionGuard from "@/components/session-guard";
 import { PosThemeRoot } from "@/components/pos/pos-theme";
@@ -40,11 +38,9 @@ export default async function PosLayout({ children }: { children: React.ReactNod
   // Other staff go to their own home, never back through login (a loop).
   if (profile.role !== "pos_user") redirect(ROLE_HOME[profile.role] ?? "/unauthorized");
 
-  // Dark unless this device picked light.
-  const dark = (await cookies()).get(POS_THEME_COOKIE)?.value !== "light";
-
+  // The POS is always dark (owner's call) — easier on the eyes all day at the counter.
   return (
-    <PosThemeRoot initialDark={dark}>
+    <PosThemeRoot initialDark>
       <SessionGuard userId={profile.id} />
       <PosHeader fullName={profile.full_name} />
       <main className="min-h-0 flex-1">{children}</main>

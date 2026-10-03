@@ -1,6 +1,7 @@
 import "server-only";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { nepalToday } from "@/lib/dates";
+import { servingStats, type ServingStats } from "@/lib/serving-time";
 
 // The POS "Today" sheet: what was sold today (Nepal day) or since the last
 // shift close, how it was paid, how much cash should be in the drawer, and
@@ -29,6 +30,7 @@ export type DaySales = {
   toCollect: { amount: number; count: number };
   cashReceived: number;   // cash paid in this period — what the drawer should hold above the float
   topItems: { name: string; qty: number }[];
+  serving: ServingStats;  // placed → handed over / ready, this period
   problems: Problem[];
   closes: ShiftClose[];   // today's earlier closes, newest first
 };
@@ -36,7 +38,7 @@ export type DaySales = {
 type Row = {
   id: string; order_number: string; daily_number: number | null; created_at: string; status: string; type: string;
   total: number; discount_amount: number; points_discount: number; payment_method: string | null; payment_status: string;
-  placed_by: string | null; paid_confirmed_at: string | null;
+  placed_by: string | null; paid_confirmed_at: string | null; ready_at: string | null; served_at: string | null;
 };
 
 const no = (o: Row) => (o.daily_number != null ? `#${String(o.daily_number).padStart(2, "0")}` : o.order_number);
@@ -76,7 +78,7 @@ export async function getDaySales(period: "day" | "shift" = "day"): Promise<DayS
   const rows: Row[] = [];
   for (let offset = 0; ; offset += 1000) {
     const { data, error } = await supabaseAdmin.from("orders")
-      .select("id, order_number, daily_number, created_at, status, type, total, discount_amount, points_discount, payment_method, payment_status, placed_by, paid_confirmed_at")
+      .select("id, order_number, daily_number, created_at, status, type, total, discount_amount, points_discount, payment_method, payment_status, placed_by, paid_confirmed_at, ready_at, served_at")
       .or(`created_at.gte.${from},paid_confirmed_at.gte.${from}`)
       .order("created_at").range(offset, offset + 999);
     if (error) throw new Error(`Couldn't load today's orders: ${error.message}`);
@@ -145,6 +147,7 @@ export async function getDaySales(period: "day" | "shift" = "day"): Promise<DayS
     discounts: live.reduce((s, o) => s + Number(o.discount_amount ?? 0) + Number(o.points_discount ?? 0), 0),
     toCollect: { amount: unpaid.reduce((s, o) => s + Number(o.total), 0), count: unpaid.length },
     cashReceived,
+    serving: servingStats(inPeriod),
     topItems: [...qty.entries()].map(([name, n]) => ({ name, qty: n })).sort((a, b) => b.qty - a.qty).slice(0, 8),
     problems,
     closes,
