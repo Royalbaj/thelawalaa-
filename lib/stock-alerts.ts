@@ -40,3 +40,39 @@ export async function checkStockAfterSale(productIds: string[]) {
     console.error("Stock alert check failed:", (e as Error).message);
   }
 }
+
+export type StockWarning = { id: string; name: string; unit: string; remaining: number; reorder: number; state: "low" | "out" };
+export type PosStock = { warnings: StockWarning[]; byProduct: Record<string, StockWarning> };
+
+/**
+ * For the POS: every stock item that's running low or out (by the same
+ * stock_levels() maths as Accounts → Stock), and which menu items use it,
+ * so their tiles can say so. Worst first.
+ */
+export async function getPosStock(): Promise<PosStock> {
+  try {
+    const [{ data: levels }, { data: links }] = await Promise.all([
+      supabaseAdmin.rpc("stock_levels"),
+      supabaseAdmin.from("stock_item_products").select("stock_item_id, product_id"),
+    ]);
+    const warnings: StockWarning[] = ((levels ?? []) as { id: string; name: string; unit: string; remaining: number; reorder_level: number }[])
+      .map((l) => {
+        const remaining = Number(l.remaining), reorder = Number(l.reorder_level);
+        const state = remaining <= 0 ? "out" as const : remaining <= reorder ? "low" as const : null;
+        return state && { id: l.id, name: l.name, unit: l.unit, remaining: +remaining.toFixed(2), reorder, state };
+      })
+      .filter((w): w is StockWarning => !!w)
+      .sort((a, b) => (a.state === b.state ? a.remaining - b.remaining : a.state === "out" ? -1 : 1));
+    const byId = new Map(warnings.map((w) => [w.id, w]));
+    const byProduct: Record<string, StockWarning> = {};
+    for (const l of links ?? []) {
+      const w = byId.get(l.stock_item_id);
+      const cur = byProduct[l.product_id];
+      // A menu item made from two stock items shows the one that's worse.
+      if (w && (!cur || (w.state === "out" && cur.state !== "out") || (w.state === cur.state && w.remaining < cur.remaining))) byProduct[l.product_id] = w;
+    }
+    return { warnings, byProduct };
+  } catch {
+    return { warnings: [], byProduct: {} };
+  }
+}

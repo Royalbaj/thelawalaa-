@@ -1,7 +1,8 @@
 import "server-only";
 import { randomBytes, scrypt, scryptSync, timingSafeEqual } from "node:crypto";
 
-// PINs for the people who use the Accounts app (account_users, migration 024).
+// 4-digit PINs: the people who use the Accounts app (account_users, migration 024)
+// and staff training people (training_people, migration 028).
 // Copy of accounts-app/lib/pin.ts, which checks them — change both.
 
 export const isPin = (s: unknown): s is string => typeof s === "string" && /^\d{4}$/.test(s);

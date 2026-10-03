@@ -10,7 +10,7 @@ export default async function MenuManager() {
   await requireRole(["super_admin"]);
   const [{ data: categories }, { data: products }] = await Promise.all([
     supabaseAdmin.from("categories").select("id, name").order("sort_order"),
-    supabaseAdmin.from("products").select("id, name, description, price, is_available, is_veg, is_bestseller, spice_level, category_id, image_url, pos_only, student_discount_eligible, member_price").order("sort_order"),
+    supabaseAdmin.from("products").select("id, name, description, price, is_available, is_veg, is_bestseller, spice_level, category_id, image_url, pos_only, student_discount_eligible, member_price, is_membership_card").order("sort_order"),
   ]);
 
   return (

@@ -2,8 +2,11 @@
 import { useEffect, useMemo, useState, useTransition } from "react";
 import Image from "next/image";
 import toast from "react-hot-toast";
-import { Search, X, Trash2, ShoppingCart, ChevronUp, UtensilsCrossed, CheckCircle2, Minus, Plus, GraduationCap, Crown } from "lucide-react";
-import { createPosOrder } from "@/app/actions/pos";
+import { Search, X, Trash2, ShoppingCart, ChevronUp, UtensilsCrossed, CheckCircle2, Minus, Plus, GraduationCap, Crown, IdCard, AlertTriangle, ChevronDown } from "lucide-react";
+import { createPosOrder, getPosStock } from "@/app/actions/pos";
+import { newMemberSchema } from "@/lib/validations/order";
+import { REFRESH_EVENT } from "@/components/refresh-button";
+import type { PosStock } from "@/lib/stock-alerts";
 import { npr, cn } from "@/lib/utils";
 import { applyOpeningPromoPrice, isOpeningPromoActive, type OpeningPromoSettings } from "@/lib/promo";
 import { studentDiscount, memberUnitPrice } from "@/lib/discounts";
@@ -11,6 +14,7 @@ import { studentDiscount, memberUnitPrice } from "@/lib/discounts";
 type Product = {
   id: string; name: string; price: number; is_available: boolean; category_id: string | null;
   image_url?: string | null; student_discount_eligible?: boolean; member_price?: number | string | null;
+  is_membership_card?: boolean;
 };
 type Category = { id: string; name: string };
 type Line = { product: Product; qty: number };
@@ -19,7 +23,12 @@ type Done = {
   orderNumber: string; dailyNumber: number | null; total: number;
   discount: number; discountLabel: string | null;
   method: "cash" | "qr"; received: number | null;
+  members: { name: string; phone: string; card: string | null }[];
 };
+// A new member, typed in while selling them a membership card.
+type MemberForm = { full_name: string; phone: string; card_number: string };
+const BLANK_MEMBER: MemberForm = { full_name: "", phone: "", card_number: "" };
+const STOCK_POLL_MS = 60_000;
 
 const MAX_QTY = 50; // per line — the same cap createPosOrder enforces
 // After the exact amount, the next few notes a customer is likely to hand over.
@@ -43,8 +52,8 @@ function Segmented<T extends string>({ value, onChange, options, activeClass }: 
 }
 
 export default function PosTerminal({
-  products, categories, openingPromo,
-}: { products: Product[]; categories: Category[]; openingPromo?: OpeningPromoSettings | null }) {
+  products, categories, openingPromo, initialStock,
+}: { products: Product[]; categories: Category[]; openingPromo?: OpeningPromoSettings | null; initialStock?: PosStock }) {
   const [cat, setCat] = useState<string>("all");
   const [q, setQ] = useState("");
   const [cart, setCart] = useState<Line[]>([]);
@@ -55,7 +64,21 @@ export default function PosTerminal({
   // Student 5% and member price never stack — picking one switches the other off.
   const [deal, setDeal] = useState<Deal>("none");
   const [done, setDone] = useState<Done | null>(null);
+  const [members, setMembers] = useState<MemberForm[]>([]);
+  const [stock, setStock] = useState<PosStock>(initialStock ?? { warnings: [], byProduct: {} });
+  const [stockOpen, setStockOpen] = useState(false);
   const [pending, start] = useTransition();
+
+  // Stock warnings: fresh from the server on load, every minute while on screen,
+  // after each sale and on the header's refresh button.
+  useEffect(() => { if (initialStock) setStock(initialStock); }, [initialStock]);
+  useEffect(() => {
+    const reload = () => { if (document.visibilityState === "visible") getPosStock().then(setStock).catch(() => {}); };
+    const poll = setInterval(reload, STOCK_POLL_MS);
+    window.addEventListener(REFRESH_EVENT, reload);
+    document.addEventListener("visibilitychange", reload);
+    return () => { clearInterval(poll); window.removeEventListener(REFRESH_EVENT, reload); document.removeEventListener("visibilitychange", reload); };
+  }, []);
 
   const promoActive = isOpeningPromoActive(openingPromo);
   const categoryName = useMemo(() => {
@@ -84,6 +107,11 @@ export default function PosTerminal({
     memberSaving += (price - memberUnitPrice(price, l.product.member_price)) * l.qty;
     itemCount += l.qty;
   }
+  // One set of member details per membership card in the cart.
+  const cardCount = cart.reduce((n, l) => n + (l.product.is_membership_card ? l.qty : 0), 0);
+  const memberAt = (i: number) => members[i] ?? BLANK_MEMBER;
+  const setMember = (i: number, patch: Partial<MemberForm>) =>
+    setMembers((cur) => { const next = [...cur]; next[i] = { ...(cur[i] ?? BLANK_MEMBER), ...patch }; return next; });
   const discount = deal === "member" ? Math.round(memberSaving * 100) / 100 : deal === "student" ? studentDiscount(eligible) : 0;
   const total = subtotal - discount;
   const received = Number(cashReceived) || 0;
@@ -109,16 +137,37 @@ export default function PosTerminal({
       if (qty === 0) return c.filter((l) => l.product.id !== p.id);
       return cur ? c.map((l) => (l.product.id === p.id ? { ...l, qty } : l)) : [...c, { product: p, qty }];
     });
-  const add = (p: Product) => { if (p.is_available) changeQty(p, (n) => n + 1); };
-  const clearCart = () => { if (cart.length && confirm("Clear the whole cart?")) setCart([]); };
+  const add = (p: Product) => {
+    if (!p.is_available) return;
+    // Stock says it's gone: sell it if it's really there, but say so once.
+    if (stock.byProduct[p.id]?.state === "out" && qtyOf(p.id) === 0) {
+      toast(`Stock shows ${stock.byProduct[p.id].name} as finished — check before selling`, { icon: "⚠️", id: `stock-${p.id}` });
+    }
+    changeQty(p, (n) => n + 1);
+  };
+  const clearCart = () => { if (cart.length && confirm("Clear the whole cart?")) { setCart([]); setMembers([]); } };
   const toggleDeal = (d: Exclude<Deal, "none">) => setDeal((cur) => (cur === d ? "none" : d));
 
-  const placeOrder = () =>
+  const placeOrder = () => {
+    // Selling membership cards: each needs the new member's name and number first.
+    const newMembers: { full_name: string; phone: string; card_number?: string }[] = [];
+    for (let i = 0; i < cardCount; i++) {
+      const m = newMemberSchema.safeParse(memberAt(i));
+      if (!m.success) {
+        const field = String(m.error.issues[0].path[0] ?? "full_name");
+        toast.error(`${cardCount > 1 ? `Card ${i + 1}: ` : ""}${m.error.issues[0].message}`);
+        setCartOpen(true);
+        setTimeout(() => document.getElementById(`member-${i}-${field}`)?.focus(), 350);
+        return;
+      }
+      newMembers.push(m.data);
+    }
     start(async () => {
       const r = await createPosOrder({
         type, payment_method: method,
         student_discount: deal === "student",
         member: deal === "member",
+        members: cardCount ? newMembers : undefined,
         items: cart.map((l) => ({ product_id: l.product.id, quantity: l.qty })),
       });
       if (r?.error) { toast.error(r.error); return; }
@@ -126,10 +175,13 @@ export default function PosTerminal({
         orderNumber: r.orderNumber!, dailyNumber: r.dailyNumber ?? null, total: Number(r.total),
         discount: Number(r.discount ?? 0), discountLabel: r.discountLabel ?? null,
         method, received: method === "cash" && received > 0 ? received : null,
+        members: r.members ?? [],
       });
       // Ready for the next customer: back to cash, no discount.
-      setCart([]); setCashReceived(""); setDeal("none"); setMethod("cash"); setCartOpen(false);
+      setCart([]); setMembers([]); setCashReceived(""); setDeal("none"); setMethod("cash"); setCartOpen(false);
+      getPosStock().then(setStock).catch(() => {}); // that sale may have used the last of something
     });
+  };
 
   const dealButton = (d: Exclude<Deal, "none">, Icon: typeof Crown, label: string) => {
     const on = deal === d;
@@ -166,7 +218,10 @@ export default function PosTerminal({
       <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain lg:flex lg:flex-col lg:overflow-hidden">
         <div className="px-4 py-2 lg:min-h-0 lg:flex-1 lg:overflow-y-auto lg:overscroll-contain">
           {cart.length === 0 && <p className="py-10 text-center text-sm text-stone-400 dark:text-stone-500">Tap items to add them.</p>}
-          {cart.map((l) => (
+          {cart.map((l, lineIndex) => {
+            // Member details for this line's cards come after any earlier card lines'.
+            const firstCard = cart.slice(0, lineIndex).reduce((n, x) => n + (x.product.is_membership_card ? x.qty : 0), 0);
+            return (
             // Name on its own line so it wraps instead of being cut off in the narrow cart.
             <div key={l.product.id} className="border-b border-orange-50 py-2.5 last:border-0 dark:border-stone-800">
               <div className="flex items-baseline justify-between gap-2">
@@ -202,8 +257,28 @@ export default function PosTerminal({
                   <Trash2 size={15} />
                 </button>
               </div>
+              {l.product.is_membership_card && Array.from({ length: l.qty }, (_, k) => {
+                const i = firstCard + k, m = memberAt(i);
+                const field = "input !py-2 text-base sm:!text-sm dark:!border-stone-700 dark:!bg-stone-800 dark:!text-stone-100";
+                return (
+                  <div key={i} className="mt-2 space-y-1.5 rounded-xl bg-amber-50 p-2.5 ring-1 ring-amber-200 dark:bg-amber-950/30 dark:ring-amber-900">
+                    <p className="flex items-center gap-1.5 text-xs font-bold text-amber-800 dark:text-amber-300">
+                      <IdCard size={14} /> New member{l.qty > 1 || cardCount > 1 ? ` ${i + 1}` : ""}
+                    </p>
+                    <input id={`member-${i}-full_name`} value={m.full_name} onChange={(e) => setMember(i, { full_name: e.target.value })}
+                      placeholder="Full name" aria-label="Member's full name" autoComplete="off" maxLength={100} className={field} />
+                    <div className="flex gap-1.5">
+                      <input id={`member-${i}-phone`} value={m.phone} onChange={(e) => setMember(i, { phone: e.target.value.replace(/[^\d+ -]/g, "").slice(0, 16) })}
+                        placeholder="Mobile 98XXXXXXXX" aria-label="Member's mobile number" inputMode="tel" autoComplete="off" className={field} />
+                      <input id={`member-${i}-card_number`} value={m.card_number} onChange={(e) => setMember(i, { card_number: e.target.value.slice(0, 30) })}
+                        placeholder="Card no." autoComplete="off" aria-label="Card number (optional)" className={cn(field, "!w-24 shrink-0")} />
+                    </div>
+                  </div>
+                );
+              })}
             </div>
-          ))}
+            );
+          })}
         </div>
 
         <div className="space-y-2.5 border-t border-orange-100 p-4 dark:border-stone-800 lg:shrink-0">
@@ -288,6 +363,32 @@ export default function PosTerminal({
             </button>
           ))}
         </div>
+        {/* Stock running low / out (Accounts → Stock, linked to menu items) */}
+        {stock.warnings.length > 0 && (
+          <div className="shrink-0 border-b border-amber-200 bg-amber-50 px-3 py-2 text-sm dark:border-amber-900 dark:bg-amber-950/40">
+            <button onClick={() => setStockOpen((v) => !v)} aria-expanded={stockOpen} className="flex w-full touch-manipulation items-center gap-2 text-left">
+              <AlertTriangle size={16} className="shrink-0 text-amber-600" />
+              <span className="min-w-0 flex-1 truncate font-bold text-amber-900 dark:text-amber-200">
+                {stock.warnings.map((w) => w.state === "out" ? `${w.name}: out` : `${w.name}: ${w.remaining} ${w.unit} left`).join(" · ")}
+              </span>
+              <ChevronDown size={16} className={cn("shrink-0 text-amber-700 transition", stockOpen && "rotate-180")} />
+            </button>
+            {stockOpen && (
+              <ul className="mt-2 space-y-1 pb-1">
+                {stock.warnings.map((w) => (
+                  <li key={w.id} className="flex items-center justify-between gap-2">
+                    <span className="font-bold text-stone-700 dark:text-stone-200">{w.name}</span>
+                    <span className={cn("rounded-full px-2 py-0.5 text-xs font-extrabold",
+                      w.state === "out" ? "bg-red-100 text-brand-red dark:bg-red-950/60" : "bg-amber-200/70 text-amber-900 dark:bg-amber-900/60 dark:text-amber-200")}>
+                      {w.state === "out" ? "Out of stock" : `${w.remaining} ${w.unit} left`}
+                    </span>
+                  </li>
+                ))}
+                <li className="pt-1 text-xs text-stone-500 dark:text-stone-400">Restock or recount in Accounts → Stock and this clears.</li>
+              </ul>
+            )}
+          </div>
+        )}
         {/* Columns: phone 2 · iPad portrait 4 · beside the cart (iPad landscape, laptop) 3 · wide 4 */}
         <div className="grid flex-1 auto-rows-min grid-cols-2 gap-3 overflow-y-auto overscroll-contain bg-brand-cream p-3 pb-24 dark:bg-stone-950 sm:grid-cols-3 sm:p-4 sm:pb-24 md:grid-cols-4 lg:grid-cols-3 lg:pb-4 2xl:grid-cols-4">
           {visible.map((p) => {
@@ -303,6 +404,12 @@ export default function PosTerminal({
                     </div>
                   ) : (
                     <div className="flex h-20 w-full items-center justify-center bg-brand-cream text-stone-300 dark:bg-stone-800 dark:text-stone-600"><UtensilsCrossed size={24} /></div>
+                  )}
+                  {stock.byProduct[p.id] && (
+                    <span className={cn("absolute right-2 top-2 rounded-full px-2 py-0.5 text-[10px] font-bold text-white shadow",
+                      stock.byProduct[p.id].state === "out" ? "bg-brand-red" : "bg-amber-500")}>
+                      {stock.byProduct[p.id].state === "out" ? "Stock out" : `${stock.byProduct[p.id].remaining} left`}
+                    </span>
                   )}
                   {memberApplies(p) ? (
                     <span className="absolute left-2 top-2 flex items-center gap-1 rounded-full bg-amber-500 px-2 py-0.5 text-[10px] font-bold text-white shadow"><Crown size={10} /> Member</span>
@@ -379,6 +486,11 @@ export default function PosTerminal({
             <p className="mt-1 font-mono text-sm text-stone-500 dark:text-stone-400">{done.orderNumber}</p>
             {done.discount > 0 && <p className="mt-1 text-sm font-bold text-brand-green">{done.discountLabel ?? "Discount"} −{npr(done.discount)}</p>}
             <p className="mt-1 font-bold">{npr(done.total)} · paid by {done.method === "cash" ? "cash" : "QR"}</p>
+            {done.members.map((m, i) => (
+              <p key={i} className="mt-1.5 flex items-center justify-center gap-1.5 text-sm text-amber-800 dark:text-amber-300">
+                <IdCard size={15} className="shrink-0" /> New member: <b>{m.name}</b> · {m.phone}{m.card ? ` · card ${m.card}` : ""}
+              </p>
+            ))}
             {/* Cash with an amount entered: what to hand back, big enough to read at arm's length. */}
             {done.received != null && (
               <div className={cn("mt-3 rounded-2xl p-3", done.received >= done.total ? "bg-green-50 dark:bg-green-950/40" : "bg-red-50 dark:bg-red-950/40")}>

@@ -31,11 +31,19 @@ export const orderSchema = z.object({
   }
 });
 
+// Someone buying a membership card at the POS: who the new member is.
+export const newMemberSchema = z.object({
+  full_name: z.string().trim().min(2, "Type the member's full name").max(100, "That name is too long"),
+  phone: z.string().transform((v) => v.replace(/[\s-]/g, "")).pipe(z.string().regex(/^(\+977)?9[6-8]\d{8}$/, "Enter the member's mobile number (98XXXXXXXX)")),
+  card_number: z.string().trim().max(30, "Card number is too long").optional().transform((v) => v || undefined),
+});
+
 export const posOrderSchema = z.object({
   type: z.enum(["pickup", "dine_in"]),
   payment_method: z.enum(["cash", "qr"]),
   student_discount: z.boolean().optional(),
   member: z.boolean().optional(),
+  members: z.array(newMemberSchema).max(10).optional(), // one per membership card sold
   items: z
     .array(z.object({ product_id: z.string().uuid(), quantity: z.number().int().min(1).max(50) }))
     .min(1).max(40),

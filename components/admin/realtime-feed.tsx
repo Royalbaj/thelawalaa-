@@ -16,6 +16,8 @@ type Row = {
 
 export default function RealtimeFeed({ initial }: { initial: Row[] }) {
   const [orders, setOrders] = useState<Row[]>(initial);
+  // Fresh rows from the server (the header's refresh button re-renders the page).
+  useEffect(() => { setOrders(initial); }, [initial]);
 
   useEffect(() => {
     const supabase = createClient();

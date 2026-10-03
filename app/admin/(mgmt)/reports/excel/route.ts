@@ -4,6 +4,7 @@ import { getVerifiedUser } from "@/lib/supabase/server";
 import { resolveRange, prettyDate } from "@/lib/dates";
 import { getSalesReport, nepalDay, nepalTime, channelOf, TYPE_LABELS, METHOD_LABELS } from "@/lib/sales-report";
 import { orderStatusLabel } from "@/lib/order-status";
+import { fmtMinutes } from "@/lib/serving-time";
 
 // Admin → Reports → Download Excel: the same period as on screen.
 export async function GET(request: Request) {
@@ -38,6 +39,8 @@ export async function GET(request: Request) {
     ["Discounts given", k.discounts],
     ["To collect (unpaid)", k.toCollect],
     ["Cancelled orders", k.cancelled],
+    ["Average serving time (placed → served)", fmtMinutes(k.serving.avgServe)],
+    ["Average time to ready (placed → ready)", fmtMinutes(k.serving.avgReady)],
   ]);
   sum.getRow(1).font = { bold: true, size: 14 };
   [4, 7, 9, 10].forEach((n) => { sum.getRow(n).getCell(2).numFmt = money; });
@@ -60,6 +63,7 @@ export async function GET(request: Request) {
     { header: "Subtotal", key: "sub", width: 11, style: { numFmt: money } }, { header: "Discount", key: "disc", width: 10, style: { numFmt: money } },
     { header: "Discount type", key: "dl", width: 14 }, { header: "Delivery", key: "del", width: 9, style: { numFmt: money } },
     { header: "Total", key: "total", width: 11, style: { numFmt: money } },
+    { header: "Served in (min)", key: "served", width: 14 },
   ];
   r.orders.forEach((o) => os.addRow({
     date: new Date(`${nepalDay(o.created_at)}T00:00:00Z`), time: nepalTime(o.created_at), no: o.daily_number ?? "",
@@ -67,10 +71,11 @@ export async function GET(request: Request) {
     status: o.status === "cancelled" ? "Cancelled" : orderStatusLabel(o.status, o.type), method: METHOD_LABELS[o.payment_method ?? ""] ?? o.payment_method ?? "",
     pay: o.payment_status === "paid" ? "Paid" : "Unpaid", sub: o.subtotal, disc: o.discount_amount || null, dl: o.discount_label ?? "",
     del: o.delivery_fee || null, total: o.total,
+    served: o.served_at ? Math.round((new Date(o.served_at).getTime() - new Date(o.created_at).getTime()) / 6000) / 10 : null,
   }));
   os.getColumn("date").numFmt = "dd mmm yyyy";
   header(os);
-  os.autoFilter = { from: "A1", to: "N1" };
+  os.autoFilter = { from: "A1", to: "O1" };
 
   const ps = wb.addWorksheet("Products");
   ps.columns = [{ header: "Product", key: "name", width: 30 }, { header: "Sold", key: "count", width: 8 }, { header: "Sales (before discounts)", key: "amount", width: 22, style: { numFmt: money } }];

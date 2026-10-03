@@ -28,7 +28,7 @@ export default function TrainingList({ videos, completedIds }: { videos: Video[]
     });
 
   if (videos.length === 0) {
-    return <p className="text-sm text-stone-400">No training videos yet — check back soon.</p>;
+    return <p className="text-sm text-stone-400">No training videos for you yet — the manager adds them in Admin → Staff Training.</p>;
   }
 
   const doneCount = videos.filter((v) => completed.has(v.id)).length;
@@ -46,7 +46,7 @@ export default function TrainingList({ videos, completedIds }: { videos: Video[]
             completed={completed.has(v.id)}
             onComplete={async () => {
               setDone(v.id, true);
-              if (await saveWatched(v.id)) toast.success("Finished — the office can see you've watched it");
+              if (await saveWatched(v.id)) toast.success("Finished — the manager can see you've watched it");
               else {
                 setDone(v.id, false);
                 toast.error("Couldn't save that you finished — check the internet, then play the last few seconds again");

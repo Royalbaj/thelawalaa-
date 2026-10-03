@@ -9,6 +9,7 @@ import { orderStatusLabel, nextCounterAction, STATUS_FILTERS } from "@/lib/order
 import { noteField, customerNote } from "@/lib/order-notes";
 import { playOrderSound } from "@/lib/order-sound";
 import { adminUpdateOrderStatus, assignDriver, markOrderPaid, getOrderLines, getLiveOrders } from "@/app/actions/staff";
+import { REFRESH_EVENT } from "@/components/refresh-button";
 import { MEMBER_PRICE_LABEL } from "@/lib/discounts";
 
 interface Line { product_name: string; quantity: number }
@@ -132,7 +133,9 @@ export default function LiveOrdersPanel({
     const clock = setInterval(() => setTick((n) => n + 1), 30_000); // keeps "5 min ago" current
     document.addEventListener("visibilitychange", sync);
     window.addEventListener("focus", sync);
+    window.addEventListener(REFRESH_EVENT, sync); // the header's refresh button
     return () => {
+      window.removeEventListener(REFRESH_EVENT, sync);
       supabase.removeChannel(channel);
       clearInterval(poll);
       clearInterval(clock);

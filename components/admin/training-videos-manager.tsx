@@ -12,7 +12,7 @@ export default function TrainingVideosManager({ videos }: { videos: Video[] }) {
     <div className="card space-y-4 p-5">
       <div>
         <h3 className="font-display font-bold text-brand-brown">Training videos</h3>
-        <p className="text-xs text-stone-500">Staff can&apos;t skip ahead — they must watch to the end. Shown on the Staff Portal.</p>
+        <p className="text-xs text-stone-500">Staff can&apos;t skip ahead — they must watch to the end. Each person sees the ones given to them (Team & PINs above).</p>
       </div>
       <div className="space-y-2">
         {videos.map((v) => (
@@ -72,7 +72,7 @@ export default function TrainingVideosManager({ videos }: { videos: Video[] }) {
           const form = e.currentTarget;
           const fd = Object.fromEntries(new FormData(form));
           start(async () => {
-            const r = await addTrainingVideo({ title: fd.title, youtube_url: fd.youtube_url });
+            const r = await addTrainingVideo({ title: fd.title, youtube_url: fd.youtube_url, assign_all: fd.assign_all === "on" });
             if (r?.error) toast.error(r.error);
             else { toast.success("Video added"); form.reset(); }
           });
@@ -80,6 +80,9 @@ export default function TrainingVideosManager({ videos }: { videos: Video[] }) {
       >
         <input name="title" required placeholder="Video title (e.g. POS basics)" className="input" maxLength={100} />
         <input name="youtube_url" required type="url" placeholder="https://youtube.com/watch?v=..." className="input" maxLength={300} />
+        <label className="flex items-center gap-2 text-sm text-stone-600">
+          <input type="checkbox" name="assign_all" defaultChecked className="h-4 w-4 accent-brand-orange" /> Give it to everyone in the team
+        </label>
         <button disabled={pending} className="btn-primary w-full">{pending ? "Adding…" : "Add video"}</button>
       </form>
     </div>

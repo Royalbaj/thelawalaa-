@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import { Menu, X, LayoutDashboard, ShoppingBag, UtensilsCrossed, BarChart3, MoreHorizontal } from "lucide-react";
 import AdminSidebar, { NAV, type NavBadges } from "./sidebar-nav";
 import { ACCOUNTS_URL } from "@/lib/role-home";
+import RefreshButton from "@/components/refresh-button";
 import { cn } from "@/lib/utils";
 
 // Phones: the four pages used most sit in a bottom bar; "More" opens the full menu.
@@ -61,6 +62,8 @@ export default function AdminShell({
               <p className="truncate text-xs font-medium text-stone-400">{fullName}</p>
             </div>
           </div>
+          <RefreshButton iconSize={18}
+            className="h-10 w-10 shrink-0 rounded-full bg-stone-100 text-stone-500 hover:bg-orange-50 hover:text-brand-orange disabled:text-brand-orange" />
         </header>
         <main className="flex-1 p-3 sm:p-6">{children}</main>
         {/* Little footer — above the phone tab bar */}

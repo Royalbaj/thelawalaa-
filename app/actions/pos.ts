@@ -2,7 +2,7 @@
 
 import { after } from "next/server";
 import { posOrderSchema } from "@/lib/validations/order";
-import { checkStockAfterSale } from "@/lib/stock-alerts";
+import { checkStockAfterSale, getPosStock as loadPosStock } from "@/lib/stock-alerts";
 import { requireRole } from "@/lib/supabase/server";
 import { supabaseAdmin, audit, resolveStaffBranchId } from "@/lib/supabase/admin";
 import { applyOpeningPromoPrice } from "@/lib/promo";
@@ -12,7 +12,10 @@ import { studentDiscount, memberUnitPrice, STUDENT_DISCOUNT_LABEL, MEMBER_PRICE_
 export async function createPosOrder(input: unknown) {
   const { user, profile } = await requireRole(["pos_user", "super_admin"]);
   const parsed = posOrderSchema.safeParse(input);
-  if (!parsed.success) return { error: "Invalid order" };
+  if (!parsed.success) {
+    const memberIssue = parsed.error.issues.find((i) => i.path[0] === "members");
+    return { error: memberIssue?.message ?? "Invalid order" };
+  }
   const d = parsed.data;
   if (d.member && d.student_discount) return { error: "Use member price or student discount — not both" };
 
@@ -23,12 +26,19 @@ export async function createPosOrder(input: unknown) {
 
   const ids = d.items.map((i) => i.product_id);
   const [{ data: products }, { data: settings }] = await Promise.all([
-    supabaseAdmin.from("products").select("id, name, price, is_available, student_discount_eligible, member_price, categories(name)").in("id", ids),
+    supabaseAdmin.from("products").select("id, name, price, is_available, student_discount_eligible, member_price, is_membership_card, categories(name)").in("id", ids),
     supabaseAdmin.from("app_settings").select("*").eq("id", 1).single(),
   ]);
   if (!products || products.length !== new Set(ids).size) return { error: "Unknown items in cart" };
   const soldOut = products.find((p) => !p.is_available);
   if (soldOut) return { error: `"${soldOut.name}" is sold out` };
+  // Every membership card sold needs the new member's name and number.
+  const cards = d.items.reduce((n, i) => n + (products.find((p) => p.id === i.product_id)?.is_membership_card ? i.quantity : 0), 0);
+  const members = d.members ?? [];
+  if (cards > 10) return { error: "Sell up to 10 membership cards at a time" };
+  if (members.length !== cards) {
+    return { error: cards ? `Add the member's name and mobile number${cards > 1 ? ` for all ${cards} cards` : ""}` : "Member details without a membership card" };
+  }
 
   let subtotal = 0;
   let discountable = 0;
@@ -71,11 +81,26 @@ export async function createPosOrder(input: unknown) {
   if (error || !order) return { error: "Order failed" };
 
   await supabaseAdmin.from("order_items").insert(rows.map((r) => ({ ...r, order_id: order.id })));
+  if (members.length) {
+    const { error: memberErr } = await supabaseAdmin.from("memberships").insert(members.map((m) => ({
+      full_name: m.full_name, phone: m.phone, card_number: m.card_number ?? null, order_id: order.id, sold_by: user.id,
+    })));
+    if (memberErr) console.error("Couldn't save membership details:", memberErr.message);
+  }
   await audit({
     actor_id: user.id, action: "POS_ORDER", target_table: "orders", target_id: order.id,
-    new_data: { total: order.total, ...(discount ? { discount, discount_label: discountLabel } : {}) },
+    new_data: { total: order.total, ...(discount ? { discount, discount_label: discountLabel } : {}), ...(members.length ? { memberships: members.length } : {}) },
   });
   // Linked stock (Accounts → Stock) counts down with every sale; warn staff if it's running out.
   after(() => checkStockAfterSale(rows.map((r) => r.product_id)));
-  return { ok: true, orderNumber: order.order_number, dailyNumber: order.daily_number, total: order.total, discount, discountLabel };
+  return {
+    ok: true, orderNumber: order.order_number, dailyNumber: order.daily_number, total: order.total, discount, discountLabel,
+    members: members.map((m) => ({ name: m.full_name, phone: m.phone, card: m.card_number ?? null })),
+  };
+}
+
+/** Stock that's running low or out, for the POS warnings (re-checked every minute and after each sale). */
+export async function getPosStock() {
+  await requireRole(["pos_user", "super_admin"]);
+  return loadPosStock();
 }

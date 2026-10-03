@@ -1,6 +1,9 @@
 import { requireRole } from "@/lib/supabase/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
+import { currentTrainee } from "@/app/actions/training";
 import TrainingList from "@/components/staff/training-list";
+import TrainingPinPad from "@/components/staff/training-pin-pad";
+import SwitchTrainee from "@/components/staff/switch-trainee";
 import { getSiteText, whatsappHref } from "@/lib/site-content";
 import { Megaphone, MessageCircle, GraduationCap } from "lucide-react";
 
@@ -9,12 +12,17 @@ export const dynamic = "force-dynamic";
 const STAFF_ROLES = ["pos_user", "delivery_driver", "super_admin"];
 
 export default async function StaffPortalPage() {
-  const { user, profile } = await requireRole(STAFF_ROLES);
-  const siteText = await getSiteText();
+  const { profile } = await requireRole(STAFF_ROLES);
+  // The login is shared at the counter: training belongs to whoever typed their PIN.
+  const [siteText, trainee] = await Promise.all([getSiteText(), currentTrainee()]);
 
-  const [{ data: videos }, { data: progress }, { data: announcements }] = await Promise.all([
-    supabaseAdmin.from("training_videos").select("id, title, youtube_url").eq("is_active", true).order("sort_order"),
-    supabaseAdmin.from("staff_training_progress").select("video_id").eq("staff_id", user.id),
+  const [{ data: assigned }, { data: progress }, { data: announcements }] = await Promise.all([
+    trainee
+      ? supabaseAdmin.from("training_assignments").select("training_videos(id, title, youtube_url, is_active, sort_order)").eq("person_id", trainee.id)
+      : Promise.resolve({ data: [] as { training_videos: unknown }[] }),
+    trainee
+      ? supabaseAdmin.from("training_people_progress").select("video_id").eq("person_id", trainee.id)
+      : Promise.resolve({ data: [] as { video_id: string }[] }),
     supabaseAdmin
       .from("announcements")
       .select("message, link_url")
@@ -24,12 +32,16 @@ export default async function StaffPortalPage() {
   ]);
 
   const completedIds = (progress ?? []).map((p) => p.video_id);
+  type V = { id: string; title: string; youtube_url: string; is_active: boolean; sort_order: number | null };
+  const videos = (assigned ?? []).map((a) => a.training_videos as unknown as V | null)
+    .filter((v): v is V => !!v?.is_active)
+    .sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0));
 
   return (
     <div className="space-y-6 p-4 pb-12">
       <div>
         <h1 className="font-display text-2xl font-bold text-brand-brown">Staff Portal</h1>
-        <p className="text-sm text-stone-500">Hi {profile.full_name.split(" ")[0]} — training and updates for the team.</p>
+        <p className="text-sm text-stone-500">{trainee ? `Hi ${trainee.name}` : `Signed in as ${profile.full_name}`} — training and updates for the team.</p>
       </div>
 
       {(announcements ?? []).length > 0 && (
@@ -47,7 +59,14 @@ export default async function StaffPortalPage() {
 
       <section>
         <h2 className="mb-3 flex items-center gap-1.5 font-bold text-brand-brown"><GraduationCap size={18} /> Training videos</h2>
-        <TrainingList videos={(videos ?? []) as never} completedIds={completedIds} />
+        {trainee ? (
+          <div className="space-y-4">
+            <SwitchTrainee name={trainee.name} />
+            <TrainingList videos={videos} completedIds={completedIds} />
+          </div>
+        ) : (
+          <TrainingPinPad />
+        )}
       </section>
 
       <a

@@ -16,11 +16,14 @@ const productSchema = z.object({
   is_bestseller: z.coerce.boolean().default(false),
   pos_only: z.boolean().default(false), // sold at the counter only — hidden from the website
   student_discount_eligible: z.boolean().default(true), // POS student 5% applies to it
+  // Selling it at the POS asks for the member's name and number (memberships, migration 028).
+  is_membership_card: z.boolean().default(false),
   // What a member pays at the POS (lib/discounts.ts); blank = no member price.
   member_price: z.preprocess((v) => (v === "" || v == null ? null : v), z.coerce.number().positive().max(100000).nullable()).default(null),
 }).refine((p) => p.member_price == null || p.member_price < p.price, {
   message: "Member price must be lower than the normal price", path: ["member_price"],
-});
+// A membership card is only sold at the counter, where the member's details are taken.
+}).transform((p) => (p.is_membership_card ? { ...p, pos_only: true } : p));
 const productError = (e: z.ZodError) =>
   e.issues.find((i) => i.path[0] === "member_price")?.message ?? "Check the product fields";
 

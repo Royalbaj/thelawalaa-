@@ -5,6 +5,7 @@ import { Columns, SERIES_1, SERIES_2 } from "@/components/admin/sales-charts";
 import BarList from "@/components/admin/bar-list";
 import RangePicker from "@/components/admin/range-picker";
 import { npr, cn } from "@/lib/utils";
+import { fmtMinutes } from "@/lib/serving-time";
 
 const KEYS: RangeKey[] = ["today", "week", "month", "last-month", "3-months", "year", "custom"];
 
@@ -19,6 +20,8 @@ export default function SalesReportView({ range, r }: { range: Range; r: SalesRe
     { label: "Discounts given", value: npr(k.discounts), sub: "student, member, promo" },
     { label: "To collect", value: npr(k.toCollect), sub: "unpaid, not cancelled", warn: k.toCollect > 0 },
     { label: "Cancelled", value: String(k.cancelled), sub: "orders" },
+    { label: "Avg serving time", value: fmtMinutes(k.serving.avgServe), sub: k.serving.served ? `placed → served, ${k.serving.served} orders` : "no served orders yet" },
+    { label: "Avg time to ready", value: fmtMinutes(k.serving.avgReady), sub: k.serving.readied ? `placed → ready, ${k.serving.readied} orders` : "no orders marked ready" },
   ];
 
   return (
@@ -36,7 +39,7 @@ export default function SalesReportView({ range, r }: { range: Range; r: SalesRe
 
       <RangePicker current={range.key} from={range.from} to={range.to} keys={KEYS} />
 
-      <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">
+      <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
         {tiles.map((t) => (
           <div key={t.label} className={cn("card p-4", t.warn && "ring-2 ring-amber-200")}>
             <p className="text-xs font-bold text-stone-500">{t.label}</p>
