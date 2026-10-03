@@ -1,4 +1,3 @@
-import { startOfDay } from "date-fns";
 import { requireRole } from "@/lib/supabase/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { npr } from "@/lib/utils";
@@ -6,6 +5,7 @@ import { getTrainingStatus } from "@/lib/training-status";
 import { servingStats, fmtMinutes, MAX_MIN } from "@/lib/serving-time";
 import { nepalToday, addDays } from "@/lib/dates";
 import RealtimeFeed from "@/components/admin/realtime-feed";
+import { getTodayCloses } from "@/lib/day-sales";
 import Link from "next/link";
 import { Package, Wallet, Clock, Bell, Bike, XCircle, ClipboardList, UtensilsCrossed, Megaphone, GraduationCap, MessageSquareHeart, Timer } from "lucide-react";
 
@@ -13,10 +13,9 @@ export const dynamic = "force-dynamic";
 
 export default async function DashboardPage() {
   await requireRole(["super_admin"]);
-  const today = startOfDay(new Date()).toISOString();
-
-  // Serving time by Nepal days (the server clock is UTC).
+  // Nepal days throughout — the server clock is UTC (5h45m behind Banepa).
   const nepalDay = nepalToday();
+  const today = new Date(`${nepalDay}T00:00:00+05:45`).toISOString();
   const [{ data: timed }, { data: todays }, { count: activeDeliveries }, { count: pendingCount }, training] = await Promise.all([
     supabaseAdmin.from("orders").select("created_at, ready_at, served_at, status, placed_by")
       .gte("created_at", `${addDays(nepalDay, -6)}T00:00:00+05:45`),
@@ -26,6 +25,7 @@ export default async function DashboardPage() {
     supabaseAdmin.from("orders").select("id", { count: "exact", head: true }).eq("status", "pending"),
     getTrainingStatus(),
   ]);
+  const closes = await getTodayCloses();
   const { data: feedbackRows } = await supabaseAdmin.from("feedback").select("rating, is_read");
   const feedbackCount = feedbackRows?.length ?? 0;
   const feedbackAvg = feedbackCount ? feedbackRows!.reduce((s, f) => s + f.rating, 0) / feedbackCount : 0;
@@ -80,6 +80,31 @@ export default async function DashboardPage() {
           </div>
         ))}
       </div>
+
+      {/* Cash drawer — each "Close shift" from the POS (Today button) */}
+      <section className="rounded-2xl border border-orange-100 bg-white p-5 shadow-sm">
+        <div className="flex flex-wrap items-baseline justify-between gap-2">
+          <h2 className="flex items-center gap-2 font-display text-lg font-bold text-brand-brown"><Wallet size={19} className="text-brand-orange" /> Cash drawer today</h2>
+          <p className="text-xs text-stone-400">Counted at the POS with &ldquo;Today → Close shift&rdquo;.</p>
+        </div>
+        {closes.length === 0 ? (
+          <p className="mt-3 text-sm text-stone-500">No shift closed yet today.</p>
+        ) : (
+          <ul className="mt-3 divide-y divide-stone-100">
+            {closes.map((c) => (
+              <li key={c.at} className="flex flex-wrap items-center justify-between gap-2 py-2.5 text-sm">
+                <span className="text-stone-600">
+                  {new Date(c.at).toLocaleTimeString("en-GB", { timeZone: "Asia/Kathmandu", hour: "numeric", minute: "2-digit", hour12: true })}
+                  {c.counted_by ? ` · ${c.counted_by}` : ""} · expected {npr(c.expected_cash)}, counted {npr(c.counted_cash)}
+                </span>
+                <span className={`rounded-full px-2.5 py-1 text-xs font-extrabold ${Math.abs(c.difference) < 1 ? "bg-green-100 text-green-800" : c.difference < 0 ? "bg-red-100 text-red-700" : "bg-amber-100 text-amber-800"}`}>
+                  {Math.abs(c.difference) < 1 ? "Balanced" : c.difference < 0 ? `Short ${npr(-c.difference)}` : `Over ${npr(c.difference)}`}
+                </span>
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
 
       {/* Serving time — order placed → handed over (stamped when staff tap Ready / Served) */}
       <section className="rounded-2xl border border-orange-100 bg-white p-5 shadow-sm">

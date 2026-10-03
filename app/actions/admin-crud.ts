@@ -7,7 +7,7 @@ import { supabaseAdmin, audit } from "@/lib/supabase/admin";
 
 // ── Menu ─────────────────────────────────────────────────────────
 const productSchema = z.object({
-  name: z.string().min(2).max(120),
+  name: z.string().trim().min(2).max(120),
   description: z.string().max(500).optional().or(z.literal("")),
   category_id: z.string().uuid(),
   price: z.coerce.number().positive().max(100000),

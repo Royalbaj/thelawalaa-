@@ -1,6 +1,8 @@
 "use server";
 
 import { after } from "next/server";
+import { z } from "zod";
+import { getDaySales as loadDaySales } from "@/lib/day-sales";
 import { posOrderSchema } from "@/lib/validations/order";
 import { checkStockAfterSale, getPosStock as loadPosStock } from "@/lib/stock-alerts";
 import { requireRole } from "@/lib/supabase/server";
@@ -103,4 +105,47 @@ export async function createPosOrder(input: unknown) {
 export async function getPosStock() {
   await requireRole(["pos_user", "super_admin"]);
   return loadPosStock();
+}
+
+// ── End of shift: today's sales and the cash count ───────────────
+
+/** The POS "Today" sheet — the whole Nepal day, or since the last shift close. */
+export async function getDaySales(period: "day" | "shift" = "day") {
+  await requireRole(["pos_user", "super_admin"]);
+  return loadDaySales(period === "shift" ? "shift" : "day");
+}
+
+const DENOMINATIONS = ["1000", "500", "100", "50", "20", "10", "5", "coins"] as const;
+const closeSchema = z.object({
+  period: z.enum(["day", "shift"]),
+  opening_float: z.number().min(0).max(1_000_000),
+  counts: z.record(z.enum(DENOMINATIONS), z.number().int().min(0).max(100_000)),
+  counted_by: z.string().trim().max(40).optional(),
+  note: z.string().trim().max(300).optional(),
+});
+
+/**
+ * "Close shift": saves the count against what the drawer SHOULD hold — the
+ * expected figure is worked out again here, never taken from the screen.
+ * Kept in audit_logs (SHIFT_CLOSE); the next shift starts from this moment.
+ */
+export async function closeShift(input: unknown) {
+  const { user } = await requireRole(["pos_user", "super_admin"]);
+  const parsed = closeSchema.safeParse(input);
+  if (!parsed.success) return { error: "Check the cash count" };
+  const d = parsed.data;
+  const counted = Object.entries(d.counts).reduce((s, [k, n]) => s + (k === "coins" ? n : Number(k) * n), 0);
+  const day = await loadDaySales(d.period);
+  const expected = Math.round((d.opening_float + day.cashReceived) * 100) / 100;
+  const difference = Math.round((counted - expected) * 100) / 100;
+  await audit({
+    actor_id: user.id, action: "SHIFT_CLOSE", target_table: "orders",
+    new_data: {
+      from: day.from, period: d.period, opening_float: d.opening_float, cash_received: day.cashReceived,
+      expected_cash: expected, counted_cash: counted, difference, counts: d.counts,
+      sales: day.sales, orders: day.orders, by_method: day.byMethod, to_collect: day.toCollect.amount,
+      counted_by: d.counted_by || null, note: d.note || null, problems: day.problems.reduce((n, p) => n + p.orders.length, 0),
+    },
+  });
+  return { ok: true, expected, counted, difference };
 }

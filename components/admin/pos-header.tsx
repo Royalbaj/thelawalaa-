@@ -6,6 +6,7 @@ import { PosThemeToggle } from "@/components/pos/pos-theme";
 import OrderAlertsButton from "@/components/pos/order-alerts";
 import RefreshButton from "@/components/refresh-button";
 import BrandLogo from "@/components/brand-logo";
+import DaySalesButton from "@/components/pos/day-sales-sheet";
 
 // pos_user only reaches this header now — super_admin no longer shares
 // the POS terminal, so there's no "back to dashboard" link to show here.
@@ -15,6 +16,8 @@ export default function PosHeader({ fullName }: { fullName: string }) {
       <BrandLogo size="sm" tone="dark" label="POS" />
       <div className="flex items-center gap-1.5">
         <span className="hidden text-xs font-bold text-white/60 sm:inline">{fullName}</span>
+        {/* Today's sales + the end-of-shift cash count. */}
+        <DaySalesButton />
         {/* Fetches orders, menu and stock again — the cart being built is kept. */}
         <RefreshButton className="h-8 w-8 rounded-full bg-white/10 text-white/70 hover:bg-white/20 hover:text-white disabled:opacity-100" />
         <OrderAlertsButton />
