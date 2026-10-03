@@ -7,6 +7,7 @@ import { createClient } from "@/lib/supabase/client";
 import { npr, cn, STATUS_COLORS } from "@/lib/utils";
 import { orderStatusLabel, nextCounterAction, STATUS_FILTERS } from "@/lib/order-status";
 import { noteField, customerNote } from "@/lib/order-notes";
+import { directionsUrl } from "@/lib/geo";
 import { playOrderSound } from "@/lib/order-sound";
 import { adminUpdateOrderStatus, assignDriver, markOrderPaid, getOrderLines, getLiveOrders } from "@/app/actions/staff";
 import { REFRESH_EVENT } from "@/components/refresh-button";
@@ -26,6 +27,9 @@ export interface Order {
   payment_method: string | null;
   created_at: string;
   notes: string | null;
+  delivery_address?: string | null;
+  delivery_lat?: number | null;
+  delivery_lng?: number | null;
   customer?: { full_name: string; phone: string | null } | null;
   items?: Line[];
 }
@@ -301,8 +305,12 @@ export default function LiveOrdersPanel({
                   {phone && (
                     <a href={`tel:${phone}`} className="inline-block text-xs font-bold text-brand-orange">📞 {phone}</a>
                   )}
-                  {o.type === "delivery" && noteField(o.notes, "Address") && (
-                    <p className="text-[11px] font-bold text-stone-600 bg-stone-50 p-1.5 rounded dark:bg-stone-800 dark:text-stone-300">📍 {noteField(o.notes, "Address")}</p>
+                  {o.type === "delivery" && (o.delivery_address || noteField(o.notes, "Address")) && (
+                    <p className="text-[11px] font-bold text-stone-600 bg-stone-50 p-1.5 rounded dark:bg-stone-800 dark:text-stone-300">📍 {o.delivery_address || noteField(o.notes, "Address")}</p>
+                  )}
+                  {o.type === "delivery" && o.delivery_lat != null && o.delivery_lng != null && (
+                    <a href={directionsUrl({ lat: o.delivery_lat, lng: o.delivery_lng })} target="_blank" rel="noopener noreferrer"
+                      className="inline-block text-xs font-bold text-brand-orange">🗺️ Customer&apos;s pin on the map</a>
                   )}
                   <div className="flex flex-wrap gap-1.5">
                     {unpaid && !takePayment && o.status !== "cancelled" && (

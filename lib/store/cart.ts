@@ -1,6 +1,13 @@
 "use client";
 import { create } from "zustand";
-import { persist } from "zustand/middleware";
+import { persist, createJSONStorage } from "zustand/middleware";
+
+// The cart lives in this browser TAB only (sessionStorage): phones are
+// shared, so nothing someone picked stays on the phone for the next person
+// once the tab is closed. Carts used to be kept in localStorage — clear any.
+if (typeof window !== "undefined") {
+  try { localStorage.removeItem("tw-cart"); } catch { /* storage blocked */ }
+}
 
 export type CartItem = {
   product_id: string;
@@ -44,6 +51,7 @@ export const useCart = create<CartState>()(
       remove: (id) => set((s) => ({ items: s.items.filter((i) => i.product_id !== id) })),
       clear: () => set({ items: [] }),
     }),
-    { name: "tw-cart" } // prices here are display-only; server recalculates everything
+    // Prices here are display-only; the server recalculates everything.
+    { name: "tw-cart", storage: createJSONStorage(() => sessionStorage) }
   )
 );

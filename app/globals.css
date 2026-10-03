@@ -72,6 +72,33 @@ main {
   }
 }
 
+/* ── Brand loader (components/brand-loader.tsx) ─────────────────── */
+/* Fades in only after 180ms, so a quick page change never flashes it. */
+.tw-loader-in { animation: tw-fade-in .25s ease-out .18s both; }
+.tw-loader-tile { position: relative; overflow: hidden; animation: tw-pop .6s cubic-bezier(.2,.9,.3,1.25) .18s both, tw-breathe 1.8s ease-in-out .8s infinite; }
+.tw-loader-tile::after { content: ""; position: absolute; top: -20%; bottom: -20%; left: 0; width: 45%; background: linear-gradient(90deg, transparent, rgba(255,255,255,.55), transparent); animation: tw-sheen 1.8s ease-in-out .6s infinite; }
+.tw-loader-ring {
+  background: conic-gradient(from 0deg, transparent 0 55%, rgba(249,115,22,.35) 70%, #F97316 88%, #DC2626 100%);
+  -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 3px), #000 calc(100% - 3px));
+          mask: radial-gradient(farthest-side, transparent calc(100% - 3px), #000 calc(100% - 3px));
+  animation: tw-spin 1s linear infinite;
+}
+.tw-letter { display: inline-block; animation: tw-letter .45s cubic-bezier(.2,.9,.3,1.3) .45s both; }
+.tw-letter-2 { animation-delay: .57s; }
+.tw-loader-word { animation: tw-reveal .7s cubic-bezier(.6,0,.2,1) .55s both; }
+.tw-loader-tag { animation: tw-rise .5s ease-out 1s both; }
+.tw-loader-bar::after { content: ""; position: absolute; inset: 0; width: 40%; border-radius: 999px; background: linear-gradient(90deg, #F97316, #DC2626); animation: tw-bar 1.1s ease-in-out infinite; }
+
+@keyframes tw-fade-in { from { opacity: 0; } to { opacity: 1; } }
+@keyframes tw-pop { 0% { transform: scale(.5) rotate(-14deg); opacity: 0; } 65% { transform: scale(1.07) rotate(2deg); opacity: 1; } 100% { transform: none; } }
+@keyframes tw-breathe { 0%, 100% { transform: scale(1); } 50% { transform: scale(.94); } }
+@keyframes tw-sheen { 0% { transform: translateX(-140%) skewX(-20deg); } 55%, 100% { transform: translateX(260%) skewX(-20deg); } }
+@keyframes tw-spin { to { transform: rotate(360deg); } }
+@keyframes tw-letter { from { opacity: 0; transform: translateY(45%); } to { opacity: 1; transform: none; } }
+@keyframes tw-reveal { from { clip-path: inset(0 100% 0 0); } to { clip-path: inset(0 0 0 0); } }
+@keyframes tw-rise { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+@keyframes tw-bar { from { transform: translateX(-110%); } to { transform: translateX(260%); } }
+
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation: none !important; transition: none !important; }
   html { scroll-behavior: auto; }

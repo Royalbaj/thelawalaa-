@@ -13,14 +13,18 @@ import { getCheckoutRewards } from "@/app/actions/customer";
 import { redeemPlan, fmtPoints, fmtRupees, pointsToRupees } from "@/lib/rewards";
 import { getEsewaPaymentForm } from "@/app/actions/payments";
 import { npr } from "@/lib/utils";
-import { UtensilsCrossed, Sparkles, CupSoda } from "lucide-react";
+import { UtensilsCrossed, Sparkles, CupSoda, LocateFixed, Loader2, X, MapPin } from "lucide-react";
 import AddToCartButton from "@/components/add-to-cart-button";
+import BrandLogo from "@/components/brand-logo";
 import { applyOpeningPromoPrice, isOpeningPromoActive, type OpeningPromoSettings } from "@/lib/promo";
+import { STORE, DELIVERY_RADIUS_KM, distanceKm, fmtKm } from "@/lib/geo";
+import { guestCodeKey } from "@/lib/guest-order";
 
 type Product = { id: string; name: string; description: string | null; price: number; category_id: string | null; spice_level: number; image_url?: string | null };
 type Category = { id: string; name: string };
 type Branch = { id: string; name: string; address: string };
-type Address = { id: string; label: string; full_address: string };
+type Address = { id: string; label: string; full_address: string; lat: number | null; lng: number | null };
+type Pin = { lat: number; lng: number; accuracy: number };
 
 /** eSewa's integration model is a full-page redirect via POSTed form, not a fetch. */
 function redirectToEsewa(action: string, fields: Record<string, string>) {
@@ -61,9 +65,14 @@ export default function OrderPage() {
 
   const [isGuest, setIsGuest] = useState(false);
   // Who this device is signed in as — shown at checkout with "Not you?", since phones get shared.
-  const [account, setAccount] = useState<{ name: string; email: string } | null>(null);
+  // Signed-in customers aren't asked their name: the order uses their account's.
+  const [account, setAccount] = useState<{ name: string; email: string; phone: string; role: string } | null>(null);
   const [guestName, setGuestName] = useState("");
   const [guestPhone, setGuestPhone] = useState("");
+  // "Share my location" for delivery — the rider gets the exact pin.
+  const [pin, setPin] = useState<Pin | null>(null);
+  const [locating, setLocating] = useState(false);
+  const [locError, setLocError] = useState<string | null>(null);
 
   const [favorites, setFavorites] = useState<string[]>([]);
   const [settings, setSettings] = useState({ esewa_enabled: false, delivery_enabled: false });
@@ -79,11 +88,8 @@ export default function OrderPage() {
     supabase.auth.getUser().then(async ({ data }) => {
       setIsGuest(!data.user);
       if (data.user) {
-        // Contact name is left blank on purpose — the account holder often
-        // isn't who's actually picking up or receiving the order.
-        const { data: profile } = await supabase.from("profiles").select("full_name, phone").eq("id", data.user.id).single();
-        if (profile) setGuestPhone(profile.phone || "");
-        setAccount({ name: profile?.full_name ?? "", email: data.user.email ?? "" });
+        const { data: profile } = await supabase.from("profiles").select("full_name, phone, role").eq("id", data.user.id).single();
+        setAccount({ name: profile?.full_name ?? "", email: data.user.email ?? "", phone: profile?.phone ?? "", role: profile?.role ?? "customer" });
         getCheckoutRewards().then(setRewards).catch(() => null);
         supabase.from("customer_favorites").select("product_id").eq("customer_id", data.user.id).then((res) => {
           setFavorites(res.data?.map(f => f.product_id) ?? []);
@@ -94,7 +100,7 @@ export default function OrderPage() {
       supabase.from("products").select("id, name, description, price, category_id, spice_level, image_url").eq("pos_only", false).order("sort_order"),
       supabase.from("categories").select("id, name").order("sort_order"),
       supabase.from("branches").select("id, name, address"),
-      supabase.from("addresses").select("id, label, full_address"),
+      supabase.from("addresses").select("id, label, full_address, lat, lng"),
       supabase.from("app_settings").select("esewa_enabled, delivery_enabled, opening_promo_enabled, opening_promo_momo_price, opening_promo_starts_at, opening_promo_ends_at").eq("id", 1).single(),
     ]).then(([p, c, b, a, s]) => {
       setProducts((p.data as Product[]) ?? []);
@@ -113,6 +119,10 @@ export default function OrderPage() {
   const categoryNameById = useMemo(() => new Map(categories.map((c) => [c.id, c.name])), [categories]);
   const priceOf = (p: Product) => applyOpeningPromoPrice(Number(p.price), categoryNameById.get(p.category_id ?? "") ?? null, openingPromo);
   const isDiscounted = (p: Product) => isOpeningPromoActive(openingPromo) && priceOf(p) !== Number(p.price);
+
+  // Signed-in customers aren't asked who they are — their account says. Guests,
+  // and staff placing an order for someone else, type a name and number.
+  const asksContact = isGuest || (!!account && account.role !== "customer");
 
   const subtotal = useMemo(() => items.reduce((t, i) => t + i.price * i.quantity, 0), [items]);
   const deliveryFee = type === "delivery" ? 20 : 0;
@@ -153,36 +163,57 @@ export default function OrderPage() {
     setCheckingPromo(false);
   }
 
+  /** A signed-in customer's new address is saved for next time (with the pin, if shared). */
   async function ensureAddress(): Promise<string | null> {
     if (addressId) return addressId;
-    if (!newAddress.trim()) return null;
+    if (newAddress.trim().length < 3) return null;
     const supabase = createClient();
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return null;
     const { data } = await supabase
       .from("addresses")
-      .insert({ customer_id: user.id, full_address: newAddress.trim().slice(0, 300) })
+      .insert({ customer_id: user.id, full_address: newAddress.trim().slice(0, 300), lat: pin?.lat ?? null, lng: pin?.lng ?? null })
       .select("id")
       .single();
     return data?.id ?? null;
   }
 
+  function shareLocation() {
+    setLocError(null);
+    if (!("geolocation" in navigator)) { setLocError("This phone can't share its location — type your full address instead."); return; }
+    setLocating(true);
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        setLocating(false);
+        setPin({ lat: pos.coords.latitude, lng: pos.coords.longitude, accuracy: Math.round(pos.coords.accuracy) });
+      },
+      (err) => {
+        setLocating(false);
+        setLocError(err.code === err.PERMISSION_DENIED
+          ? "Location is blocked for this site. Allow it in your browser settings, or type your full address."
+          : "Couldn't get your location — try again outside, or type your full address.");
+      },
+      { enableHighAccuracy: true, timeout: 20000, maximumAge: 0 },
+    );
+  }
+
   async function placeOrder() {
     setBusy(true);
     try {
-      if (!guestName.trim() || !guestPhone.trim()) {
-        toast.error("Please enter your contact name and phone number");
-        return;
-      }
-      if (guestPhone && !/^(\+977)?9[6-8]\d{8}$/.test(guestPhone.trim())) {
+      const needPhone = asksContact || (type === "delivery" && !account?.phone);
+      if (asksContact && guestName.trim().length < 2) { toast.error("Please enter your name"); return; }
+      if (needPhone && !/^(\+977)?9[6-8]\d{8}$/.test(guestPhone.trim())) {
         toast.error("Please enter a valid Nepali mobile number");
         return;
       }
-      
-      const delivery_address_id = (type === "delivery" && !isGuest) ? await ensureAddress() : undefined;
-      if (type === "delivery" && !isGuest && !delivery_address_id) { toast.error("Add a delivery address"); return; }
-      if (type === "delivery" && isGuest && !newAddress.trim()) { toast.error("Add a delivery address"); return; }
+      const savedAddress = addresses.find((a) => a.id === addressId);
+      if (type === "delivery" && !pin && !savedAddress && newAddress.trim().length < 10) {
+        toast.error("Add your full address (tole/street, house, landmark) — or share your location");
+        return;
+      }
       if (type === "pickup" && !branchId) { toast.error("Pick a branch"); return; }
+
+      const delivery_address_id = (type === "delivery" && !isGuest) ? await ensureAddress() : undefined;
 
       const res = await createOrder({
         type,
@@ -192,13 +223,16 @@ export default function OrderPage() {
         promo_code: promo || undefined,
         use_points: pointsPlan.points > 0 || undefined,
         use_free_item: useFree || undefined,
-        guest_name: guestName.trim() || undefined,
-        guest_phone: guestPhone.trim() || undefined,
-        guest_address: isGuest && type === "delivery" ? newAddress.trim() : undefined,
+        guest_name: asksContact ? guestName.trim() : undefined,
+        guest_phone: needPhone ? guestPhone.trim() : undefined,
+        guest_address: type === "delivery" && !delivery_address_id ? newAddress.trim() : undefined,
+        delivery_location: type === "delivery" && pin ? pin : undefined,
         items: items.map((i) => ({ product_id: i.product_id, quantity: i.quantity })),
       });
       if ("error" in res && res.error) { toast.error(res.error); return; }
-      const ok = res as { orderId: string; orderNumber: string; dailyNumber: number | null; total: number };
+      const ok = res as { orderId: string; orderNumber: string; dailyNumber: number | null; total: number; deliveryCode: string | null };
+      // A guest can't sign in to see their delivery code again — keep it for this tab only.
+      if (ok.deliveryCode) { try { sessionStorage.setItem(guestCodeKey(ok.orderId), ok.deliveryCode); } catch { /* private mode */ } }
 
       if (payment === "esewa") {
         const form = await getEsewaPaymentForm({ orderId: ok.orderId });
@@ -208,13 +242,16 @@ export default function OrderPage() {
         return;
       }
 
-      const collectionNote = type === "pickup" ? ` Your order number is ${ok.dailyNumber ?? ok.orderNumber} — tell this to our counter staff when you arrive.` : "";
+      const collectionNote = type === "pickup"
+        ? ` Your order number is ${ok.dailyNumber ?? ok.orderNumber} — tell this to our counter staff when you arrive.`
+        : ok.deliveryCode ? ` Your delivery code is ${ok.deliveryCode} — give it to the rider.` : "";
       toast.success(
         `Order placed!${collectionNote} ${payment === "qr" ? "Scan the QR when your order arrives." : `Keep Rs ${ok.total} cash ready.`}`,
-        { duration: 6000 }
+        { duration: 7000 }
       );
       clear();
-      router.push(`/track/${ok.orderId}`);
+      // replace, not push: Back shouldn't return to a checkout that's already been placed.
+      router.replace(`/track/${ok.orderId}`);
     } finally {
       setBusy(false);
     }
@@ -223,11 +260,14 @@ export default function OrderPage() {
   return (
     <div className="min-h-screen bg-brand-cream pb-8">
       {/* Sticky Header with Inline Checkout Button */}
-      <div className="sticky top-0 z-40 bg-brand-cream/95 backdrop-blur-md border-b border-stone-200/50 shadow-sm py-4 px-4 mb-6">
-        <div className="mx-auto max-w-4xl flex items-center justify-between">
-          <div>
-            <h1 className="font-display text-2xl sm:text-3xl font-bold text-brand-brown">Place Your Order</h1>
-            <p className="text-xs sm:text-sm text-stone-500 mt-0.5">Browse menu → Add items → Checkout</p>
+      <div className="sticky top-0 z-40 bg-brand-cream/95 backdrop-blur-md border-b border-stone-200/50 shadow-sm py-3 px-4 mb-6">
+        <div className="mx-auto max-w-4xl flex items-center justify-between gap-3">
+          <div className="flex min-w-0 items-center gap-4">
+            <Link href={account ? "/account" : "/"} aria-label="Thelawalaa home" className="hidden shrink-0 sm:block"><BrandLogo size="sm" /></Link>
+            <div className="min-w-0 sm:border-l sm:border-stone-200 sm:pl-4">
+              <h1 className="font-display text-2xl font-bold text-brand-brown">Place your order</h1>
+              <p className="mt-0.5 text-xs text-stone-500 sm:text-sm">Browse menu → Add items → Checkout</p>
+            </div>
           </div>
           
           {step === 1 && items.length > 0 && (
@@ -351,28 +391,40 @@ export default function OrderPage() {
             <div className="card p-5">
               <h2 className="font-display text-xl font-bold border-b pb-2 mb-4">Checkout Details</h2>
               {account ? (
-                <p className="mb-4 flex flex-wrap items-center justify-between gap-x-3 gap-y-1 rounded-xl bg-stone-50 px-3 py-2.5 text-sm text-stone-600">
-                  <span className="min-w-0">Ordering as <b className="text-stone-800">{account.name || account.email}</b>{account.name && account.email ? <span className="text-stone-400"> · {account.email}</span> : null}</span>
+                <div className="mb-4 flex flex-wrap items-center justify-between gap-x-3 gap-y-1 rounded-xl bg-stone-50 px-3 py-2.5 text-sm text-stone-600">
+                  <span className="min-w-0">
+                    Ordering as <b className="text-stone-800">{account.name || account.email}</b>
+                    {account.phone ? <span className="text-stone-400"> · {account.phone}</span> : null}
+                  </span>
                   <button type="button" onClick={() => signOutTo("/order")} className="font-bold text-brand-orange">Not you? Sign out</button>
-                </p>
+                </div>
               ) : !isGuest ? null : (
                 <p className="mb-4 rounded-xl bg-orange-50 px-3 py-2.5 text-sm text-brand-brown">
                   Ordering as a guest. <Link href="/auth/login?redirect=/order" className="font-bold text-brand-orange">Sign in</Link> or <Link href="/auth/signup" className="font-bold text-brand-orange">create an account</Link> to earn points on this order.
                 </p>
               )}
-              
+
               <div className="space-y-5">
-                  <div className="grid sm:grid-cols-2 gap-4">
+                {/* Guests (and staff ordering for someone): who it's for. Not remembered by this phone. */}
+                {asksContact && (
+                  <div className="grid gap-4 sm:grid-cols-2">
                     <div>
-                      <label className="label" htmlFor="guestName">{isGuest ? "Your name" : "Contact name"}</label>
-                      <input id="guestName" className="input" maxLength={100} value={guestName} onChange={(e) => setGuestName(e.target.value)} placeholder="Full name" />
+                      <label className="label" htmlFor="guestName">Your name</label>
+                      <input id="guestName" name="tw-guest-name" autoComplete="off" className="input" maxLength={100} value={guestName} onChange={(e) => setGuestName(e.target.value)} placeholder="Full name" />
                     </div>
                     <div>
-                      <label className="label" htmlFor="guestPhone">{isGuest ? "Mobile number" : "Contact number"}</label>
-                      <input id="guestPhone" className="input" maxLength={20} value={guestPhone} onChange={(e) => setGuestPhone(e.target.value)} placeholder="98XXXXXXXX" />
+                      <label className="label" htmlFor="guestPhone">Mobile number</label>
+                      <input id="guestPhone" name="tw-guest-phone" autoComplete="off" inputMode="tel" className="input" maxLength={20} value={guestPhone} onChange={(e) => setGuestPhone(e.target.value)} placeholder="98XXXXXXXX" />
                     </div>
                   </div>
-                
+                )}
+                {account && !asksContact && !account.phone && type === "delivery" && (
+                  <div>
+                    <label className="label" htmlFor="guestPhone">Mobile number for the rider</label>
+                    <input id="guestPhone" inputMode="tel" className="input" maxLength={20} value={guestPhone} onChange={(e) => setGuestPhone(e.target.value)} placeholder="98XXXXXXXX" />
+                  </div>
+                )}
+
                 <div className={settings.delivery_enabled ? "grid grid-cols-2 gap-4" : "grid grid-cols-1 gap-4"}>
                   {(settings.delivery_enabled ? (["pickup", "delivery"] as const) : (["pickup"] as const)).map((t) => (
                     <button key={t} onClick={() => setType(t)} className={`card p-4 text-center font-bold ${type === t ? "ring-2 ring-brand-orange bg-orange-50" : ""}`}>
@@ -398,7 +450,37 @@ export default function OrderPage() {
                     </div>
                   ) : null
                 ) : (
-                  <div className="space-y-3">
+                  <div className="space-y-4">
+                    {/* The exact pin: the rider gets a map and directions to it. */}
+                    <div className="rounded-2xl bg-orange-50/70 p-4 ring-1 ring-orange-100">
+                      {pin ? (
+                        <div className="flex items-start gap-3">
+                          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-brand-green text-white"><MapPin size={18} /></span>
+                          <div className="min-w-0 flex-1">
+                            <p className="text-sm font-bold text-brand-brown">Location shared</p>
+                            <p className="text-xs text-stone-600">
+                              Accurate to about {fmtKm(pin.accuracy / 1000)} · {fmtKm(distanceKm(STORE, pin))} from our shop
+                            </p>
+                            {pin.accuracy > 150 && <p className="mt-1 text-xs font-bold text-amber-700">That&apos;s approximate — add a landmark below so the rider finds you.</p>}
+                            {distanceKm(STORE, pin) > DELIVERY_RADIUS_KM + 0.5 && (
+                              <p className="mt-1 text-xs font-bold text-amber-700">We deliver within {DELIVERY_RADIUS_KM} km — we may call you before sending this one.</p>
+                            )}
+                          </div>
+                          <button type="button" onClick={() => setPin(null)} aria-label="Remove shared location" className="rounded-full p-1.5 text-stone-400 hover:bg-white hover:text-stone-600"><X size={16} /></button>
+                        </div>
+                      ) : (
+                        <>
+                          <button type="button" onClick={shareLocation} disabled={locating}
+                            className="flex w-full items-center justify-center gap-2 rounded-full bg-white py-3 text-sm font-bold text-brand-orange shadow-sm ring-1 ring-orange-200 transition hover:bg-orange-50 disabled:opacity-60">
+                            {locating ? <Loader2 size={17} className="animate-spin" /> : <LocateFixed size={17} />}
+                            {locating ? "Finding you…" : "Share my current location"}
+                          </button>
+                          <p className="mt-2 text-center text-xs text-stone-500">Best if you&apos;re at the delivery address now — our rider gets the exact spot on a map.</p>
+                          {locError && <p className="mt-2 text-center text-xs font-bold text-brand-red">{locError}</p>}
+                        </>
+                      )}
+                    </div>
+
                     {addresses.length > 0 && (
                       <div>
                         <label className="label" htmlFor="addr">Saved addresses</label>
@@ -410,8 +492,13 @@ export default function OrderPage() {
                     )}
                     {!addressId && (
                       <div>
-                        <label className="label" htmlFor="newaddr">Delivery address</label>
-                        <textarea id="newaddr" className="input" rows={2} maxLength={300} value={newAddress} onChange={(e) => setNewAddress(e.target.value)} placeholder="Flat, building, street, landmark, area" />
+                        <label className="label" htmlFor="newaddr">
+                          {pin ? <>Address details <span className="font-normal text-stone-400">(house, floor, landmark — helps the rider)</span></> : "Full delivery address"}
+                        </label>
+                        <textarea id="newaddr" name="tw-delivery-address" autoComplete={isGuest ? "off" : "street-address"} className="input" rows={2} maxLength={300}
+                          value={newAddress} onChange={(e) => setNewAddress(e.target.value)}
+                          placeholder="Tole / street, house or building, nearest landmark" />
+                        {!pin && <p className="mt-1 text-xs text-stone-500">No location shared, so we need the full address — e.g. &ldquo;Ward 5, Shanti Tole, blue house behind Banepa Hospital&rdquo;.</p>}
                       </div>
                     )}
                     <p className="text-xs font-bold text-brand-green">Home delivery: flat Nrs 20 (within 5km of Godam Chowk)</p>
@@ -484,6 +571,9 @@ export default function OrderPage() {
               </div>
             </div>
 
+            <p className="text-center text-xs text-stone-500">
+              By placing this order you agree to our <Link href="/terms" target="_blank" className="font-bold text-brand-orange">Terms &amp; Conditions</Link>. Offers and prices can change without notice.
+            </p>
             <div className="flex gap-3">
               <button onClick={() => setStep(1)} className="rounded-full bg-white px-6 py-3 font-bold border border-stone-200">← Back</button>
               <button onClick={placeOrder} disabled={busy || items.length === 0} className="btn-primary flex-1 shadow-lg shadow-orange-500/30">

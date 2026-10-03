@@ -1,6 +1,5 @@
 "use server";
 
-import crypto from "crypto";
 import { after } from "next/server";
 import { checkStockAfterSale } from "@/lib/stock-alerts";
 import { orderSchema } from "@/lib/validations/order";
@@ -12,13 +11,7 @@ import { orderConfirmedEmail } from "@/lib/account-emails";
 import { applyOpeningPromoPrice } from "@/lib/promo";
 import { pushToStaff } from "@/lib/push";
 import { npr } from "@/lib/utils";
-
-function hashOtp(otp: string, orderId: string) {
-  return crypto
-    .createHmac("sha256", process.env.OTP_HMAC_SECRET!)
-    .update(`${orderId}:${otp}`)
-    .digest("hex");
-}
+import { deliveryOtp, hashOtp } from "@/lib/delivery-otp";
 
 // USP: flat Nrs 20 home delivery within 5km of the store (Godam Chowk, Banepa at launch).
 const DELIVERY_FEE = 20; // NPR — flat
@@ -94,16 +87,35 @@ export async function createOrder(input: unknown) {
     };
   });
 
-  // Verify the delivery address belongs to THIS customer
-  if (data.type === "delivery" && isSelfCheckout && data.delivery_address_id) {
-    const { data: addr } = await supabaseAdmin
-      .from("addresses")
-      .select("id, customer_id")
-      .eq("id", data.delivery_address_id)
-      .single();
-    if (!addr || addr.customer_id !== user?.id) return { error: "Invalid delivery address" };
-  } else if (data.type === "delivery" && (isAnonymous || isStaff) && !data.guest_address) {
-    return { error: "Please provide a delivery address" };
+  // ── Where a delivery goes: a saved address (theirs only) or the typed one,
+  // plus the pin if they shared their location. No pin → a proper address.
+  let deliveryAddress = "";
+  let pin: { lat: number; lng: number; accuracy: number | null } | null = null;
+  if (data.type === "delivery") {
+    if (data.delivery_address_id) {
+      if (!isSelfCheckout) return { error: "Invalid delivery address" };
+      const { data: addr } = await supabaseAdmin
+        .from("addresses")
+        .select("id, customer_id, full_address, lat, lng")
+        .eq("id", data.delivery_address_id)
+        .single();
+      if (!addr || addr.customer_id !== user?.id) return { error: "Invalid delivery address" };
+      deliveryAddress = addr.full_address;
+      if (addr.lat != null && addr.lng != null) pin = { lat: Number(addr.lat), lng: Number(addr.lng), accuracy: null };
+    } else {
+      deliveryAddress = (data.guest_address ?? "").trim();
+    }
+    if (data.delivery_location) {
+      const { lat, lng, accuracy } = data.delivery_location;
+      pin = { lat, lng, accuracy: accuracy != null ? Math.round(accuracy) : null };
+    }
+    if (!pin && deliveryAddress.length < 10) {
+      return { error: "Add your full delivery address (tole/street, house and a landmark) — or share your location" };
+    }
+  }
+  const contactPhone = isSelfCheckout ? (profile.phone || data.guest_phone || null) : data.guest_phone;
+  if (isSelfCheckout && data.type === "delivery" && !contactPhone) {
+    return { error: "Add your mobile number so the rider can reach you" };
   }
 
   const delivery_fee = data.type === "delivery" ? DELIVERY_FEE : 0;
@@ -175,18 +187,16 @@ export async function createOrder(input: unknown) {
   const total = Math.max(0, subtotal + delivery_fee - discount_amount - points_discount);
   
   let finalNotes = data.notes ? data.notes.trim() : "";
-  let extractedAddress = "";
-  if (data.type === "delivery" && isSelfCheckout && data.delivery_address_id) {
-    const { data: addr } = await supabaseAdmin.from("addresses").select("full_address").eq("id", data.delivery_address_id).single();
-    if (addr) extractedAddress = addr.full_address;
-  }
+  const addressLine = data.type === "delivery"
+    ? `\nAddress: ${(deliveryAddress || "Shared location pin").replace(/\s*\n\s*/g, ", ")}${pin && deliveryAddress ? " (pin shared)" : ""}`
+    : "";
 
   if (isStaff) {
-    finalNotes = `[POS Order]\nName: ${data.guest_name}\nPhone: ${data.guest_phone && data.guest_phone !== "N/A" ? data.guest_phone : "N/A"}${data.type === 'delivery' ? `\nAddress: ${data.guest_address}` : ""}\n\n${finalNotes}`.trim();
+    finalNotes = `[POS Order]\nName: ${data.guest_name}\nPhone: ${data.guest_phone && data.guest_phone !== "N/A" ? data.guest_phone : "N/A"}${addressLine}\n\n${finalNotes}`.trim();
   } else if (isAnonymous) {
-    finalNotes = `[Guest Checkout]\nName: ${data.guest_name}\nPhone: ${data.guest_phone}${data.type === 'delivery' ? `\nAddress: ${data.guest_address}` : ""}\n\n${finalNotes}`.trim();
+    finalNotes = `[Guest Checkout]\nName: ${data.guest_name}\nPhone: ${data.guest_phone}${addressLine}\n\n${finalNotes}`.trim();
   } else if (isSelfCheckout) {
-    finalNotes = `[Registered User]\nName: ${profile.full_name}\nPhone: ${profile.phone ?? "N/A"}${data.type === 'delivery' && extractedAddress ? `\nAddress: ${extractedAddress}` : ""}${rewardNote ? `\n[Rewards]${rewardNote}` : ""}\n\n${finalNotes}`.trim();
+    finalNotes = `[Registered User]\nName: ${profile.full_name}\nPhone: ${contactPhone ?? "N/A"}${addressLine}${rewardNote ? `\n[Rewards]${rewardNote}` : ""}\n\n${finalNotes}`.trim();
   }
 
   if (isSelfCheckout && (points_redeemed > 0 || free_item_redeemed)) {
@@ -208,6 +218,10 @@ export async function createOrder(input: unknown) {
       discount_amount,
       total,
       delivery_address_id: isSelfCheckout ? (data.delivery_address_id ?? null) : null,
+      delivery_address: data.type === "delivery" ? (deliveryAddress || null) : null,
+      delivery_lat: pin?.lat ?? null,
+      delivery_lng: pin?.lng ?? null,
+      delivery_accuracy_m: pin?.accuracy ?? null,
       pickup_time: data.pickup_time ?? null,
       payment_method: data.payment_method,
       payment_status: "pending", // admin confirms cash/QR manually
@@ -237,10 +251,11 @@ export async function createOrder(input: unknown) {
     .from("order_items")
     .insert(itemRows.map((r) => ({ ...r, order_id: order.id })));
 
-  // ── Delivery OTP — plaintext only goes to the customer's email ──
+  // ── Delivery code — only its hash is stored. The customer sees it on the
+  // order-placed screen, their tracking page and (signed in) their email.
   let otpForEmail: string | null = null;
   if (data.type === "delivery") {
-    otpForEmail = crypto.randomInt(1000, 10000).toString();
+    otpForEmail = deliveryOtp(order.id);
     await supabaseAdmin.from("deliveries").insert({
       order_id: order.id,
       delivery_otp_hash: hashOtp(otpForEmail, order.id),
@@ -289,7 +304,7 @@ export async function createOrder(input: unknown) {
   // Linked stock (Accounts → Stock) counts down with every sale; warn staff if it's running out.
   after(() => checkStockAfterSale(itemRows.map((r) => r.product_id)));
 
-  return { orderId: order.id, orderNumber: order.order_number, dailyNumber: order.daily_number, total };
+  return { orderId: order.id, orderNumber: order.order_number, dailyNumber: order.daily_number, total, deliveryCode: otpForEmail };
 }
 
 export async function validatePromoCode(code: string, subtotal: number) {

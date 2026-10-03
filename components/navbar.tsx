@@ -2,9 +2,12 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { Menu, X, ShoppingCart } from "lucide-react";
+import { ShoppingCart, UserRound } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useCart } from "@/lib/store/cart";
+import { useViewerRole } from "@/lib/use-viewer";
+import { ROLE_HOME } from "@/lib/role-home";
+import BrandLogo from "@/components/brand-logo";
 
 const LINKS = [
   { id: "home", label: "Home" },
@@ -15,10 +18,15 @@ const LINKS = [
   { id: "contact", label: "Contact" },
 ];
 
+// One navigation per screen size: the links live here on tablets and
+// laptops; phones get the bottom bar (components/mobile-nav.tsx) instead,
+// so this bar only keeps the logo, the cart and the account button there.
 export default function Navbar() {
-  const [open, setOpen] = useState(false);
-  const [active, setActive] = useState("home");
+  const [active, setActive] = useState<string | null>(null);
   const itemCount = useCart((s) => s.items.reduce((n, i) => n + i.quantity, 0));
+  const { role, ready } = useViewerRole();
+  const accountHref = role ? ROLE_HOME[role] ?? "/" : "/auth/login";
+  const accountLabel = !role ? "Sign in" : role === "customer" ? "My account" : "My portal";
 
   useEffect(() => {
     const observer = new IntersectionObserver(
@@ -35,10 +43,10 @@ export default function Navbar() {
   }, []);
 
   return (
-    <header className="sticky top-0 z-50 border-b border-stone-200 bg-white/90 backdrop-blur shadow-sm">
-      <nav className="mx-auto flex max-w-6xl items-center justify-between px-4 py-3">
-        <a href="/#home" className="flex items-center gap-2">
-          <span className="font-display text-2xl font-extrabold text-brand-orange">Thelawalaa</span>
+    <header className="sticky top-0 z-50 border-b border-stone-200/80 bg-white/90 shadow-sm backdrop-blur-md">
+      <nav className="mx-auto flex max-w-6xl items-center justify-between gap-3 px-4 py-2.5">
+        <a href="/#home" aria-label="Thelawalaa home" className="min-w-0">
+          <BrandLogo size="sm" />
         </a>
 
         <ul className="hidden items-center gap-1 md:flex lg:gap-2">
@@ -47,12 +55,12 @@ export default function Navbar() {
               <a
                 href={`/#${id}`}
                 className={cn(
-                  "whitespace-nowrap rounded-full px-3 py-2 text-sm font-bold transition lg:px-5",
+                  "whitespace-nowrap rounded-full px-3 py-2 text-sm font-bold transition lg:px-4",
                   id === "order"
                     ? "bg-brand-orange text-white shadow hover:brightness-110"
                     : active === id
-                      ? "text-brand-orange bg-orange-50"
-                      : "text-stone-600 hover:text-brand-orange hover:bg-orange-50/50"
+                      ? "bg-orange-50 text-brand-orange"
+                      : "text-stone-600 hover:bg-orange-50/50 hover:text-brand-orange"
                 )}
               >
                 {label}
@@ -61,11 +69,11 @@ export default function Navbar() {
           ))}
         </ul>
 
-        <div className="flex items-center gap-2">
+        <div className="flex shrink-0 items-center gap-1.5">
           <Link
             href="/order"
             aria-label={`Your cart${itemCount > 0 ? `, ${itemCount} item${itemCount > 1 ? "s" : ""}` : ""}`}
-            className="relative flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-stone-600 transition hover:bg-orange-50 hover:text-brand-orange"
+            className="relative flex h-10 w-10 items-center justify-center rounded-full text-stone-600 transition hover:bg-orange-50 hover:text-brand-orange"
           >
             <ShoppingCart size={20} />
             {itemCount > 0 && (
@@ -75,39 +83,18 @@ export default function Navbar() {
             )}
           </Link>
           <Link
-            href="/auth/login"
-            className="hidden whitespace-nowrap rounded-full border-2 border-brand-orange px-3 py-2 text-sm font-bold text-brand-orange transition hover:bg-orange-50 md:inline-flex lg:px-5"
+            href={accountHref}
+            aria-label={accountLabel}
+            className={cn(
+              "flex h-10 items-center gap-1.5 whitespace-nowrap rounded-full border-2 border-brand-orange px-3 text-sm font-bold text-brand-orange transition hover:bg-orange-50 lg:px-4",
+              !ready && "invisible"
+            )}
           >
-            Login
+            <UserRound size={16} className="md:hidden" />
+            <span className="hidden sm:inline">{accountLabel}</span>
           </Link>
-          <button
-            className="rounded-full p-2 text-stone-600 md:hidden"
-            onClick={() => setOpen((o) => !o)}
-            aria-label="Toggle menu"
-            aria-expanded={open}
-          >
-            {open ? <X /> : <Menu />}
-          </button>
         </div>
       </nav>
-
-      {open && (
-        <div className="border-t border-stone-200 bg-white px-4 pb-4 md:hidden shadow-lg">
-          {LINKS.map(({ id, label }) => (
-            <a
-              key={id}
-              href={`/#${id}`}
-              onClick={() => setOpen(false)}
-              className="block rounded-xl px-4 py-3 font-bold text-stone-700 hover:bg-orange-50 hover:text-brand-orange"
-            >
-              {label}
-            </a>
-          ))}
-          <Link href="/auth/login" className="mt-2 block rounded-full border-2 border-brand-orange px-4 py-3 text-center font-bold text-brand-orange hover:bg-orange-50">
-            Login
-          </Link>
-        </div>
-      )}
     </header>
   );
 }

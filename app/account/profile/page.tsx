@@ -1,6 +1,8 @@
 import Link from "next/link";
-import { MapPin, MessageCircle, ChevronRight, BadgeCheck } from "lucide-react";
+import { MapPin, MessageCircle, ChevronRight, BadgeCheck, FileText } from "lucide-react";
 import { getVerifiedUser } from "@/lib/supabase/server";
+import { supabaseAdmin } from "@/lib/supabase/admin";
+import { OffersToggle } from "@/components/account/offers-join";
 import { DetailsForm, PasswordForm } from "@/components/account/profile-forms";
 import SignOutButton from "@/components/account/sign-out-button";
 
@@ -10,9 +12,10 @@ export default async function ProfilePage() {
   const { user, profile } = await getVerifiedUser();
   if (!user || !profile) return null;
   const since = new Date(user.created_at).toLocaleDateString("en-GB", { timeZone: "Asia/Kathmandu", month: "long", year: "numeric" });
+  const { data: consent } = await supabaseAdmin.from("profiles").select("marketing_opt_in").eq("id", user.id).single();
 
   return (
-    <div className="space-y-5 pb-24 sm:pb-8">
+    <div className="space-y-5 pb-4">
       <div>
         <h1 className="font-display text-2xl font-extrabold text-brand-brown">Profile</h1>
         <p className="text-sm text-stone-500">Member since {since}</p>
@@ -31,6 +34,13 @@ export default async function ProfilePage() {
         </div>
       </section>
 
+      {profile.role === "customer" && (
+        <section id="offers" className="scroll-mt-24 rounded-3xl bg-white p-5 shadow-sm ring-1 ring-stone-100 sm:p-6">
+          <h2 className="mb-4 font-display text-lg font-bold text-brand-brown">Messages from us</h2>
+          <OffersToggle joined={!!consent?.marketing_opt_in} />
+        </section>
+      )}
+
       <section className="rounded-3xl bg-white p-5 shadow-sm ring-1 ring-stone-100 sm:p-6">
         <h2 className="mb-4 font-display text-lg font-bold text-brand-brown">Password</h2>
         <PasswordForm email={user.email ?? ""} />
@@ -40,6 +50,7 @@ export default async function ProfilePage() {
         {[
           { href: "/account/addresses", icon: MapPin, title: "Saved addresses", body: "For home delivery" },
           { href: "/whatsapp", icon: MessageCircle, title: "Help & support", body: "Chat with us on WhatsApp" },
+          { href: "/terms", icon: FileText, title: "Terms & privacy", body: "Orders, offers, rewards and your data" },
         ].map((l) => (
           <Link key={l.href} href={l.href} className="flex items-center gap-3 px-5 py-4 transition hover:bg-stone-50">
             <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-orange-50 text-brand-orange"><l.icon size={18} /></span>

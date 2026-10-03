@@ -1,6 +1,8 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { after } from "next/server";
+import { pushToDrivers } from "@/lib/push";
 import { inviteStaffSchema } from "@/lib/validations/staff";
 import { requireRole } from "@/lib/supabase/server";
 import { supabaseAdmin, audit, loyaltyAward, loyaltyUnaward, loyaltyOnCancel } from "@/lib/supabase/admin";
@@ -203,7 +205,21 @@ export async function assignDriver(orderId: string, driverId: string) {
     .eq("order_id", orderId);
   await supabaseAdmin.from("orders").update({ status: "assigned" }).eq("id", orderId);
   await audit({ actor_id: user.id, action: "ASSIGN_DRIVER", target_table: "deliveries", target_id: orderId, new_data: { driverId } });
+  // The rider's phone buzzes even with the app closed (if they turned alerts on).
+  after(async () => {
+    const { data: o } = await supabaseAdmin.from("orders")
+      .select("order_number, daily_number, delivery_address, items:order_items(quantity)").eq("id", orderId).single();
+    if (!o) return;
+    const count = (o.items as { quantity: number }[]).reduce((n, i) => n + i.quantity, 0);
+    await pushToDrivers({
+      title: `New delivery ${o.daily_number != null ? `#${String(o.daily_number).padStart(2, "0")}` : o.order_number}`,
+      body: `${count} item${count === 1 ? "" : "s"}${o.delivery_address ? ` · ${o.delivery_address.split(",")[0].slice(0, 40)}` : ""} — tap to open`,
+      tag: `delivery-${orderId}`,
+      url: "/delivery",
+    }, driverId);
+  });
   revalidatePath("/admin/delivery");
+  revalidatePath("/delivery");
   return { ok: true };
 }
 

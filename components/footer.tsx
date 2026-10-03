@@ -2,6 +2,7 @@ import { Facebook, Instagram, Link2 } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import TikTokIcon from "@/components/icons/tiktok";
 import { getSiteText } from "@/lib/site-content";
+import BrandLogo from "@/components/brand-logo";
 
 function platformIcon(platform: string) {
   const p = platform.toLowerCase();
@@ -22,8 +23,8 @@ export default async function Footer() {
     <footer className="bg-brand-brown px-4 py-12 text-white">
       <div className="mx-auto grid max-w-6xl gap-8 md:grid-cols-3">
         <div>
-          <p className="font-display text-2xl font-bold brand-gradient-text">Thelawalaa</p>
-          <p className="mt-2 text-sm text-orange-100/80">{t["footer.tagline"]}</p>
+          <BrandLogo size="lg" tone="dark" tagline />
+          <p className="mt-3 text-sm text-orange-100/80">{t["footer.tagline"]}</p>
           {(socialLinks ?? []).length > 0 && (
             <div className="mt-4">
               <p className="text-xs font-bold uppercase tracking-wide text-orange-100/60">Follow Us</p>
@@ -53,7 +54,7 @@ export default async function Footer() {
           <a href="/feedback" className="hover:text-white">Feedback</a>
         </nav>
         <div className="text-sm text-orange-100/70">
-          <p>Privacy Policy · Terms of Service</p>
+          <p className="font-bold"><a href="/terms" className="hover:text-white">Terms &amp; Conditions</a> · <a href="/terms#privacy" className="hover:text-white">Privacy</a></p>
           <p className="mt-2">© {new Date().getFullYear()} Thelawalaa.com — All rights reserved</p>
         </div>
       </div>

@@ -1,5 +1,5 @@
 import "server-only";
-import { renderEmail, p, callout, list, receipt, EMAIL_SITE, firstName } from "@/lib/email";
+import { renderEmail, p, callout, list, receipt, EMAIL_SITE, firstName, esc } from "@/lib/email";
 import { describeRewards, fmtPoints, type RewardSettings } from "@/lib/rewards";
 
 // The customer account emails, all in the branded layout (lib/email.ts).
@@ -180,4 +180,24 @@ export function supabaseTemplates(welcomePoints: number) {
     { key: "confirmation", label: "Confirm signup", subject: confirm.subject, html: fill(confirm.html) },
     { key: "recovery", label: "Reset password", subject: reset.subject, html: fill(reset.html) },
   ];
+}
+
+/** An offer / news message from Admin → Notifications — only to customers who joined offers. */
+export function offerNoticeEmail(o: { name: string; title: string; body: string; url: string | null; unsubscribeUrl: string }) {
+  const paragraphs = o.body.split(/\n\s*\n/).map((t) => t.trim()).filter(Boolean);
+  return {
+    subject: o.title,
+    ...renderEmail({
+      preheader: o.body.slice(0, 120),
+      heading: o.title,
+      name: o.name,
+      blocks: [
+        ...paragraphs.map((t) => p(esc(t).replace(/\n/g, "<br>"), t)),
+        p(`<span style="font-size:13px;color:#78716C">Offers can change or end at any time without notice — see our <a href="${EMAIL_SITE}/terms#offers" style="color:#F97316">terms</a>. Don't want these emails? <a href="${o.unsubscribeUrl}" style="color:#F97316">Unsubscribe</a>.</span>`,
+          `Offers can change or end at any time without notice (${EMAIL_SITE}/terms#offers). Unsubscribe: ${o.unsubscribeUrl}`),
+      ],
+      cta: o.url ? { label: "See the offer", url: o.url } : { label: "Order now", url: `${EMAIL_SITE}/order` },
+      reason: "You're getting this because you joined Thelawalaa offers and competitions. You can leave any time from your profile.",
+    }),
+  };
 }

@@ -13,5 +13,7 @@ export async function signOutHere() {
 /** The same, landing somewhere else (checkout's "Not you?" goes back to /order as a guest). */
 export async function signOutTo(path: string) {
   await createClient().auth.signOut({ scope: "local" });
+  // Nothing of theirs stays for the next person on this device.
+  try { sessionStorage.clear(); } catch { /* storage blocked */ }
   window.location.replace(path);
 }

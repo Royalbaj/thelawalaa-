@@ -8,6 +8,7 @@ import { orderStatusLabel } from "@/lib/order-status";
 import RewardsCard from "@/components/account/rewards-card";
 import OrderTracker from "@/components/account/order-tracker";
 import ReorderButton from "@/components/account/reorder-button";
+import { OffersJoinCard } from "@/components/account/offers-join";
 
 export const dynamic = "force-dynamic";
 
@@ -19,18 +20,19 @@ export default async function AccountHome({ searchParams }: { searchParams: Prom
   const welcome = (await searchParams).welcome === "1";
 
   const supabase = await createClient();
-  const [rewards, { data: offers }, { data: orders }, { data: favorites }] = await Promise.all([
+  const [rewards, { data: offers }, { data: orders }, { data: favorites }, { data: consent }] = await Promise.all([
     getCustomerRewards(user.id),
     supabase.from("offers").select("*").order("sort_order").limit(6),
-    supabase.from("orders").select("id, order_number, daily_number, status, total, type, created_at, items:order_items(product_name, quantity)")
+    supabase.from("orders").select("id, order_number, daily_number, status, total, type, payment_status, created_at, items:order_items(product_name, quantity)")
       .order("created_at", { ascending: false }).limit(5),
     supabase.from("customer_favorites").select("product_id, products(name, price, image_url)").eq("customer_id", user.id).limit(4),
+    supabase.from("profiles").select("marketing_opt_in").eq("id", user.id).single(),
   ]);
   const active = (orders ?? []).find((o) => !["delivered", "cancelled"].includes(o.status));
   const first = profile.full_name.split(" ")[0];
 
   return (
-    <div className="space-y-6 pb-24 sm:pb-8">
+    <div className="space-y-6 pb-4">
       {welcome && (
         <div className="flex items-start gap-3 rounded-3xl bg-green-50 p-5 ring-1 ring-green-200">
           <PartyPopper className="mt-0.5 shrink-0 text-brand-green" size={24} />
@@ -49,6 +51,8 @@ export default async function AccountHome({ searchParams }: { searchParams: Prom
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_340px]">
         <div className="space-y-6">
           {active && <OrderTracker order={active} />}
+
+          {profile.role === "customer" && <OffersJoinCard joined={!!consent?.marketing_opt_in} />}
 
           <div className="grid grid-cols-4 gap-2 sm:gap-3">
             {[
@@ -87,7 +91,13 @@ export default async function AccountHome({ searchParams }: { searchParams: Prom
                           {nepalDate(o.created_at)} · {(o.items as { product_name: string; quantity: number }[]).map((i) => `${i.quantity}× ${i.product_name}`).join(", ")}
                         </p>
                       </Link>
-                      <p className="shrink-0 font-bold text-brand-brown">{npr(Number(o.total))}</p>
+                      {/* The price only while the order is open — history shows what, not how much. */}
+                      {!["delivered", "cancelled"].includes(o.status) && (
+                        <p className="shrink-0 text-right font-bold text-brand-brown">
+                          {o.payment_status !== "paid" && <span className="block text-[10px] font-bold uppercase tracking-wide text-amber-600">To pay</span>}
+                          {npr(Number(o.total))}
+                        </p>
+                      )}
                     </div>
                     <div className="mt-3 flex items-center justify-between gap-2">
                       <span className="rounded-full bg-stone-100 px-2.5 py-1 text-[11px] font-bold text-stone-600">{orderStatusLabel(o.status, o.type)}</span>

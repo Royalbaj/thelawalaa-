@@ -28,7 +28,7 @@ export default async function RewardsPage() {
   const stamps = r.settings.free_item_orders;
 
   return (
-    <div className="space-y-6 pb-24 sm:pb-8">
+    <div className="space-y-6 pb-4">
       <h1 className="font-display text-2xl font-extrabold text-brand-brown">Rewards</h1>
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
         <RewardsCard r={r} />

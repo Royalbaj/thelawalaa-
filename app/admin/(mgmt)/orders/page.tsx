@@ -5,7 +5,7 @@ import { npr, cn } from "@/lib/utils";
 import { STATUS_FILTERS } from "@/lib/order-status";
 import OrderStatusSelect from "@/components/admin/order-status-select";
 import MarkPaidButton from "@/components/admin/mark-paid-button";
-import Link from "next/link";
+import { ItemsSummary, OrderDetails } from "@/components/admin/order-details";
 
 export const dynamic = "force-dynamic";
 
@@ -20,7 +20,7 @@ export default async function AdminOrders(props: { searchParams: Promise<{ statu
 
   let query = supabaseAdmin
     .from("orders")
-    .select("id, order_number, daily_number, status, type, total, payment_status, payment_method, created_at, notes, discount_amount, promo_codes:promo_code_id(code), profiles:customer_id(full_name)")
+    .select("id, order_number, daily_number, status, type, subtotal, delivery_fee, total, payment_status, payment_method, created_at, notes, discount_amount, discount_label, points_discount, delivery_address, delivery_lat, delivery_lng, promo_codes:promo_code_id(code), profiles:customer_id(full_name), items:order_items(product_name, quantity, product_price, line_total)")
     .order("created_at", { ascending: false })
     .limit(100);
   if (tab.statuses.length) query = query.in("status", tab.statuses);
@@ -92,9 +92,11 @@ export default async function AdminOrders(props: { searchParams: Promise<{ statu
               </div>
               <p className="shrink-0 font-display text-lg font-bold text-brand-brown">{npr(Number(o.total))}</p>
             </div>
+            <div className="mt-1.5"><ItemsSummary items={o.items ?? []} /></div>
             {Number(o.discount_amount) > 0 && o.promo_codes?.code && (
               <p className="mt-1 inline-block rounded-full bg-green-50 px-2 py-0.5 text-[11px] font-bold text-brand-green">🎟️ {o.promo_codes.code} (−{npr(Number(o.discount_amount))})</p>
             )}
+            <OrderDetails o={{ ...o, items: o.items ?? [] }} />
             <div className="mt-2.5 flex flex-wrap items-center gap-2">
               <MarkPaidButton orderId={o.id} total={Number(o.total)} paid={o.payment_status === "paid"} method={o.payment_method} />
               <span className="text-[11px] font-bold uppercase text-stone-400">{o.payment_method ?? "—"}</span>
@@ -113,11 +115,12 @@ export default async function AdminOrders(props: { searchParams: Promise<{ statu
 
       {/* Orders Table (tablets and up) */}
       <div className="hidden rounded-2xl bg-white shadow-sm border border-stone-100 overflow-x-auto md:block">
-        <table className="w-full text-sm">
+        <table className="w-full text-sm [&_td]:align-top">
           <thead>
             <tr className="border-b border-stone-100 text-left text-xs uppercase text-stone-400 bg-stone-50/50">
               <th className="px-4 py-3.5 font-bold">Order #</th>
               <th className="px-4 py-3.5 font-bold">Customer</th>
+              <th className="px-4 py-3.5 font-bold">Items</th>
               <th className="px-4 py-3.5 font-bold">Type</th>
               <th className="px-4 py-3.5 font-bold">Total</th>
               <th className="px-4 py-3.5 font-bold">Payment</th>
@@ -140,6 +143,10 @@ export default async function AdminOrders(props: { searchParams: Promise<{ statu
                     {isGuest && (
                       <span className="text-[10px] font-bold text-stone-400 bg-stone-100 px-1.5 py-0.5 rounded">GUEST</span>
                     )}
+                  </td>
+                  <td className="min-w-[220px] max-w-[320px] px-4 py-3.5">
+                    <ItemsSummary items={o.items ?? []} />
+                    <OrderDetails o={{ ...o, items: o.items ?? [] }} />
                   </td>
                   <td className="px-4 py-3.5">
                     <span className={cn(
@@ -175,7 +182,7 @@ export default async function AdminOrders(props: { searchParams: Promise<{ statu
             })}
             {(orders ?? []).length === 0 && (
               <tr>
-                <td colSpan={7} className="px-4 py-12 text-center">
+                <td colSpan={8} className="px-4 py-12 text-center">
                   <div className="text-3xl mb-2">📋</div>
                   <p className="font-bold text-stone-500">No orders found</p>
                   <p className="text-xs text-stone-400 mt-1">Try a different filter or search term</p>

@@ -2,6 +2,7 @@
 import { ChevronDown } from "lucide-react";
 import SignupForm from "@/components/auth/signup-form";
 import { FacebookLogo, InstagramLogo, TikTokLogo } from "@/components/icons/social-logos";
+import BrandLogo from "@/components/brand-logo";
 
 const SOCIALS = [
   { platform: "Facebook", href: "https://www.facebook.com/share/19i61to1PT/?mibextid=wwXIfr", Icon: FacebookLogo },
@@ -33,7 +34,7 @@ export default function QrSignupPage() {
     <div className="flex min-h-screen flex-col items-center justify-center bg-brand-dark px-4 py-10">
       <div className="w-full max-w-md">
         <div className="rounded-2xl bg-gradient-to-br from-brand-red via-brand-orange to-brand-yellow p-6 text-center shadow-xl">
-          <p className="font-display text-3xl font-black tracking-tight text-white drop-shadow-sm">Thelawalaa</p>
+          <div className="mx-auto mb-1 w-fit rounded-2xl bg-white px-4 py-2.5 shadow-lg"><BrandLogo size="md" /></div>
           <p className="mt-1 font-display text-sm font-bold uppercase tracking-widest text-white/90">
             Opening Day Special
           </p>

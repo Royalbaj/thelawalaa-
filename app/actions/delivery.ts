@@ -4,20 +4,16 @@ import crypto from "crypto";
 import { revalidatePath } from "next/cache";
 import { requireRole } from "@/lib/supabase/server";
 import { supabaseAdmin, audit } from "@/lib/supabase/admin";
-
-function hashOtp(otp: string, orderId: string) {
-  return crypto
-    .createHmac("sha256", process.env.OTP_HMAC_SECRET!)
-    .update(`${orderId}:${otp}`)
-    .digest("hex");
-}
+import { hashOtp } from "@/lib/delivery-otp";
+import { noteField } from "@/lib/order-notes";
 
 export async function setDriverOnline(online: boolean) {
   const { user } = await requireRole(["delivery_driver"]);
   await supabaseAdmin
     .from("profiles")
-    .update({ is_online: online, last_seen_at: new Date().toISOString() })
+    .update({ is_online: !!online, last_seen_at: new Date().toISOString() })
     .eq("id", user.id);
+  await audit({ actor_id: user.id, action: online ? "DRIVER_ONLINE" : "DRIVER_OFFLINE", target_table: "profiles", target_id: user.id });
   revalidatePath("/delivery");
   return { ok: true };
 }
@@ -38,11 +34,11 @@ export async function driverAdvanceStatus(orderId: string) {
     .eq("id", orderId)
     .single();
 
-  if (!order || (order.deliveries as any)?.driver_id !== user.id) {
+  if (!order || (order.deliveries as unknown as { driver_id: string } | null)?.driver_id !== user.id) {
     return { error: "Not your delivery" };
   }
   const t = DRIVER_TRANSITIONS[order.status];
-  if (!t) return { error: "This order can't be advanced from here" };
+  if (!t) return { error: "This order can't be moved on from here" };
 
   await supabaseAdmin.from("orders").update({ status: t.next }).eq("id", orderId);
   await supabaseAdmin
@@ -59,7 +55,7 @@ const MAX_OTP_ATTEMPTS = 3;
 
 export async function verifyDeliveryOtp(orderId: string, otp: string) {
   const { user } = await requireRole(["delivery_driver"]);
-  if (!/^\d{4}$/.test(otp)) return { error: "OTP is 4 digits" };
+  if (!/^\d{4}$/.test(otp)) return { error: "The code is 4 digits" };
 
   const { data: delivery } = await supabaseAdmin
     .from("deliveries")
@@ -70,7 +66,7 @@ export async function verifyDeliveryOtp(orderId: string, otp: string) {
   if (!delivery || delivery.driver_id !== user.id) return { error: "Not your delivery" };
   if (delivery.otp_verified) return { ok: true };
   if (delivery.otp_attempts >= MAX_OTP_ATTEMPTS) {
-    return { error: "Too many wrong attempts — ask support to confirm this delivery" };
+    return { error: "Too many wrong codes — call the shop so they can confirm this delivery" };
   }
 
   const expected = delivery.delivery_otp_hash ?? "";
@@ -84,7 +80,8 @@ export async function verifyDeliveryOtp(orderId: string, otp: string) {
       .from("deliveries")
       .update({ otp_attempts: delivery.otp_attempts + 1 })
       .eq("id", delivery.id);
-    return { error: `Wrong OTP (${MAX_OTP_ATTEMPTS - delivery.otp_attempts - 1} attempts left)` };
+    const left = MAX_OTP_ATTEMPTS - delivery.otp_attempts - 1;
+    return { error: left > 0 ? `Wrong code — ${left} ${left === 1 ? "try" : "tries"} left` : "Wrong code — call the shop so they can confirm this delivery" };
   }
 
   const now = new Date().toISOString();
@@ -102,27 +99,27 @@ export async function verifyDeliveryOtp(orderId: string, otp: string) {
 /**
  * Customer phone never appears in driver-side HTML. The driver taps
  * "Call" and this returns a tel: URI on demand — only while the
- * delivery is theirs and still active.
+ * delivery is theirs and still active. Works for guest orders too
+ * (their number is in the order, not a profile).
  */
 export async function getCustomerTelLink(orderId: string) {
   const { user } = await requireRole(["delivery_driver"]);
 
   const { data } = await supabaseAdmin
     .from("orders")
-    .select("status, customer_id, deliveries!inner(driver_id)")
+    .select("status, customer_id, notes, deliveries!inner(driver_id)")
     .eq("id", orderId)
     .single();
 
-  if (!data || (data.deliveries as any)?.driver_id !== user.id) return { error: "Not your delivery" };
-  if (["delivered", "cancelled"].includes(data.status)) return { error: "Delivery is closed" };
+  if (!data || (data.deliveries as unknown as { driver_id: string } | null)?.driver_id !== user.id) return { error: "Not your delivery" };
+  if (["delivered", "cancelled"].includes(data.status)) return { error: "This delivery is closed" };
 
-  const { data: customer } = await supabaseAdmin
-    .from("profiles")
-    .select("phone")
-    .eq("id", data.customer_id)
-    .single();
-
-  if (!customer?.phone) return { error: "No phone on file" };
+  let phone = noteField(data.notes, "Phone");
+  if (!phone && data.customer_id) {
+    const { data: customer } = await supabaseAdmin.from("profiles").select("phone").eq("id", data.customer_id).single();
+    phone = customer?.phone ?? null;
+  }
+  if (!phone) return { error: "No phone number on this order — call the shop" };
   await audit({ actor_id: user.id, action: "DRIVER_FETCH_PHONE", target_table: "orders", target_id: orderId });
-  return { tel: `tel:${customer.phone}` };
+  return { tel: `tel:${phone.replace(/[^\d+]/g, "")}` };
 }

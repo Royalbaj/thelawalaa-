@@ -1,39 +1,43 @@
+import type { Metadata, Viewport } from "next";
 import { redirect } from "next/navigation";
-import Link from "next/link";
-import { GraduationCap } from "lucide-react";
 import { getVerifiedUser } from "@/lib/supabase/server";
+import { unreadCount } from "@/lib/notifications";
 import SessionGuard from "@/components/session-guard";
+import BrandLogo from "@/components/brand-logo";
+import DriverTabs from "@/components/delivery/driver-tabs";
 
 export const dynamic = "force-dynamic";
+
+// "Add to Home Screen" installs this as its own app (needed on iPhone for
+// new-delivery notifications — components/delivery/driver-alerts.tsx).
+export const metadata: Metadata = {
+  title: "Driver",
+  manifest: "/delivery.webmanifest",
+  appleWebApp: { capable: true, title: "Thelawalaa Driver", statusBarStyle: "black" },
+  robots: { index: false, follow: false },
+};
+export const viewport: Viewport = { themeColor: "#0c0a09", viewportFit: "cover" };
 
 export default async function DeliveryLayout({ children }: { children: React.ReactNode }) {
   const { profile } = await getVerifiedUser();
   if (!profile || !["delivery_driver", "super_admin"].includes(profile.role)) {
     redirect("/auth/login?redirect=/delivery");
   }
+  const unread = await unreadCount(profile.id, "drivers").catch(() => 0);
+  const initials = profile.full_name.split(/\s+/).map((w: string) => w[0]).slice(0, 2).join("").toUpperCase();
 
   return (
-    <div className="min-h-screen bg-stone-900 text-white">
+    <div className="min-h-dvh bg-stone-950 text-white pl-[env(safe-area-inset-left)] pr-[env(safe-area-inset-right)]">
       <SessionGuard userId={profile.id} />
-      {/* Mobile-first sticky header */}
-      <header className="sticky top-0 z-30 bg-stone-900/95 backdrop-blur-md border-b border-white/10 px-4 py-3">
-        <div className="flex items-center justify-between max-w-lg mx-auto">
-          <div>
-            <p className="font-display text-lg font-bold">🛵 Driver Portal</p>
-            <p className="text-[10px] text-white/40 font-bold">{profile.full_name}</p>
-          </div>
-          <div className="flex items-center gap-2">
-            <Link href="/staff" aria-label="Staff Portal" className="flex h-7 w-7 items-center justify-center rounded-full bg-white/10 text-white/70 hover:bg-white/20 hover:text-white transition">
-              <GraduationCap size={15} />
-            </Link>
-            <span className="inline-flex items-center gap-1.5 text-[10px] font-bold text-green-400 bg-green-500/10 px-2.5 py-1 rounded-full border border-green-500/20">
-              <span className="h-1.5 w-1.5 rounded-full bg-green-400 animate-pulse" />
-              Online
-            </span>
-          </div>
+      <header className="sticky top-0 z-30 border-b border-white/10 bg-stone-950/90 pt-[env(safe-area-inset-top)] backdrop-blur-md">
+        <div className="mx-auto flex max-w-lg items-center justify-between gap-3 px-4 py-3">
+          <BrandLogo size="sm" tone="dark" label="Driver" />
+          <span title={profile.full_name} className="flex h-9 w-9 items-center justify-center rounded-full bg-white/10 text-xs font-extrabold text-orange-100">{initials}</span>
         </div>
       </header>
-      <main className="max-w-lg mx-auto px-4 py-4">{children}</main>
+      {/* Bottom padding: room for the floating tab bar + the iPhone home bar. */}
+      <main className="mx-auto max-w-lg px-4 pb-[calc(env(safe-area-inset-bottom)+7rem)] pt-4">{children}</main>
+      <DriverTabs unread={unread} />
     </div>
   );
 }

@@ -46,7 +46,7 @@ export async function sendEmail(msg: { to: string; subject: string; html: string
 }
 
 // ── Layout ────────────────────────────────────────────────────────
-const esc = (s: string) => s.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]!));
+export const esc = (s: string) => s.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]!));
 export const firstName = (full?: string | null) => (full ?? "").trim().split(/\s+/)[0] || "there";
 
 const C = { cream: "#FFFBEB", brown: "#78350F", orange: "#F97316", ink: "#44403C", muted: "#78716C", line: "#F5E6D3" };

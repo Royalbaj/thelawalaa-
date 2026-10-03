@@ -2,112 +2,74 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Home, ShoppingCart, Utensils, User, Gift, Package } from "lucide-react";
-import { useEffect, useState } from "react";
-import { createClient } from "@/lib/supabase/client";
-
-const PUBLIC_NAV = [
-  { id: "site", label: "Home", href: "/", icon: Home },
-  { id: "menu", label: "Menu", href: "/#menu", icon: Utensils },
-  { id: "order", label: "Order & Collect", href: "/order", icon: ShoppingCart },
-];
+import { Home, ShoppingCart, Utensils, User, Gift, Package, UserRound } from "lucide-react";
+import { useViewerRole } from "@/lib/use-viewer";
+import { ROLE_HOME } from "@/lib/role-home";
+import { cn } from "@/lib/utils";
 
 const CUSTOMER_NAV = [
   { id: "home", label: "Home", href: "/account", icon: Home },
   { id: "order", label: "Order", href: "/order", icon: ShoppingCart },
-  { id: "orders", label: "My Orders", href: "/account/orders", icon: Package },
+  { id: "orders", label: "Orders", href: "/account/orders", icon: Package },
   { id: "rewards", label: "Rewards", href: "/account/rewards", icon: Gift },
   { id: "profile", label: "Profile", href: "/account/profile", icon: User },
 ];
 
+// The ONLY navigation on phones for the website and the customer portal —
+// the top bars there keep just the logo and a button or two, so there are
+// never two menus on one screen. Staff screens have their own bars.
 export default function MobileNav() {
   const pathname = usePathname();
-  const [role, setRole] = useState<string | null>(null);
+  const { role, ready } = useViewerRole();
 
-  useEffect(() => {
-    async function checkRole() {
-      const supabase = createClient();
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) { setRole(null); return; }
-      
-      const { data } = await supabase.from("profiles").select("role").eq("id", user.id).single();
-      if (data) setRole(data.role);
-    }
-    checkRole();
-  }, []);
+  if (["/admin", "/pos", "/delivery", "/staff", "/auth"].some((p) => pathname.startsWith(p))) return null;
 
-  // Hide mobile nav entirely in staff-facing portals
-  if (pathname.startsWith("/admin") || pathname.startsWith("/pos") || pathname.startsWith("/delivery") || pathname.startsWith("/staff") || pathname.startsWith("/auth")) {
-    return null;
-  }
+  const items = role === "customer" ? CUSTOMER_NAV : [
+    { id: "site", label: "Home", href: "/", icon: Home },
+    { id: "menu", label: "Menu", href: "/#menu", icon: Utensils },
+    { id: "order", label: "Order", href: "/order", icon: ShoppingCart },
+    role
+      ? { id: "portal", label: "My portal", href: ROLE_HOME[role] ?? "/", icon: UserRound }
+      : { id: "signin", label: "Sign in", href: "/auth/login", icon: UserRound },
+  ];
 
-  // Room at the end of the page so the fixed bar never covers the last of the
-  // content. It lives here (not as body padding) so the staff screens above,
-  // which have no bar, don't get a strip of blank page — on the POS that made
-  // the whole till scroll on iPhones.
-  const spacer = <div aria-hidden className="h-20 sm:hidden" />;
-
-  const isCustomer = role === "customer" || role === "super_admin";
-  const navItems = isCustomer ? CUSTOMER_NAV : PUBLIC_NAV;
-  
-  const active = navItems.find((item) => {
-    if (item.href === "/" && pathname !== "/") return false;
-    if (item.href === "/account" && pathname !== "/account") return false;
+  const active = items.find((item) => {
+    if (item.href === "/" || item.href === "/account") return pathname === item.href;
+    if (item.href.startsWith("/#")) return false;
     return pathname.startsWith(item.href);
-  })?.id || navItems[0].id;
+  })?.id;
 
-  if (isCustomer) {
-    return (
-      <>
-      {spacer}
-      <nav className="fixed bottom-0 left-0 right-0 z-50 bg-white border-t border-stone-200 shadow-lg sm:hidden pb-safe">
-        <div className="flex">
-          {navItems.map((item) => {
+  return (
+    <>
+      {/* Room at the end of the page so the floating bar never covers the last
+          of the content. Here, not as body padding, so staff screens (no bar)
+          don't get a blank strip — on the POS that made the till scroll. */}
+      <div aria-hidden className="h-28 md:hidden" />
+      <nav
+        aria-label="Main"
+        className={cn("fixed inset-x-3 z-50 rounded-3xl bg-white/95 p-1.5 shadow-[0_8px_30px_rgba(28,10,0,0.18)] ring-1 ring-stone-200 backdrop-blur-md transition-opacity md:hidden",
+          !ready && "opacity-0")}
+        style={{ bottom: "calc(env(safe-area-inset-bottom) + 0.75rem)" }}
+      >
+        <div className="flex gap-1">
+          {items.map((item) => {
             const isActive = active === item.id;
             const Icon = item.icon;
-            
             return (
               <Link
                 key={item.id}
                 href={item.href}
-                className={`flex flex-1 flex-col items-center justify-center py-2.5 transition-colors ${
-                  isActive ? "text-brand-orange" : "text-stone-500 hover:text-brand-orange"
-                }`}
+                aria-current={isActive ? "page" : undefined}
+                className={cn("flex min-h-[60px] flex-1 flex-col items-center justify-center gap-1 rounded-2xl text-[11px] font-bold transition active:scale-95",
+                  isActive ? "bg-orange-50 text-brand-orange" : "text-stone-500")}
               >
-                <Icon className={`mb-1 ${isActive ? "fill-brand-orange/20" : ""}`} size={20} />
-                <span className="text-[10px] font-bold">{item.label}</span>
+                <Icon size={22} />
+                {item.label}
               </Link>
             );
           })}
         </div>
       </nav>
-      </>
-    );
-  }
-
-  // Public Nav
-  return (
-    <>
-    {spacer}
-    <nav className="fixed bottom-0 left-0 right-0 z-50 flex items-center justify-between border-t border-stone-800 bg-[#1A1A1A] px-2 py-2 sm:hidden pb-safe">
-      {navItems.map((item) => {
-        const isActive = active === item.id;
-        const Icon = item.icon;
-        
-        return (
-          <Link
-            key={item.id}
-            href={item.href}
-            className={`flex flex-1 flex-col items-center justify-center rounded-xl py-2 transition-colors ${
-              isActive ? "bg-brand-orange text-white" : "text-stone-400 hover:text-stone-200"
-            }`}
-          >
-            <Icon className="mb-1 h-5 w-5" />
-            <span className="text-[10px] font-bold uppercase tracking-wide">{item.label}</span>
-          </Link>
-        );
-      })}
-    </nav>
     </>
   );
 }

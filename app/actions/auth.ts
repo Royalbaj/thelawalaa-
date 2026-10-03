@@ -82,8 +82,22 @@ export async function signUpCustomer(input: unknown): Promise<Result> {
       user_metadata: { full_name: d.full_name, phone: d.phone },
     });
     if (error || !created.user) return { error: "Couldn't create your account — please try again" };
-    await supabaseAdmin.from("profiles").update({ signup_source: d.source ?? "web" }).eq("id", created.user.id);
-    await audit({ actor_id: created.user.id, action: "CUSTOMER_SIGNUP", target_table: "profiles", target_id: created.user.id, new_data: { source: d.source ?? "web" } });
+    const now = new Date().toISOString();
+    // Consent as given on the form: Terms always (the form requires it), offers only if they ticked it.
+    await supabaseAdmin.from("profiles").update({
+      signup_source: d.source ?? "web",
+      terms_accepted_at: now,
+      marketing_opt_in: d.marketing_opt_in,
+      marketing_opt_in_at: d.marketing_opt_in ? now : null,
+    }).eq("id", created.user.id);
+    await audit({ actor_id: created.user.id, action: "CUSTOMER_SIGNUP", target_table: "profiles", target_id: created.user.id, new_data: { source: d.source ?? "web", terms_accepted: true, marketing_opt_in: d.marketing_opt_in } });
+  }
+  if (existing) {
+    // Signing up again before confirming: the latest form's choices count.
+    const now = new Date().toISOString();
+    await supabaseAdmin.from("profiles").update({
+      terms_accepted_at: now, marketing_opt_in: d.marketing_opt_in, marketing_opt_in_at: d.marketing_opt_in ? now : null,
+    }).eq("id", existing.id);
   }
   const sent = await sendVerification(d.email, existing?.full_name ?? d.full_name);
   return { ok: true, fallback: !sent };

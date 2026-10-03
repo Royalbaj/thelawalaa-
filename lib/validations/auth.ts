@@ -14,6 +14,9 @@ export const signupSchema = z.object({
   email: z.string().trim().email("Enter a valid email address").max(254, "That email is too long"),
   phone: phoneNP,
   password: passwordSchema,
+  accept_terms: z.literal(true, { errorMap: () => ({ message: "Please accept the Terms & Conditions to create an account" }) }),
+  // Offers are opt-in only — never ticked for anyone.
+  marketing_opt_in: z.boolean().default(false),
 });
 
 export const loginSchema = z.object({

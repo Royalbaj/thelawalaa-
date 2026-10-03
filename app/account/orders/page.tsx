@@ -21,8 +21,11 @@ export default async function MyOrders() {
     .limit(50);
 
   return (
-    <div className="space-y-4 pb-24 sm:pb-8">
-      <h1 className="font-display text-2xl font-extrabold text-brand-brown">My orders</h1>
+    <div className="space-y-4 pb-4">
+      <div>
+        <h1 className="font-display text-2xl font-extrabold text-brand-brown">My orders</h1>
+        <p className="text-sm text-stone-500">Tap an order to track it, or order the same again.</p>
+      </div>
       {(orders ?? []).length === 0 ? (
         <div className="rounded-3xl bg-white p-10 text-center shadow-sm ring-1 ring-stone-100">
           <Package size={34} className="mx-auto mb-2 text-stone-300" />
@@ -33,6 +36,7 @@ export default async function MyOrders() {
         <div className="grid gap-3 md:grid-cols-2">
           {(orders ?? []).map((o) => {
             const items = o.items as { product_name: string; quantity: number }[];
+            const open = !["delivered", "cancelled"].includes(o.status);
             return (
               <div key={o.id} className="flex flex-col rounded-2xl bg-white p-4 shadow-sm ring-1 ring-stone-100">
                 <div className="flex items-start justify-between gap-3">
@@ -45,15 +49,22 @@ export default async function MyOrders() {
                 <p className="mt-2 line-clamp-2 text-sm text-stone-600">{items.map((i) => `${i.quantity}× ${i.product_name}`).join(", ")}</p>
                 <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] font-bold">
                   <span className="flex items-center gap-1 text-stone-500">{o.type === "delivery" ? <Bike size={12} /> : <Store size={12} />} {o.type === "delivery" ? "Delivery" : "Pickup"}</span>
-                  <span className={`flex items-center gap-1 ${o.payment_status === "paid" ? "text-green-700" : "text-amber-600"}`}>
-                    {o.payment_status === "paid" ? <CheckCircle2 size={12} /> : <Clock size={12} />} {o.payment_status === "paid" ? "Paid" : "Pay on arrival"}
-                  </span>
+                  {open && (
+                    <span className={`flex items-center gap-1 ${o.payment_status === "paid" ? "text-green-700" : "text-amber-600"}`}>
+                      {o.payment_status === "paid" ? <CheckCircle2 size={12} /> : <Clock size={12} />} {o.payment_status === "paid" ? "Paid" : "Pay on arrival"}
+                    </span>
+                  )}
                   {o.points_earned > 0 && <span className="flex items-center gap-1 text-amber-600"><Sparkles size={12} /> +{fmtPoints(o.points_earned)} pts</span>}
                   {o.points_redeemed > 0 && <span className="text-stone-500">−{fmtPoints(o.points_redeemed)} pts used</span>}
                   {o.free_item_redeemed && <span className="text-green-700">Free drink claimed</span>}
                 </div>
                 <div className="mt-auto flex items-center justify-between gap-2 border-t border-stone-100 pt-3">
-                  <p className="font-display text-lg font-bold text-brand-brown">{npr(Number(o.total))}</p>
+                  {/* The price only while the order is open — history shows what, not how much. */}
+                  {open ? (
+                    <p className="font-display text-lg font-bold text-brand-brown">{npr(Number(o.total))}</p>
+                  ) : (
+                    <p className="text-xs font-bold text-stone-400">{items.reduce((n, i) => n + i.quantity, 0)} item{items.reduce((n, i) => n + i.quantity, 0) === 1 ? "" : "s"}</p>
+                  )}
                   <div className="flex items-center gap-2">
                     <Link href={`/track/${o.id}`} className="rounded-full px-3.5 py-1.5 text-xs font-bold text-stone-600 ring-1 ring-stone-200 hover:bg-stone-50">Track</Link>
                     <ReorderButton orderId={o.id} />

@@ -2,11 +2,12 @@
 import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Menu, X, LayoutDashboard, ShoppingBag, UtensilsCrossed, BarChart3, MoreHorizontal } from "lucide-react";
+import { X, LayoutDashboard, ShoppingBag, UtensilsCrossed, BarChart3, MoreHorizontal } from "lucide-react";
 import AdminSidebar, { NAV, type NavBadges } from "./sidebar-nav";
 import { ACCOUNTS_URL } from "@/lib/role-home";
 import RefreshButton from "@/components/refresh-button";
 import { cn } from "@/lib/utils";
+import BrandLogo, { BrandMark } from "@/components/brand-logo";
 
 // Phones: the four pages used most sit in a bottom bar; "More" opens the full menu.
 const TABS = [
@@ -43,7 +44,7 @@ export default function AdminShell({
         }`}
       >
         <div className="flex items-center justify-between border-b border-white/5 px-5 py-5">
-          <span className="font-display text-lg font-bold brand-gradient-text">Thelawalaa</span>
+          <BrandLogo size="sm" tone="dark" label="Admin" />
           <button onClick={() => setOpen(false)} aria-label="Close menu" className="rounded-lg p-1.5 text-white/40 hover:bg-white/10 hover:text-white lg:hidden">
             <X size={20} />
           </button>
@@ -53,10 +54,9 @@ export default function AdminShell({
 
       <div className="flex min-w-0 flex-1 flex-col">
         <header className="sticky top-0 z-30 flex items-center justify-between gap-3 border-b border-stone-200 bg-white/90 px-4 py-3 backdrop-blur-md sm:px-6 sm:py-3.5">
+          {/* Phones: no menu button up here — the bottom bar's "More" opens the menu (one navigation). */}
           <div className="flex min-w-0 items-center gap-3">
-            <button onClick={() => setOpen(true)} aria-label="Open menu" className="rounded-lg p-1.5 text-stone-500 hover:bg-stone-100 lg:hidden">
-              <Menu size={22} />
-            </button>
+            <BrandMark size={32} className="lg:hidden" />
             <div className="min-w-0">
               <p className="truncate font-display text-lg font-bold text-brand-brown">{pageTitle}</p>
               <p className="truncate text-xs font-medium text-stone-400">{fullName}</p>

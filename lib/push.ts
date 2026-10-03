@@ -1,5 +1,6 @@
 // Web Push to staff devices — the POS iPad gets a notification (with the
-// system sound) for every new online order, even with the POS closed.
+// system sound) for every new online order, even with the POS closed, and a
+// rider's phone gets one for each delivery assigned to them.
 // iOS only allows this for a web app added to the Home Screen; see
 // components/pos/order-alerts.tsx for the device side.
 import "server-only";
@@ -27,8 +28,8 @@ function ready() {
 
 export type PushMessage = { title: string; body: string; tag: string; url: string };
 
-/** Send to every active staff device that turned alerts on (or just one profile's). Dead devices are forgotten. */
-export async function pushToStaff(message: PushMessage, onlyProfileId?: string) {
+/** Send to every active device of these roles that turned alerts on (or just one profile's). Dead devices are forgotten. */
+async function pushToRoles(roles: string[], message: PushMessage, onlyProfileId?: string) {
   if (!ready()) return { sent: 0, configured: false };
   let query = supabaseAdmin
     .from("push_subscriptions")
@@ -38,7 +39,7 @@ export async function pushToStaff(message: PushMessage, onlyProfileId?: string) 
 
   const targets = (subs ?? []).filter((s) => {
     const p = s.profile as unknown as { role: string; is_active: boolean } | null;
-    return p?.is_active && STAFF_ROLES.includes(p.role);
+    return p?.is_active && roles.includes(p.role);
   });
   const payload = JSON.stringify(message);
   const results = await Promise.allSettled(targets.map((s) =>
@@ -52,3 +53,9 @@ export async function pushToStaff(message: PushMessage, onlyProfileId?: string) 
       })));
   return { sent: results.filter((r) => r.status === "fulfilled").length, configured: true };
 }
+
+/** The counter devices (POS / admin) — new online orders, stock alerts. */
+export const pushToStaff = (message: PushMessage, onlyProfileId?: string) => pushToRoles(STAFF_ROLES, message, onlyProfileId);
+
+/** Delivery riders' phones — a new delivery for them, or a message from the admin. */
+export const pushToDrivers = (message: PushMessage, onlyProfileId?: string) => pushToRoles(["delivery_driver"], message, onlyProfileId);

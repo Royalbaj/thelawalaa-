@@ -2,6 +2,7 @@
 import Link from "next/link";
 import { ArrowLeft, LogOut } from "lucide-react";
 import { signOutHere } from "@/lib/sign-out";
+import BrandLogo from "@/components/brand-logo";
 
 export default function StaffHeader({ backHref }: { backHref: string }) {
   return (
@@ -9,7 +10,7 @@ export default function StaffHeader({ backHref }: { backHref: string }) {
       <Link href={backHref} className="flex items-center gap-1.5 text-sm font-bold text-white/80 hover:text-white">
         <ArrowLeft size={16} /> Back
       </Link>
-      <span className="font-display font-bold brand-gradient-text">Staff Portal</span>
+      <BrandLogo size="sm" tone="dark" label="Training" />
       <button
         onClick={signOutHere}
         aria-label="Sign out"

@@ -4,33 +4,14 @@ import toast from "react-hot-toast";
 import { Bell, BellOff, BellRing, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { unlockOrderSound, orderSoundReady } from "@/lib/order-sound";
-import { saveStaffPushSubscription, sendTestPush } from "@/app/actions/push";
+import { sendTestPush } from "@/app/actions/push";
+import { currentPushState, enablePush as subscribeThisDevice, type PushState } from "@/lib/push-client";
 
 // Order alerts for the POS device:
 //  1. Sound on this screen — needs one tap after loading (iPad rule).
 //  2. Push notifications (with the system sound) when the POS is closed or
 //     the iPad is asleep. On iPad/iPhone that only works for a web app added
 //     to the Home Screen (iPadOS 16.4+), so outside one we explain how.
-const VAPID_KEY = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY ?? "";
-
-type PushState = "checking" | "off" | "on" | "blocked" | "install" | "unsupported" | "unconfigured";
-
-function urlBase64ToUint8Array(base64: string) {
-  const padded = base64 + "=".repeat((4 - (base64.length % 4)) % 4);
-  const raw = atob(padded.replace(/-/g, "+").replace(/_/g, "/"));
-  return Uint8Array.from(raw, (c) => c.charCodeAt(0));
-}
-
-function detectPush(): PushState {
-  if (!VAPID_KEY) return "unconfigured";
-  const supported = "serviceWorker" in navigator && "PushManager" in window && "Notification" in window;
-  if (supported) return Notification.permission === "denied" ? "blocked" : "checking";
-  // iPadOS Safari reports itself as a Mac — touch points give it away.
-  const apple = /iP(ad|hone|od)/.test(navigator.userAgent) || (navigator.userAgent.includes("Macintosh") && navigator.maxTouchPoints > 1);
-  const installed = window.matchMedia("(display-mode: standalone)").matches || (navigator as unknown as { standalone?: boolean }).standalone === true;
-  return apple && !installed ? "install" : "unsupported";
-}
-
 export default function OrderAlertsButton() {
   const [soundOn, setSoundOn] = useState(false);
   const [push, setPush] = useState<PushState>("checking");
@@ -50,20 +31,8 @@ export default function OrderAlertsButton() {
     };
   }, []);
 
-  // Is this device already subscribed? Re-save it so the server always has it.
-  useEffect(() => {
-    const state = detectPush();
-    if (state !== "checking") { setPush(state); return; }
-    navigator.serviceWorker.register("/sw.js")
-      .then((reg) => reg.pushManager.getSubscription())
-      .then(async (sub) => {
-        if (sub && Notification.permission === "granted") {
-          await saveStaffPushSubscription(JSON.parse(JSON.stringify(sub))).catch(() => {});
-          setPush("on");
-        } else setPush("off");
-      })
-      .catch(() => setPush("unsupported"));
-  }, []);
+  // Is this device already subscribed? (Re-saved so the server always has it.)
+  useEffect(() => { currentPushState().then(setPush); }, []);
 
   useEffect(() => {
     if (!open) return;
@@ -75,16 +44,10 @@ export default function OrderAlertsButton() {
   async function enablePush() {
     setBusy(true);
     try {
-      // First thing in the tap — iOS only shows the permission prompt for a direct user action.
-      const permission = await Notification.requestPermission();
-      if (permission !== "granted") { setPush(permission === "denied" ? "blocked" : "off"); return; }
-      const reg = await navigator.serviceWorker.register("/sw.js");
-      await navigator.serviceWorker.ready;
-      const sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: urlBase64ToUint8Array(VAPID_KEY) });
-      const r = await saveStaffPushSubscription(JSON.parse(JSON.stringify(sub)));
-      if (r?.error) { toast.error(r.error); return; }
-      setPush("on");
-      toast.success("Alerts on — this device will be notified of online orders");
+      const r = await subscribeThisDevice();
+      setPush(r.state);
+      if (r.error) { toast.error(r.error); return; }
+      if (r.state === "on") toast.success("Alerts on — this device will be notified of online orders");
     } catch {
       toast.error("Couldn't turn alerts on — try again");
     } finally {

@@ -21,7 +21,7 @@ export default function SignupForm({ source = "web", afterSent }: { source?: "we
     fd.phone = (fd.phone ?? "").replace(/[\s-]/g, ""); // "98 1234 5678" is fine too
     // Top to bottom, like the form: say what's wrong and put the cursor there.
     const fail = (field: string, message: string) => { setError(message); document.getElementById(field)?.focus(); };
-    const parsed = signupSchema.safeParse(fd);
+    const parsed = signupSchema.safeParse({ ...fd, accept_terms: fd.accept_terms === "on", marketing_opt_in: fd.marketing_opt_in === "on" });
     if (!parsed.success) return fail(String(parsed.error.issues[0].path[0] ?? ""), parsed.error.issues[0].message);
     if (fd.password !== fd.confirm) return fail("confirm", "The two passwords don't match");
 
@@ -47,8 +47,18 @@ export default function SignupForm({ source = "web", afterSent }: { source?: "we
       <div><label className="label" htmlFor="phone">Mobile number</label><input id="phone" name="phone" required placeholder="98XXXXXXXX" autoComplete="tel" inputMode="tel" className="input" /></div>
       <PasswordInput id="password" name="password" label="Password" value={pw} onChange={setPw} showRules autoComplete="new-password" />
       <PasswordInput id="confirm" name="confirm" label="Confirm password" autoComplete="new-password" />
+      <div className="space-y-3 rounded-2xl bg-stone-50 p-4 ring-1 ring-stone-100">
+        <label className="flex cursor-pointer items-start gap-3 text-sm text-stone-700">
+          <input id="accept_terms" name="accept_terms" type="checkbox" className="mt-0.5 h-5 w-5 shrink-0 accent-brand-orange" />
+          <span>I agree to the <Link href="/terms" target="_blank" className="font-bold text-brand-orange underline-offset-2 hover:underline">Terms &amp; Conditions</Link> and <Link href="/terms#privacy" target="_blank" className="font-bold text-brand-orange underline-offset-2 hover:underline">Privacy</Link> — including that offers can change or end at any time. <span className="text-brand-red">*</span></span>
+        </label>
+        <label className="flex cursor-pointer items-start gap-3 text-sm text-stone-700">
+          <input id="marketing_opt_in" name="marketing_opt_in" type="checkbox" className="mt-0.5 h-5 w-5 shrink-0 accent-brand-orange" />
+          <span>Send me offers, promotions and competitions by email <span className="text-stone-400">(optional — leave any time)</span></span>
+        </label>
+      </div>
       <button disabled={busy} className="btn-primary w-full !py-3.5">{busy ? "Creating your account…" : "Create account"}</button>
-      <p className="text-center text-xs text-stone-400">By creating an account you agree to receive order updates by email. We never share your details.</p>
+      <p className="text-center text-xs text-stone-400">We&apos;ll email you about your orders and account. We never sell your details.</p>
       <p className="text-center text-sm text-stone-600">Already have an account? <Link href="/auth/login" className="font-bold text-brand-orange">Sign in</Link></p>
     </form>
   );

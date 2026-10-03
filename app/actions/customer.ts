@@ -3,7 +3,8 @@
 import { revalidatePath } from "next/cache";
 import { requireRole } from "@/lib/supabase/server";
 import { z as zod } from "zod";
-import { supabaseAdmin, getRewardSettings } from "@/lib/supabase/admin";
+import { supabaseAdmin, getRewardSettings, audit } from "@/lib/supabase/admin";
+import { verifyUnsubscribeToken } from "@/lib/signed-links";
 import { phoneNP } from "@/lib/validations/auth";
 
 export async function toggleFavorite(productId: string) {
@@ -99,4 +100,31 @@ export async function getCheckoutRewards() {
     freeItems: settings.free_item_enabled ? bal?.free_items ?? 0 : 0,
     freeItem: freeItem ? { name: freeItem.name, available: freeItem.is_available } : null,
   };
+}
+
+// ── Offers & competitions (opt-in only, migration 029) ───────────
+
+/** "Join offers & competitions" / "Leave" in the customer's account. */
+export async function setMarketingOptIn(join: boolean) {
+  const { user } = await requireRole(["customer"]);
+  const { error } = await supabaseAdmin.from("profiles")
+    .update({ marketing_opt_in: !!join, marketing_opt_in_at: join ? new Date().toISOString() : null })
+    .eq("id", user.id);
+  if (error) return { error: "Couldn't save — please try again" };
+  await audit({ actor_id: user.id, action: join ? "MARKETING_OPT_IN" : "MARKETING_OPT_OUT", target_table: "profiles", target_id: user.id });
+  revalidatePath("/account", "layout");
+  return { ok: true, joined: !!join };
+}
+
+/**
+ * The unsubscribe link in an offers email — works without signing in. No
+ * requireRole on purpose (like submitFeedback): the signed token proves the
+ * link came from us for this person, and it can only ever switch offers OFF.
+ */
+export async function unsubscribeByLink(profileId: unknown, token: unknown) {
+  const ok = zod.object({ id: zod.string().uuid(), token: zod.string().min(20).max(100) }).safeParse({ id: profileId, token });
+  if (!ok.success || !verifyUnsubscribeToken(ok.data.id, ok.data.token)) return { error: "This unsubscribe link isn't valid — sign in and use your profile instead." };
+  await supabaseAdmin.from("profiles").update({ marketing_opt_in: false, marketing_opt_in_at: null }).eq("id", ok.data.id);
+  await audit({ actor_id: ok.data.id, action: "MARKETING_OPT_OUT", target_table: "profiles", target_id: ok.data.id, new_data: { via: "email_link" } });
+  return { ok: true };
 }

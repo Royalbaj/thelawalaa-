@@ -1,5 +1,6 @@
-// Thelawalaa POS service worker. Its only job: show the new-online-order
-// alerts the server pushes (lib/push.ts), and open the POS when tapped.
+// Thelawalaa staff service worker. Its only job: show the alerts the server
+// pushes (lib/push.ts) — new online orders on the POS, new deliveries on a
+// rider's phone — and open the right screen when one is tapped.
 self.addEventListener("install", () => self.skipWaiting());
 self.addEventListener("activate", (event) => event.waitUntil(self.clients.claim()));
 
@@ -30,8 +31,9 @@ self.addEventListener("notificationclick", (event) => {
   event.waitUntil(
     (async () => {
       const windows = await self.clients.matchAll({ type: "window", includeUncontrolled: true });
-      const pos = windows.find((w) => new URL(w.url).pathname.startsWith("/admin"));
-      if (pos) return pos.focus();
+      const section = "/" + (new URL(url, self.location.origin).pathname.split("/")[1] || "");
+      const open = windows.find((w) => new URL(w.url).pathname.startsWith(section));
+      if (open) return open.focus();
       return self.clients.openWindow(url);
     })()
   );
