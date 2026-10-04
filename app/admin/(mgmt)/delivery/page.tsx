@@ -5,7 +5,7 @@ import { supabaseAdmin } from "@/lib/supabase/admin";
 import { npr, cn } from "@/lib/utils";
 import { orderStatusLabel } from "@/lib/order-status";
 import { noteField } from "@/lib/order-notes";
-import { directionsUrl, searchUrl, distanceKm, fmtKm, STORE } from "@/lib/geo";
+import { directionsUrl, searchUrl, distanceKm, fmtKm, deliveryArea, type LatLng } from "@/lib/geo";
 import { nepalToday } from "@/lib/dates";
 import AssignDriver from "@/components/admin/assign-driver";
 
@@ -20,14 +20,14 @@ type Row = {
 
 const SELECT = "id, order_number, daily_number, total, status, created_at, payment_status, notes, delivery_address, delivery_lat, delivery_lng, items:order_items(product_name, quantity), deliveries!inner(driver_id, assigned_at, profiles:driver_id(full_name))";
 
-function Where({ o }: { o: Row }) {
+function Where({ o, shop }: { o: Row; shop: LatLng }) {
   const address = o.delivery_address ?? noteField(o.notes, "Address");
   const pin = o.delivery_lat != null && o.delivery_lng != null ? { lat: o.delivery_lat, lng: o.delivery_lng } : null;
   return (
     <div className="mt-1.5 space-y-1 text-xs text-stone-600">
       <p className="flex gap-1.5"><MapPin size={13} className="mt-0.5 shrink-0 text-brand-orange" /> {address ?? "Shared location"}</p>
       <a href={pin ? directionsUrl(pin) : searchUrl(address ?? "")} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 font-bold text-brand-orange">
-        <Navigation size={12} /> {pin ? `Exact pin · ${fmtKm(distanceKm(STORE, pin))} away` : "No pin — find the address"}
+        <Navigation size={12} /> {pin ? `Exact pin · ${fmtKm(distanceKm(shop, pin))} away` : "No pin — find the address"}
       </a>
     </div>
   );
@@ -36,7 +36,7 @@ function Where({ o }: { o: Row }) {
 export default async function DeliveryPage() {
   await requireRole(["super_admin"]);
 
-  const [{ data: drivers }, { data: unassigned }, { data: active }, { data: doneToday }] = await Promise.all([
+  const [{ data: drivers }, { data: unassigned }, { data: active }, { data: doneToday }, { data: settings }] = await Promise.all([
     supabaseAdmin.from("profiles")
       .select("id, full_name, is_online, vehicle_type, vehicle_number, last_seen_at")
       .eq("role", "delivery_driver").eq("is_active", true).order("full_name"),
@@ -47,7 +47,9 @@ export default async function DeliveryPage() {
       .eq("type", "delivery").in("status", ["assigned", "picked_up", "on_the_way"]).order("created_at"),
     supabaseAdmin.from("orders").select("id, deliveries!inner(driver_id)")
       .eq("type", "delivery").eq("status", "delivered").gte("served_at", `${nepalToday()}T00:00:00+05:45`),
+    supabaseAdmin.from("app_settings").select("delivery_radius_km, store_lat, store_lng").eq("id", 1).maybeSingle(),
   ]);
+  const { shop } = deliveryArea(settings);
   const perDriver = new Map<string, number>();
   for (const o of (doneToday ?? []) as unknown as { deliveries: { driver_id: string | null } }[]) {
     if (o.deliveries?.driver_id) perDriver.set(o.deliveries.driver_id, (perDriver.get(o.deliveries.driver_id) ?? 0) + 1);
@@ -70,7 +72,7 @@ export default async function DeliveryPage() {
                     <span className="text-xs text-stone-400">{format(new Date(o.created_at), "h:mm a")} · {npr(Number(o.total))}{o.payment_status === "paid" ? " · paid" : ""}</span>
                   </p>
                   <p className="mt-1 text-xs text-stone-600">{o.items.map((i) => `${i.quantity}× ${i.product_name}`).join(", ")}</p>
-                  <Where o={o} />
+                  <Where o={o} shop={shop} />
                 </div>
                 <AssignDriver orderId={o.id} drivers={riderChoices} />
               </div>
@@ -93,7 +95,7 @@ export default async function DeliveryPage() {
                     {o.status === "assigned" ? "Rider on the way to the shop" : o.status === "picked_up" ? "Picked up" : "On the way to customer"}
                   </span>
                 </div>
-                <Where o={o} />
+                <Where o={o} shop={shop} />
               </div>
             ))}
             {(active ?? []).length === 0 && <p className="px-4 py-6 text-center text-sm text-stone-500">No active deliveries.</p>}

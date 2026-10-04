@@ -1,7 +1,7 @@
 import { requireRole } from "@/lib/supabase/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { npr } from "@/lib/utils";
-import { BranchForm, PromoForm, ActiveToggle, FeatureFlagsForm, OpeningPromoForm, SocialLinksManager } from "@/components/admin/settings-controls";
+import { BranchForm, PromoForm, ActiveToggle, FeatureFlagsForm, OpeningPromoForm, SocialLinksManager, DeliveryAreaForm } from "@/components/admin/settings-controls";
 import ResetSalesData from "@/components/admin/reset-sales-data";
 import EmailSetupPanel from "@/components/admin/email-setup";
 
@@ -91,6 +91,7 @@ export default async function SettingsPage() {
       </div>
       <div className="space-y-4">
         <FeatureFlagsForm esewaEnabled={settings?.esewa_enabled ?? false} deliveryEnabled={settings?.delivery_enabled ?? false} />
+        <DeliveryAreaForm radiusKm={Number(settings?.delivery_radius_km ?? 5)} storeLat={settings?.store_lat ?? null} storeLng={settings?.store_lng ?? null} />
         <OpeningPromoForm
           enabled={settings?.opening_promo_enabled ?? false}
           momoPrice={Number(settings?.opening_promo_momo_price ?? 11)}

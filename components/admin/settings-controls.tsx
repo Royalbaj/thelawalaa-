@@ -4,7 +4,7 @@ import toast from "react-hot-toast";
 import { Facebook, Instagram, Link2, Trash2 } from "lucide-react";
 import TikTokIcon from "@/components/icons/tiktok";
 import { createBranch, setBranchActive, createPromoCode, setPromoActive } from "@/app/actions/admin-crud";
-import { updateAppSettings, updateOpeningPromo, addSocialLink, setSocialLinkActive, deleteSocialLink } from "@/app/actions/settings";
+import { updateAppSettings, updateOpeningPromo, addSocialLink, setSocialLinkActive, deleteSocialLink, updateDeliveryArea } from "@/app/actions/settings";
 
 function platformIcon(platform: string) {
   const p = platform.toLowerCase();
@@ -252,5 +252,66 @@ export function ActiveToggle({ id, active, kind }: { id: string; active: boolean
     >
       {active ? "Active" : "Inactive"}
     </button>
+  );
+}
+
+/** Admin → Settings → Delivery area: the radius, and the shop's exact spot (best set while standing in the shop). */
+export function DeliveryAreaForm({ radiusKm, storeLat, storeLng }: { radiusKm: number; storeLat: number | null; storeLng: number | null }) {
+  const [radius, setRadius] = useState(String(radiusKm));
+  const [lat, setLat] = useState(storeLat != null ? String(storeLat) : "");
+  const [lng, setLng] = useState(storeLng != null ? String(storeLng) : "");
+  const [locating, setLocating] = useState(false);
+  const [pending, start] = useTransition();
+
+  const here = () => {
+    if (!("geolocation" in navigator)) { toast.error("This device can't share its location"); return; }
+    setLocating(true);
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        setLocating(false);
+        setLat(pos.coords.latitude.toFixed(6)); setLng(pos.coords.longitude.toFixed(6));
+        toast.success(`Got it (accurate to about ${Math.round(pos.coords.accuracy)} m) — tap Save`);
+      },
+      () => { setLocating(false); toast.error("Couldn't get the location — allow it for this site and try again"); },
+      { enableHighAccuracy: true, timeout: 20000, maximumAge: 0 },
+    );
+  };
+  const save = () => start(async () => {
+    const r = await updateDeliveryArea({
+      delivery_radius_km: Number(radius),
+      store_lat: lat ? Number(lat) : null,
+      store_lng: lng ? Number(lng) : null,
+    });
+    if (r?.error) toast.error(r.error); else toast.success("Delivery area saved");
+  });
+
+  return (
+    <div className="card space-y-4 p-5">
+      <div>
+        <h3 className="font-display font-bold text-brand-brown">Delivery area</h3>
+        <p className="text-xs text-stone-500">Customers who share a location farther than this can&apos;t order delivery online — they&apos;re asked to call you to confirm. Pickup always works.</p>
+      </div>
+      <div>
+        <label className="label" htmlFor="radius">Deliver within (km)</label>
+        <input id="radius" className="input" inputMode="decimal" value={radius} onChange={(e) => setRadius(e.target.value.replace(/[^\d.]/g, ""))} />
+      </div>
+      <div>
+        <p className="label">Shop location</p>
+        <button type="button" onClick={here} disabled={locating}
+          className="flex w-full items-center justify-center gap-2 rounded-full py-2.5 text-sm font-bold text-brand-orange ring-1 ring-orange-200 hover:bg-orange-50 disabled:opacity-60">
+          {locating ? "Finding this device…" : "Use this device's location (stand in the shop)"}
+        </button>
+        <div className="mt-2 grid grid-cols-2 gap-2">
+          <input className="input" inputMode="decimal" value={lat} onChange={(e) => setLat(e.target.value.replace(/[^\d.]/g, ""))} placeholder="Latitude" aria-label="Shop latitude" />
+          <input className="input" inputMode="decimal" value={lng} onChange={(e) => setLng(e.target.value.replace(/[^\d.]/g, ""))} placeholder="Longitude" aria-label="Shop longitude" />
+        </div>
+        <p className="mt-1 text-xs text-stone-500">
+          {lat && lng
+            ? <a href={`https://www.google.com/maps/search/?api=1&query=${lat},${lng}`} target="_blank" rel="noopener noreferrer" className="font-bold text-brand-orange">Check it on Google Maps</a>
+            : "Not set yet — distances use an approximate Banepa location until you set it."}
+        </p>
+      </div>
+      <button onClick={save} disabled={pending || !radius} className="btn-primary w-full !py-2.5 text-sm">{pending ? "Saving…" : "Save delivery area"}</button>
+    </div>
   );
 }

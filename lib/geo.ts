@@ -1,14 +1,28 @@
 import { SITE } from "@/lib/seo";
 
 // Maps helpers for delivery: the customer's shared pin, the rider's map and
-// navigation, and how far a pin is from the shop. The shop's coordinates
-// come from lib/seo.ts (approximate until verified — see the TODO there).
+// navigation, and how far a pin is from the shop. The shop's position and the
+// delivery radius are set in Admin → Settings → Delivery area (app_settings);
+// lib/seo.ts's approximate coordinates are only the fallback.
 
 export type LatLng = { lat: number; lng: number };
 
+/** Fallback shop position (approximate) until Admin → Settings → Delivery area sets the real one. */
 export const STORE: LatLng = { lat: SITE.geo.lat, lng: SITE.geo.lng };
-/** How far we deliver (km) — the 5 km promise, with a little slack for an approximate shop pin. */
-export const DELIVERY_RADIUS_KM = 5;
+export const DEFAULT_RADIUS_KM = 5;
+
+/** The shop and how far it delivers, from app_settings (migration 033). */
+export type DeliveryArea = { shop: LatLng; radiusKm: number; shopIsSet: boolean };
+export function deliveryArea(s: { store_lat?: number | null; store_lng?: number | null; delivery_radius_km?: number | string | null } | null | undefined): DeliveryArea {
+  const set = s?.store_lat != null && s?.store_lng != null;
+  return {
+    shop: set ? { lat: Number(s!.store_lat), lng: Number(s!.store_lng) } : STORE,
+    radiusKm: s?.delivery_radius_km != null ? Number(s.delivery_radius_km) : DEFAULT_RADIUS_KM,
+    shopIsSet: set,
+  };
+}
+/** Is this spot outside the delivery area? (A few metres of GPS wobble is allowed.) */
+export const outsideArea = (area: DeliveryArea, p: LatLng) => distanceKm(area.shop, p) > area.radiusKm + 0.05;
 
 export function distanceKm(a: LatLng, b: LatLng) {
   const rad = (d: number) => (d * Math.PI) / 180;

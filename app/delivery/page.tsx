@@ -7,16 +7,19 @@ import { nepalToday } from "@/lib/dates";
 import OnlineToggle from "@/components/delivery/online-toggle";
 import JobCard from "@/components/delivery/job-card";
 import DriverLive from "@/components/delivery/driver-live";
+import { deliveryArea } from "@/lib/geo";
 
 export const dynamic = "force-dynamic";
 
 export default async function DeliveriesPage() {
   const { user, profile } = await requireRole(["delivery_driver", "super_admin"]);
-  const [jobs, counts, { data: me }] = await Promise.all([
+  const [jobs, counts, { data: me }, { data: settings }] = await Promise.all([
     getDriverJobs(user.id),
     getDriverCounts(user.id, `${nepalToday()}T00:00:00+05:45`),
     supabaseAdmin.from("profiles").select("is_online").eq("id", user.id).single(),
+    supabaseAdmin.from("app_settings").select("delivery_radius_km, store_lat, store_lng").eq("id", 1).maybeSingle(),
   ]);
+  const { shop } = deliveryArea(settings);
   const first = profile.full_name.split(" ")[0];
 
   return (
@@ -50,7 +53,7 @@ export default async function DeliveriesPage() {
           <Link href="/delivery/history" className="mt-4 inline-block text-sm font-bold text-orange-300">See past deliveries →</Link>
         </div>
       ) : (
-        <div className="space-y-4">{jobs.map((j) => <JobCard key={j.orderId} job={j} />)}</div>
+        <div className="space-y-4">{jobs.map((j) => <JobCard key={j.orderId} job={j} shop={shop} />)}</div>
       )}
     </div>
   );

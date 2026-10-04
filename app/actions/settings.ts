@@ -100,3 +100,23 @@ export async function deleteSocialLink(id: string) {
   revalidatePath("/admin/settings"); revalidatePath("/"); revalidatePath("/qr");
   return { ok: true };
 }
+
+// ── Delivery area: how far we deliver, from where (migration 033) ──
+const deliveryAreaSchema = z.object({
+  delivery_radius_km: z.number().min(0.5, "At least 0.5 km").max(50, "At most 50 km"),
+  store_lat: z.number().min(26.3).max(30.5).nullable(),
+  store_lng: z.number().min(80).max(88.3).nullable(),
+}).refine((v) => (v.store_lat == null) === (v.store_lng == null), { message: "Give both latitude and longitude" });
+
+export async function updateDeliveryArea(input: unknown) {
+  const { user } = await requireRole(["super_admin"]);
+  const parsed = deliveryAreaSchema.safeParse(input);
+  if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Check the delivery area — the shop must be in Nepal" };
+  const { error } = await supabaseAdmin.from("app_settings")
+    .update({ ...parsed.data, updated_at: new Date().toISOString() }).eq("id", 1);
+  if (error) return { error: "Could not save the delivery area" };
+  await audit({ actor_id: user.id, action: "UPDATE_DELIVERY_AREA", target_table: "app_settings", target_id: "1", new_data: parsed.data });
+  revalidatePath("/admin/settings");
+  revalidatePath("/order");
+  return { ok: true };
+}

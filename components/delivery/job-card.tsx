@@ -4,7 +4,7 @@ import { useRouter } from "next/navigation";
 import toast from "react-hot-toast";
 import { Navigation, Phone, MapPin, Package, Banknote, QrCode, CheckCircle2, KeyRound, MessageSquareText, Map as MapIcon } from "lucide-react";
 import { driverAdvanceStatus, verifyDeliveryOtp, getCustomerTelLink } from "@/app/actions/delivery";
-import { directionsUrl, embedUrl, searchUrl, distanceKm, fmtKm, STORE } from "@/lib/geo";
+import { directionsUrl, embedUrl, searchUrl, distanceKm, fmtKm, STORE, type LatLng } from "@/lib/geo";
 import type { DriverJob } from "@/lib/driver-jobs";
 import { npr, cn } from "@/lib/utils";
 
@@ -15,7 +15,7 @@ const STEPS = [
   { key: "delivered", label: "Delivered" },
 ];
 
-export default function JobCard({ job }: { job: DriverJob }) {
+export default function JobCard({ job, shop = STORE }: { job: DriverJob; shop?: LatLng }) {
   const router = useRouter();
   const [pending, start] = useTransition();
   const [codeOpen, setCodeOpen] = useState(false);
@@ -106,7 +106,7 @@ export default function JobCard({ job }: { job: DriverJob }) {
               <p className="text-sm font-bold text-white">{job.address || "Location shared by the customer"}</p>
               <p className="text-xs text-white/45">
                 {job.pin
-                  ? `Exact pin shared · ${fmtKm(distanceKm(STORE, job.pin))} from the shop${job.pin.accuracy ? ` · ±${job.pin.accuracy} m` : ""}`
+                  ? `Exact pin shared · ${fmtKm(distanceKm(shop, job.pin))} from the shop${job.pin.accuracy ? ` · ±${job.pin.accuracy} m` : ""}`
                   : "No pin — follow the address and call if unsure"}
               </p>
             </div>

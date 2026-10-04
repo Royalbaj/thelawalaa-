@@ -19,3 +19,11 @@ export const STATUS_COLORS: Record<string, string> = {
   delivered: "bg-green-100 text-green-800",
   cancelled: "bg-red-100 text-red-800",
 };
+
+/** "9779744777925" → "9744777925" (how Nepali numbers are written). */
+export const phoneDisplay = (digits: string) => digits.replace(/\D/g, "").replace(/^977(?=9\d{9}$)/, "");
+/** A tel: link that works from anywhere — always with +977. */
+export const telHref = (digits: string) => {
+  const d = digits.replace(/\D/g, "");
+  return `tel:+${d.startsWith("977") ? d : `977${d}`}`;
+};

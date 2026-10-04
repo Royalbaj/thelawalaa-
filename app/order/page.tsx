@@ -13,11 +13,12 @@ import { getCheckoutRewards } from "@/app/actions/customer";
 import { redeemPlan, fmtPoints, fmtRupees, pointsToRupees } from "@/lib/rewards";
 import { getEsewaPaymentForm } from "@/app/actions/payments";
 import { npr } from "@/lib/utils";
-import { UtensilsCrossed, Sparkles, CupSoda, LocateFixed, Loader2, X, MapPin } from "lucide-react";
+import { UtensilsCrossed, Sparkles, CupSoda, LocateFixed, Loader2, X, MapPin, Phone, MapPinOff } from "lucide-react";
 import AddToCartButton from "@/components/add-to-cart-button";
 import BrandLogo from "@/components/brand-logo";
 import { applyOpeningPromoPrice, isOpeningPromoActive, type OpeningPromoSettings } from "@/lib/promo";
-import { STORE, DELIVERY_RADIUS_KM, distanceKm, fmtKm } from "@/lib/geo";
+import { deliveryArea, outsideArea, distanceKm, fmtKm } from "@/lib/geo";
+import { phoneDisplay, telHref } from "@/lib/utils";
 import { guestCodeKey } from "@/lib/guest-order";
 
 type Product = { id: string; name: string; description: string | null; price: number; category_id: string | null; spice_level: number; image_url?: string | null };
@@ -75,7 +76,9 @@ export default function OrderPage() {
   const [locError, setLocError] = useState<string | null>(null);
 
   const [favorites, setFavorites] = useState<string[]>([]);
-  const [settings, setSettings] = useState({ esewa_enabled: false, delivery_enabled: false });
+  const [settings, setSettings] = useState<{ esewa_enabled: boolean; delivery_enabled: boolean; delivery_radius_km?: number | null; store_lat?: number | null; store_lng?: number | null }>({ esewa_enabled: false, delivery_enabled: false });
+  // The shop's number (Admin → Website text → WhatsApp number) for "call us to confirm".
+  const [shopPhone, setShopPhone] = useState<string | null>(null);
   const [openingPromo, setOpeningPromo] = useState<OpeningPromoSettings | null>(null);
   const [menuLoading, setMenuLoading] = useState(true);
   // Signed-in customers: their points and free item, and whether to use them on this order.
@@ -101,8 +104,10 @@ export default function OrderPage() {
       supabase.from("categories").select("id, name").order("sort_order"),
       supabase.from("branches").select("id, name, address"),
       supabase.from("addresses").select("id, label, full_address, lat, lng"),
-      supabase.from("app_settings").select("esewa_enabled, delivery_enabled, opening_promo_enabled, opening_promo_momo_price, opening_promo_starts_at, opening_promo_ends_at").eq("id", 1).single(),
-    ]).then(([p, c, b, a, s]) => {
+      supabase.from("app_settings").select("esewa_enabled, delivery_enabled, opening_promo_enabled, opening_promo_momo_price, opening_promo_starts_at, opening_promo_ends_at, delivery_radius_km, store_lat, store_lng").eq("id", 1).single(),
+      supabase.from("site_content").select("value").eq("key", "contact.whatsapp").maybeSingle(),
+    ]).then(([p, c, b, a, s, phone]) => {
+      if (phone.data?.value) setShopPhone(phone.data.value as string);
       setProducts((p.data as Product[]) ?? []);
       setCategories((c.data as Category[]) ?? []);
       setBranches((b.data as Branch[]) ?? []);
@@ -123,6 +128,13 @@ export default function OrderPage() {
   // Signed-in customers aren't asked who they are — their account says. Guests,
   // and staff placing an order for someone else, type a name and number.
   const asksContact = isGuest || (!!account && account.role !== "customer");
+
+  // Delivery area (Admin → Settings): a shared pin, or a saved address with one, outside it can't be delivered to online.
+  const area = deliveryArea(settings);
+  const savedPinned = addresses.find((a) => a.id === addressId && a.lat != null && a.lng != null);
+  const checkPoint = pin ?? (savedPinned ? { lat: Number(savedPinned.lat), lng: Number(savedPinned.lng) } : null);
+  const tooFar = type === "delivery" && !!checkPoint && outsideArea(area, checkPoint);
+  const farKm = checkPoint ? distanceKm(area.shop, checkPoint) : 0;
 
   const subtotal = useMemo(() => items.reduce((t, i) => t + i.price * i.quantity, 0), [items]);
   const deliveryFee = type === "delivery" ? 20 : 0;
@@ -212,6 +224,7 @@ export default function OrderPage() {
         return;
       }
       if (type === "pickup" && !branchId) { toast.error("Pick a branch"); return; }
+      if (tooFar) { toast.error("We're not delivering to that location right now — please call us to confirm, or choose pickup"); return; }
 
       const delivery_address_id = (type === "delivery" && !isGuest) ? await ensureAddress() : undefined;
 
@@ -455,16 +468,13 @@ export default function OrderPage() {
                     <div className="rounded-2xl bg-orange-50/70 p-4 ring-1 ring-orange-100">
                       {pin ? (
                         <div className="flex items-start gap-3">
-                          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-brand-green text-white"><MapPin size={18} /></span>
+                          <MapPin size={20} className={`mt-0.5 shrink-0 ${outsideArea(area, pin) ? "text-brand-red" : "text-brand-green"}`} />
                           <div className="min-w-0 flex-1">
                             <p className="text-sm font-bold text-brand-brown">Location shared</p>
                             <p className="text-xs text-stone-600">
-                              Accurate to about {fmtKm(pin.accuracy / 1000)} · {fmtKm(distanceKm(STORE, pin))} from our shop
+                              Accurate to about {fmtKm(pin.accuracy / 1000)} · {fmtKm(distanceKm(area.shop, pin))} from our shop
                             </p>
                             {pin.accuracy > 150 && <p className="mt-1 text-xs font-bold text-amber-700">That&apos;s approximate — add a landmark below so the rider finds you.</p>}
-                            {distanceKm(STORE, pin) > DELIVERY_RADIUS_KM + 0.5 && (
-                              <p className="mt-1 text-xs font-bold text-amber-700">We deliver within {DELIVERY_RADIUS_KM} km — we may call you before sending this one.</p>
-                            )}
                           </div>
                           <button type="button" onClick={() => setPin(null)} aria-label="Remove shared location" className="rounded-full p-1.5 text-stone-400 hover:bg-white hover:text-stone-600"><X size={16} /></button>
                         </div>
@@ -501,7 +511,24 @@ export default function OrderPage() {
                         {!pin && <p className="mt-1 text-xs text-stone-500">No location shared, so we need the full address — e.g. &ldquo;Ward 5, Shanti Tole, blue house behind Banepa Hospital&rdquo;.</p>}
                       </div>
                     )}
-                    <p className="text-xs font-bold text-brand-green">Home delivery: flat Nrs 20 (within 5km of Godam Chowk)</p>
+                    {tooFar && (
+                      <div role="alert" className="rounded-2xl bg-red-50 p-4 ring-1 ring-red-200">
+                        <p className="flex items-center gap-2 font-bold text-red-800"><MapPinOff size={18} className="shrink-0" /> We&apos;re not delivering to this location right now</p>
+                        <p className="mt-1 text-sm text-red-900/80">
+                          It&apos;s about {fmtKm(farKm)} from our shop, and we deliver within {area.radiusKm} km of Godam Chowk. Please call us to confirm whether we can bring it to you — or pick it up instead.
+                        </p>
+                        <div className="mt-3 flex flex-wrap gap-2">
+                          {shopPhone && (
+                            <a href={telHref(shopPhone)} className="inline-flex items-center gap-1.5 rounded-full bg-red-600 px-4 py-2 text-sm font-bold text-white hover:bg-red-700">
+                              <Phone size={15} /> Call {phoneDisplay(shopPhone)}
+                            </a>
+                          )}
+                          <a href="/whatsapp" target="_blank" rel="noopener noreferrer" className="inline-flex items-center rounded-full bg-white px-4 py-2 text-sm font-bold text-red-700 ring-1 ring-red-200 hover:bg-red-50">WhatsApp us</a>
+                          <button type="button" onClick={() => setType("pickup")} className="inline-flex items-center rounded-full bg-white px-4 py-2 text-sm font-bold text-stone-700 ring-1 ring-stone-200 hover:bg-stone-50">Switch to pickup</button>
+                        </div>
+                      </div>
+                    )}
+                    <p className="text-xs font-bold text-brand-green">Home delivery: flat Nrs 20 (within {area.radiusKm} km of Godam Chowk)</p>
                   </div>
                 )}
               </div>
@@ -576,7 +603,7 @@ export default function OrderPage() {
             </p>
             <div className="flex gap-3">
               <button onClick={() => setStep(1)} className="rounded-full bg-white px-6 py-3 font-bold border border-stone-200">← Back</button>
-              <button onClick={placeOrder} disabled={busy || items.length === 0} className="btn-primary flex-1 shadow-lg shadow-orange-500/30">
+              <button onClick={placeOrder} disabled={busy || items.length === 0 || tooFar} className="btn-primary flex-1 shadow-lg shadow-orange-500/30">
                 {busy ? "Placing order…" : `Place order • ${npr(finalTotal)}`}
               </button>
             </div>

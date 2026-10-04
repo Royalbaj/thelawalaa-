@@ -10,8 +10,10 @@ import { sendEmail, FROM_ORDERS } from "@/lib/email";
 import { orderConfirmedEmail } from "@/lib/account-emails";
 import { applyOpeningPromoPrice } from "@/lib/promo";
 import { pushToStaff } from "@/lib/push";
-import { npr } from "@/lib/utils";
+import { npr, phoneDisplay } from "@/lib/utils";
 import { deliveryOtp, hashOtp } from "@/lib/delivery-otp";
+import { deliveryArea, outsideArea, distanceKm, fmtKm } from "@/lib/geo";
+import { getSiteText } from "@/lib/site-content";
 
 // USP: flat Nrs 20 home delivery within 5km of the store (Godam Chowk, Banepa at launch).
 const DELIVERY_FEE = 20; // NPR — flat
@@ -111,6 +113,12 @@ export async function createOrder(input: unknown) {
     }
     if (!pin && deliveryAddress.length < 10) {
       return { error: "Add your full delivery address (tole/street, house and a landmark) — or share your location" };
+    }
+    // Outside the delivery area (Admin → Settings → Delivery area): not online — call to confirm.
+    const area = deliveryArea(settings);
+    if (pin && outsideArea(area, pin)) {
+      const phone = phoneDisplay((await getSiteText())["contact.whatsapp"]);
+      return { error: `We're not delivering to that location right now (about ${fmtKm(distanceKm(area.shop, pin))} away — we deliver within ${area.radiusKm} km). Please call us on ${phone} to confirm, or choose pickup.` };
     }
   }
   const contactPhone = isSelfCheckout ? (profile.phone || data.guest_phone || null) : data.guest_phone;
