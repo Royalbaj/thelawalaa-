@@ -4,14 +4,14 @@ import { Calculator, TrendingUp, TrendingDown } from "lucide-react";
 import { planOutcome, pct, times, type Plan } from "@/lib/marketing-shared";
 import { npr, cn } from "@/lib/utils";
 
-// "Is this worth doing?" before spending: plan a campaign and see what it
+// "Is this worth doing?" before spending: plan a marketing idea and see what it
 // needs to bring in. Average order, repeat orders and margin start from your
 // real numbers (last 30/90 days, Marketing settings).
 
 const EXAMPLES: { label: string; patch: Partial<Plan> }[] = [
-  { label: "Facebook boost", patch: { spend: 2000, reach: 20000, conversionPct: 0.5, discountPerOrder: 0 } },
-  { label: "200 posters + QR", patch: { spend: 3000, reach: 4000, conversionPct: 2, discountPerOrder: 0 } },
-  { label: "Influencer post", patch: { spend: 5000, reach: 15000, conversionPct: 1, discountPerOrder: 20 } },
+  { label: "Poster run", patch: { spend: 3000, reach: 4000, conversionPct: 2, discountPerOrder: 0 } },
+  { label: "Event stall", patch: { spend: 5000, reach: 800, conversionPct: 10, discountPerOrder: 0 } },
+  { label: "Free samples", patch: { spend: 2500, reach: 300, conversionPct: 15, discountPerOrder: 0 } },
   { label: "Discount offer", patch: { spend: 0, reach: 1500, conversionPct: 8, discountPerOrder: 40 } },
 ];
 
@@ -32,7 +32,7 @@ function Field({ id, label, hint, value, onChange, step = 1, suffix }: { id: str
 
 export default function RoiCalculator({ defaults }: { defaults: { aov: number; ordersPerCustomer: number; margin: number } }) {
   const [p, setP] = useState<Plan>({
-    spend: 2000, reach: 20000, conversionPct: 0.5,
+    spend: 3000, reach: 4000, conversionPct: 2,
     aov: defaults.aov, ordersPerCustomer: Math.max(1, defaults.ordersPerCustomer), discountPerOrder: 0, marginPct: defaults.margin,
   });
   const set = (k: keyof Plan) => (v: number) => setP((x) => ({ ...x, [k]: v }));
@@ -42,19 +42,19 @@ export default function RoiCalculator({ defaults }: { defaults: { aov: number; o
   return (
     <section className="rounded-2xl bg-white p-5 shadow-sm ring-1 ring-stone-100">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <h2 className="flex items-center gap-2 font-display text-lg font-bold text-brand-brown"><Calculator size={19} className="text-brand-orange" /> ROI calculator</h2>
+        <h2 className="flex items-center gap-2 font-display text-lg font-bold text-brand-brown"><Calculator size={19} className="text-brand-orange" /> ROI planner</h2>
         <div className="flex flex-wrap gap-1.5">
           {EXAMPLES.map((e) => (
             <button key={e.label} onClick={() => setP((x) => ({ ...x, ...e.patch }))} className="rounded-full bg-stone-100 px-3 py-1 text-xs font-bold text-stone-600 hover:bg-orange-50 hover:text-brand-orange">{e.label}</button>
           ))}
         </div>
       </div>
-      <p className="mt-1 text-xs text-stone-500">Plan a campaign before spending. The example buttons are rough starting guesses — change them to your own.</p>
+      <p className="mt-1 text-xs text-stone-500">Thinking of spending on something? Check what it needs to bring in first. The example buttons are rough starting guesses — change them to your own.</p>
 
-      <div className="mt-4 grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
+      <div className="mt-4 grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] [&>*]:min-w-0">
         <div className="grid grid-cols-2 gap-3">
-          <Field id="r-spend" label="Campaign cost" value={p.spend} onChange={set("spend")} step={100} suffix="Rs" />
-          <Field id="r-reach" label="People reached" value={p.reach} onChange={set("reach")} step={100} hint="Who sees the ad / poster" />
+          <Field id="r-spend" label="Cost" value={p.spend} onChange={set("spend")} step={100} suffix="Rs" />
+          <Field id="r-reach" label="People reached" value={p.reach} onChange={set("reach")} step={100} hint="People it will reach" />
           <Field id="r-conv" label="% who become customers" value={p.conversionPct} onChange={set("conversionPct")} step={0.1} suffix="%" />
           <Field id="r-aov" label="Average order" value={p.aov} onChange={set("aov")} step={10} suffix="Rs" hint="Your last 30 days" />
           <Field id="r-repeat" label="Orders per customer" value={p.ordersPerCustomer} onChange={set("ordersPerCustomer")} step={0.1} hint="Your regulars: last 90 days" />

@@ -9,7 +9,6 @@ import { supabaseAdmin, audit, getRewardSettings } from "@/lib/supabase/admin";
 import { signupSchema } from "@/lib/validations/auth";
 import { sendEmail, EMAIL_SITE, emailRecentlyWorking } from "@/lib/email";
 import { verifyEmail, welcomeEmail, resetEmail, alreadyRegisteredEmail } from "@/lib/account-emails";
-import { campaignFromCookie } from "@/lib/marketing";
 
 // Customer accounts, done on the server so the emails are ours (branded,
 // from "Thelawalaa", via Resend) instead of Supabase's plain, rate-limited
@@ -87,7 +86,6 @@ export async function signUpCustomer(input: unknown): Promise<Result> {
     // Consent as given on the form: Terms always (the form requires it), offers only if they ticked it.
     await supabaseAdmin.from("profiles").update({
       signup_source: d.source ?? "web",
-      signup_campaign_id: await campaignFromCookie(),
       terms_accepted_at: now,
       marketing_opt_in: d.marketing_opt_in,
       marketing_opt_in_at: d.marketing_opt_in ? now : null,

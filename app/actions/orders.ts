@@ -12,7 +12,6 @@ import { applyOpeningPromoPrice } from "@/lib/promo";
 import { pushToStaff } from "@/lib/push";
 import { npr } from "@/lib/utils";
 import { deliveryOtp, hashOtp } from "@/lib/delivery-otp";
-import { campaignForPromo, campaignFromCookie } from "@/lib/marketing";
 
 // USP: flat Nrs 20 home delivery within 5km of the store (Godam Chowk, Banepa at launch).
 const DELIVERY_FEE = 20; // NPR — flat
@@ -186,8 +185,6 @@ export async function createOrder(input: unknown) {
   }
 
   const total = Math.max(0, subtotal + delivery_fee - discount_amount - points_discount);
-  // Marketing: which campaign this online order came from — its promo code, else the link they arrived by.
-  const campaign_id = isStaff ? null : (await campaignForPromo(promo_code_id)) ?? (await campaignFromCookie());
   
   let finalNotes = data.notes ? data.notes.trim() : "";
   const addressLine = data.type === "delivery"
@@ -233,7 +230,6 @@ export async function createOrder(input: unknown) {
       points_redeemed,
       points_discount,
       free_item_redeemed,
-      campaign_id,
     })
     .select("id, order_number, total, daily_number")
     .single();

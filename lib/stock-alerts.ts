@@ -41,38 +41,51 @@ export async function checkStockAfterSale(productIds: string[]) {
   }
 }
 
-export type StockWarning = { id: string; name: string; unit: string; remaining: number; reorder: number; state: "low" | "out" };
-export type PosStock = { warnings: StockWarning[]; byProduct: Record<string, StockWarning> };
+export type StockLevel = {
+  id: string; name: string; unit: string; remaining: number; reorder: number; state: "ok" | "low" | "out";
+  soldToday: number; countedAt: string | null; products: string[];
+};
+/** Kept for the tiles' wording: a level that's low or out. */
+export type StockWarning = StockLevel;
+export type PosStock = { all: StockLevel[]; warnings: StockLevel[]; byProduct: Record<string, StockLevel> };
+
+const RANK = { out: 0, low: 1, ok: 2 } as const;
 
 /**
- * For the POS: every stock item that's running low or out (by the same
- * stock_levels() maths as Accounts → Stock), and which menu items use it,
- * so their tiles can say so. Worst first.
+ * For the POS (read-only — counting and restocking happen in Accounts →
+ * Stock): every stock item with what's left (same stock_levels() maths), the
+ * ones running low or out, and which menu items use each, so every linked
+ * tile can show its count. Worst first.
  */
 export async function getPosStock(): Promise<PosStock> {
   try {
-    const [{ data: levels }, { data: links }] = await Promise.all([
+    const [{ data: levels }, { data: links }, { data: products }] = await Promise.all([
       supabaseAdmin.rpc("stock_levels"),
       supabaseAdmin.from("stock_item_products").select("stock_item_id, product_id"),
+      supabaseAdmin.from("products").select("id, name"),
     ]);
-    const warnings: StockWarning[] = ((levels ?? []) as { id: string; name: string; unit: string; remaining: number; reorder_level: number }[])
+    const productName = new Map((products ?? []).map((p) => [p.id, (p.name as string).trim()]));
+    const all: StockLevel[] = ((levels ?? []) as { id: string; name: string; unit: string; remaining: number; reorder_level: number; sold_today: number; counted_at: string | null }[])
       .map((l) => {
         const remaining = Number(l.remaining), reorder = Number(l.reorder_level);
-        const state = remaining <= 0 ? "out" as const : remaining <= reorder ? "low" as const : null;
-        return state && { id: l.id, name: l.name, unit: l.unit, remaining: +remaining.toFixed(2), reorder, state };
+        return {
+          id: l.id, name: l.name, unit: l.unit, remaining: +remaining.toFixed(2), reorder,
+          state: remaining <= 0 ? "out" as const : remaining <= reorder ? "low" as const : "ok" as const,
+          soldToday: +Number(l.sold_today ?? 0).toFixed(2), countedAt: l.counted_at,
+          products: (links ?? []).filter((k) => k.stock_item_id === l.id).map((k) => productName.get(k.product_id) ?? "").filter(Boolean),
+        };
       })
-      .filter((w): w is StockWarning => !!w)
-      .sort((a, b) => (a.state === b.state ? a.remaining - b.remaining : a.state === "out" ? -1 : 1));
-    const byId = new Map(warnings.map((w) => [w.id, w]));
-    const byProduct: Record<string, StockWarning> = {};
+      .sort((a, b) => RANK[a.state] - RANK[b.state] || a.remaining - b.remaining || a.name.localeCompare(b.name));
+    const byId = new Map(all.map((w) => [w.id, w]));
+    const byProduct: Record<string, StockLevel> = {};
     for (const l of links ?? []) {
       const w = byId.get(l.stock_item_id);
       const cur = byProduct[l.product_id];
       // A menu item made from two stock items shows the one that's worse.
-      if (w && (!cur || (w.state === "out" && cur.state !== "out") || (w.state === cur.state && w.remaining < cur.remaining))) byProduct[l.product_id] = w;
+      if (w && (!cur || RANK[w.state] < RANK[cur.state] || (w.state === cur.state && w.remaining < cur.remaining))) byProduct[l.product_id] = w;
     }
-    return { warnings, byProduct };
+    return { all, warnings: all.filter((w) => w.state !== "ok"), byProduct };
   } catch {
-    return { warnings: [], byProduct: {} };
+    return { all: [], warnings: [], byProduct: {} };
   }
 }

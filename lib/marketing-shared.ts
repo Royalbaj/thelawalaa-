@@ -1,50 +1,60 @@
-// Marketing maths and labels — shared by Admin → Marketing (server) and the
-// ROI calculator (browser). Revenue here is what customers actually paid
-// (after discounts); profit = revenue × gross margin (what's left after the
-// food, packaging and other per-order costs).
+// Marketing budget & ROI — labels and maths shared by Admin → Marketing &
+// ROI (server) and its forms / ROI planner (browser).
+//
+// Expenses = money spent on marketing. Returns = what it brought back
+// (extra sales, event takings, catering won, cards sold…), entered by hand.
+// ROI = (returns − expenses) ÷ expenses. "Profit ROI" counts returns at the
+// gross margin instead — what's left after the food and packaging.
 
-export const CHANNELS = {
-  facebook: "Facebook ads", instagram: "Instagram ads", tiktok: "TikTok ads", google: "Google ads",
-  poster: "Posters / QR", flyer: "Flyers", influencer: "Influencer", sms: "SMS / Viber",
-  event: "Event / stall", print: "Newspaper / print", radio: "Radio", other: "Other",
+export const CATEGORIES = {
+  printing: "Printing — posters, flyers, cards",
+  social: "Social media",
+  events: "Events & sponsorships",
+  samples: "Free samples & tastings",
+  offers: "Offers & giveaways",
+  signage: "Signage & branding",
+  influencers: "Influencers & promoters",
+  media: "Newspaper, radio & media",
+  other: "Other",
 } as const;
-export type Channel = keyof typeof CHANNELS;
+export type Category = keyof typeof CATEGORIES;
+export const CATEGORY_KEYS = Object.keys(CATEGORIES) as [Category, ...Category[]];
+/** Short names for charts and tight spaces. */
+export const CATEGORY_SHORT: Record<Category, string> = {
+  printing: "Printing", social: "Social media", events: "Events", samples: "Samples", offers: "Offers",
+  signage: "Signage", influencers: "Influencers", media: "Media", other: "Other",
+};
 
-export const LANDINGS = { "/": "Homepage", "/order": "Order page", "/auth/signup": "Sign-up page" } as const;
-export type Landing = keyof typeof LANDINGS;
+export const PAYMENT_METHODS = { cash: "Cash", bank: "Bank", qr: "QR / eSewa", other: "Other" } as const;
+export type PaymentMethod = keyof typeof PAYMENT_METHODS;
 
-/** The cookie a /go/<code> visit leaves (30 days): which campaign brought them. */
-export const CAMPAIGN_COOKIE = "tw_c";
-export const CAMPAIGN_DAYS = 30;
+export type Ym = string; // "2026-10"
+export const ymOf = (ymd: string): Ym => ymd.slice(0, 7);
+export const monthStart = (ym: Ym) => `${ym}-01`;
+export const shiftMonth = (ym: Ym, n: number): Ym => {
+  const [y, m] = ym.split("-").map(Number);
+  const d = new Date(Date.UTC(y, m - 1 + n, 1));
+  return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}`;
+};
+export const monthName = (ym: Ym) => new Date(`${ym}-01T00:00:00Z`).toLocaleDateString("en-GB", { month: "long", year: "numeric", timeZone: "UTC" });
+export const monthShort = (ym: Ym) => new Date(`${ym}-01T00:00:00Z`).toLocaleDateString("en-GB", { month: "short", year: "2-digit", timeZone: "UTC" });
 
-export const slugify = (s: string) =>
-  s.toLowerCase().normalize("NFKD").replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 30) || "campaign";
-
-export type Results = { spend: number; revenue: number; orders: number; signups: number; clicks: number };
-
-export function metrics(r: Results, marginPct: number) {
-  const margin = marginPct / 100;
-  const grossProfit = r.revenue * margin;
-  const net = grossProfit - r.spend;
+export function roiOf(expenses: number, returns: number, marginPct: number) {
   return {
-    grossProfit,
-    net,
-    /** (profit − spend) ÷ spend: 1 = every rupee spent came back doubled. */
-    roi: r.spend > 0 ? net / r.spend : null,
-    /** Revenue per rupee spent. */
-    roas: r.spend > 0 ? r.revenue / r.spend : null,
-    costPerOrder: r.spend > 0 && r.orders ? r.spend / r.orders : null,
-    costPerSignup: r.spend > 0 && r.signups ? r.spend / r.signups : null,
-    conversion: r.clicks ? r.orders / r.clicks : null,
-    /** Revenue needed for the spend to pay for itself. */
-    breakEvenRevenue: margin > 0 ? r.spend / margin : null,
+    net: returns - expenses,
+    /** (returns − expenses) ÷ expenses — 1 = every rupee spent came back doubled. */
+    roi: expenses > 0 ? (returns - expenses) / expenses : null,
+    /** Returns for every Rs 1 spent. */
+    perRupee: expenses > 0 ? returns / expenses : null,
+    /** Same, counting returns at the gross margin (what's left after food & packaging). */
+    profitRoi: expenses > 0 ? (returns * (marginPct / 100) - expenses) / expenses : null,
   };
 }
 
-export const pct = (x: number | null, digits = 0) => (x == null || !isFinite(x) ? "—" : `${(x * 100).toFixed(digits)}%`);
-export const times = (x: number | null) => (x == null || !isFinite(x) ? "—" : `${x.toFixed(1)}×`);
+export const pct = (x: number | null | undefined, digits = 0) => (x == null || !isFinite(x) ? "—" : `${(x * 100).toFixed(digits)}%`);
+export const times = (x: number | null | undefined) => (x == null || !isFinite(x) ? "—" : `${x.toFixed(1)}×`);
 
-/** ROI calculator: a plan, before spending. */
+/** ROI planner: is an idea worth it, before spending? */
 export type Plan = { spend: number; reach: number; conversionPct: number; aov: number; ordersPerCustomer: number; discountPerOrder: number; marginPct: number };
 
 export function planOutcome(p: Plan) {

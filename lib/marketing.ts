@@ -1,119 +1,103 @@
 import "server-only";
-import { cookies } from "next/headers";
 import { supabaseAdmin, getRewardSettings } from "@/lib/supabase/admin";
-import { nepalToday, addMonths, startOfMonth, monthLabel, type Ymd } from "@/lib/dates";
-import { CAMPAIGN_COOKIE, metrics, type Channel, type Landing } from "@/lib/marketing-shared";
+import { nepalToday } from "@/lib/dates";
+import { CATEGORY_KEYS, CATEGORY_SHORT, roiOf, ymOf, monthStart, shiftMonth, monthName, monthShort, type Category, type PaymentMethod, type Ym } from "@/lib/marketing-shared";
 
-// Admin → Marketing. Sales count the way Admin → Reports does (paid, not
-// cancelled); an order belongs to a campaign if it came through the
-// campaign's link (orders.campaign_id) or used its promo code.
+// Admin → Marketing & ROI (migration 032): the marketing budget per month,
+// every expense and return recorded by hand, and what that adds up to.
+// Shop sales come from the orders (paid, not cancelled — like Reports) only
+// to show marketing as a share of sales.
 
-const NPT_MS = (5 * 60 + 45) * 60_000;
-const nepalDay = (iso: string): Ymd => new Date(new Date(iso).getTime() + NPT_MS).toISOString().slice(0, 10);
-
-/** The campaign that brought this visitor (from their /go/<code> cookie), if it's still running. */
-export async function campaignFromCookie(): Promise<string | null> {
-  const code = (await cookies()).get(CAMPAIGN_COOKIE)?.value;
-  if (!code || !/^[a-z0-9][a-z0-9-]{1,29}$/.test(code)) return null;
-  const { data } = await supabaseAdmin.from("marketing_campaigns").select("id").eq("code", code).neq("status", "ended").maybeSingle();
-  return data?.id ?? null;
-}
-
-/** The campaign an order with this promo code belongs to (the newest one using it). */
-export async function campaignForPromo(promoCodeId: string | null): Promise<string | null> {
-  if (!promoCodeId) return null;
-  const { data } = await supabaseAdmin.from("marketing_campaigns").select("id")
-    .eq("promo_code_id", promoCodeId).neq("status", "ended").order("created_at", { ascending: false }).limit(1).maybeSingle();
-  return data?.id ?? null;
-}
-
-export type CampaignRow = {
-  id: string; name: string; channel: Channel; code: string; landing_path: Landing; promo_code_id: string | null; promoCode: string | null;
-  budget: number | null; starts_on: string; ends_on: string | null; status: "active" | "paused" | "ended"; notes: string | null; clicks: number;
-  spend: number; spendThisMonth: number; orders: number; revenue: number; discounts: number; signups: number;
-  m: ReturnType<typeof metrics>;
+export type Entry = {
+  id: string; kind: "expense" | "return"; entry_date: string; category: Category; activity_id: string | null; activity: string | null;
+  amount: number; new_customers: number | null; payment_method: PaymentMethod | null; note: string | null;
+};
+export type Activity = {
+  id: string; name: string; category: Category; budget: number | null; starts_on: string; ends_on: string | null;
+  status: "active" | "paused" | "ended"; notes: string | null;
+  spent: number; returns: number; newCustomers: number; r: ReturnType<typeof roiOf>; budgetUse: number | null;
 };
 export type Alert = { tone: "red" | "amber"; text: string };
 
-type OrderRow = { id: string; created_at: string; total: number; discount_amount: number; discount_label: string | null; points_discount: number; free_item_redeemed: boolean; promo_code_id: string | null; campaign_id: string | null; customer_id: string | null; placed_by: string | null };
+const startIso = (ymd: string) => `${ymd}T00:00:00+05:45`;
 
-async function allPages<T>(build: (from: number, to: number) => PromiseLike<{ data: T[] | null; error: { message: string } | null }>) {
-  const out: T[] = [];
+async function allEntries() {
+  const out: Omit<Entry, "activity">[] = [];
   for (let offset = 0; ; offset += 1000) {
-    const { data, error } = await build(offset, offset + 999);
-    if (error) throw new Error(error.message);
-    out.push(...(data ?? []));
+    const { data, error } = await supabaseAdmin.from("marketing_entries")
+      .select("id, kind, entry_date, category, activity_id, amount, new_customers, payment_method, note")
+      .order("entry_date", { ascending: false }).order("created_at", { ascending: false }).range(offset, offset + 999);
+    if (error) throw new Error(`Couldn't load marketing entries: ${error.message}`);
+    out.push(...((data ?? []) as Omit<Entry, "activity">[]).map((e) => ({ ...e, amount: Number(e.amount) })));
     if (!data || data.length < 1000) return out;
   }
 }
 
-export async function getMarketing() {
-  const today = nepalToday();
-  const monthStart = startOfMonth(today);
-  const trendStart = addMonths(monthStart, -5);
-  const since90 = new Date(Date.now() - 90 * 86400_000).toISOString();
+async function paidSales(fromYmd: string, toYmd: string) {
+  let total = 0;
+  const rows: { total: number; discount_amount: number; discount_label: string | null; points_discount: number; free_item_redeemed: boolean; promo_code_id: string | null; customer_id: string | null }[] = [];
+  for (let offset = 0; ; offset += 1000) {
+    const { data, error } = await supabaseAdmin.from("orders")
+      .select("total, discount_amount, discount_label, points_discount, free_item_redeemed, promo_code_id, customer_id")
+      .eq("payment_status", "paid").neq("status", "cancelled")
+      .gte("created_at", startIso(fromYmd)).lt("created_at", startIso(toYmd)).range(offset, offset + 999);
+    if (error) throw new Error(`Couldn't load sales: ${error.message}`);
+    for (const o of data ?? []) { total += Number(o.total); rows.push(o as never); }
+    if (!data || data.length < 1000) return { total, rows };
+  }
+}
 
-  const [{ data: settingsRow }, { data: campaignRows }, costs, { data: promos }, rewards] = await Promise.all([
-    supabaseAdmin.from("marketing_settings").select("gross_margin_pct, monthly_budget").eq("id", 1).maybeSingle(),
-    supabaseAdmin.from("marketing_campaigns").select("*").order("created_at", { ascending: false }),
-    allPages<{ id: string; campaign_id: string; spent_on: string; amount: number; note: string | null; created_at: string }>((a, b) =>
-      supabaseAdmin.from("marketing_costs").select("id, campaign_id, spent_on, amount, note, created_at").order("spent_on", { ascending: false }).range(a, b)),
-    supabaseAdmin.from("promo_codes").select("id, code, is_active").order("created_at", { ascending: false }),
+export async function getMarketing(ymInput?: string) {
+  const thisYm = ymOf(nepalToday());
+  const ym: Ym = ymInput && /^\d{4}-\d{2}$/.test(ymInput) && ymInput <= thisYm ? ymInput : thisYm;
+  const from = monthStart(ym), to = monthStart(shiftMonth(ym, 1));
+  const prevYm = shiftMonth(ym, -1);
+
+  const [{ data: settingsRow }, { data: budgetRows }, { data: activityRows }, entriesRaw, sales, prevSales, rewards] = await Promise.all([
+    supabaseAdmin.from("marketing_settings").select("gross_margin_pct").eq("id", 1).maybeSingle(),
+    supabaseAdmin.from("marketing_budgets").select("month, category, amount").in("month", [from, monthStart(prevYm)]),
+    supabaseAdmin.from("marketing_activities").select("id, name, category, budget, starts_on, ends_on, status, notes").order("starts_on", { ascending: false }),
+    allEntries(),
+    paidSales(from, to),
+    paidSales(monthStart(prevYm), from),
     getRewardSettings(),
   ]);
   const margin = Number(settingsRow?.gross_margin_pct ?? 60);
-  const monthlyBudget = settingsRow?.monthly_budget != null ? Number(settingsRow.monthly_budget) : null;
-  const campaigns = campaignRows ?? [];
-  const promoById = new Map((promos ?? []).map((p) => [p.id, p.code as string]));
+  const activityName = new Map((activityRows ?? []).map((a) => [a.id, a.name as string]));
+  const entries: Entry[] = entriesRaw.map((e) => ({ ...e, activity: e.activity_id ? activityName.get(e.activity_id) ?? null : null }));
 
-  // Paid, not-cancelled orders since the start of the trend window (or the oldest campaign).
-  const oldestStart = campaigns.reduce<string>((m, c) => (c.starts_on < m ? c.starts_on : m), trendStart);
-  const orders = await allPages<OrderRow>((a, b) =>
-    supabaseAdmin.from("orders")
-      .select("id, created_at, total, discount_amount, discount_label, points_discount, free_item_redeemed, promo_code_id, campaign_id, customer_id, placed_by")
-      .eq("payment_status", "paid").neq("status", "cancelled").gte("created_at", `${oldestStart}T00:00:00+05:45`)
-      .order("created_at").range(a, b));
-
-  const campaignOf = (o: OrderRow): string | null => {
-    if (o.campaign_id) return o.campaign_id;
-    if (!o.promo_code_id) return null;
-    const c = campaigns.find((x) => x.promo_code_id === o.promo_code_id && nepalDay(o.created_at) >= x.starts_on && (!x.ends_on || nepalDay(o.created_at) <= x.ends_on));
-    return c?.id ?? null;
+  const budgetFor = (monthYmd: string) => {
+    const rows = (budgetRows ?? []).filter((b) => b.month === monthYmd);
+    const byCategory = Object.fromEntries(rows.filter((b) => b.category !== "total").map((b) => [b.category, Number(b.amount)])) as Partial<Record<Category, number>>;
+    const total = rows.find((b) => b.category === "total");
+    return { total: total ? Number(total.amount) : null, byCategory };
   };
-
-  const { data: signupRows } = await supabaseAdmin.from("profiles").select("signup_campaign_id, created_at").not("signup_campaign_id", "is", null);
-
-  const rows: CampaignRow[] = campaigns.map((c) => {
-    const mine = orders.filter((o) => campaignOf(o) === c.id);
-    const spendRows = costs.filter((k) => k.campaign_id === c.id);
-    const r = {
-      spend: spendRows.reduce((s, k) => s + Number(k.amount), 0),
-      revenue: mine.reduce((s, o) => s + Number(o.total), 0),
-      orders: mine.length,
-      signups: (signupRows ?? []).filter((p) => p.signup_campaign_id === c.id).length,
-      clicks: Number(c.clicks ?? 0),
-    };
-    return {
-      ...c, budget: c.budget != null ? Number(c.budget) : null, promoCode: c.promo_code_id ? promoById.get(c.promo_code_id) ?? null : null,
-      spend: r.spend, spendThisMonth: spendRows.filter((k) => k.spent_on >= monthStart).reduce((s, k) => s + Number(k.amount), 0),
-      orders: r.orders, revenue: r.revenue, signups: r.signups,
-      discounts: mine.reduce((s, o) => s + Number(o.discount_amount ?? 0), 0),
-      m: metrics(r, margin),
-    } as CampaignRow;
-  });
+  const budget = budgetFor(from);
+  const prevBudget = budgetFor(monthStart(prevYm));
 
   // ── This month ───────────────────────────────────────────────
-  const monthOrders = orders.filter((o) => nepalDay(o.created_at) >= monthStart);
-  const monthAttributed = monthOrders.filter((o) => campaignOf(o));
-  const monthSpend = costs.filter((k) => k.spent_on >= monthStart).reduce((s, k) => s + Number(k.amount), 0);
-  const byChannel = new Map<string, number>();
-  for (const k of costs.filter((x) => x.spent_on >= monthStart)) {
-    const ch = campaigns.find((c) => c.id === k.campaign_id)?.channel ?? "other";
-    byChannel.set(ch, (byChannel.get(ch) ?? 0) + Number(k.amount));
-  }
-  const monthSignups = (signupRows ?? []).filter((p) => nepalDay(p.created_at) >= monthStart).length;
+  const inMonth = entries.filter((e) => e.entry_date >= from && e.entry_date < to);
+  const expenses = inMonth.filter((e) => e.kind === "expense");
+  const returns = inMonth.filter((e) => e.kind === "return");
+  const spent = expenses.reduce((s, e) => s + e.amount, 0);
+  const returned = returns.reduce((s, e) => s + e.amount, 0);
+  const newCustomers = returns.reduce((s, e) => s + (e.new_customers ?? 0), 0);
+  const byCategory = CATEGORY_KEYS.map((c) => {
+    const s = expenses.filter((e) => e.category === c).reduce((t, e) => t + e.amount, 0);
+    const r = returns.filter((e) => e.category === c).reduce((t, e) => t + e.amount, 0);
+    return { category: c, spent: s, returns: r, budget: budget.byCategory[c] ?? null, r: roiOf(s, r, margin) };
+  }).filter((c) => c.spent || c.returns || c.budget);
+  const byMethod = (["cash", "bank", "qr", "other"] as PaymentMethod[])
+    .map((m) => ({ method: m, amount: expenses.filter((e) => (e.payment_method ?? "other") === m).reduce((s, e) => s + e.amount, 0) }))
+    .filter((m) => m.amount > 0);
 
-  // Offers are a marketing cost too: what discounts, points and free items gave away this month.
+  // Customers who signed up this month (and last), for "cost per new customer".
+  const [{ count: signups }, { count: prevSignups }] = await Promise.all([
+    supabaseAdmin.from("profiles").select("id", { count: "exact", head: true }).eq("role", "customer").gte("created_at", startIso(from)).lt("created_at", startIso(to)),
+    supabaseAdmin.from("profiles").select("id", { count: "exact", head: true }).eq("role", "customer").gte("created_at", startIso(monthStart(prevYm))).lt("created_at", startIso(from)),
+  ]);
+
+  // Offers given at the till / online this month — discounts are a marketing cost too.
   let freeItemPrice = 0;
   if (rewards.free_item_product_id) {
     const { data: fp } = await supabaseAdmin.from("products").select("price").eq("id", rewards.free_item_product_id).maybeSingle();
@@ -121,65 +105,83 @@ export async function getMarketing() {
   }
   const giveaways = new Map<string, number>();
   const give = (k: string, v: number) => { if (v > 0) giveaways.set(k, (giveaways.get(k) ?? 0) + v); };
-  for (const o of monthOrders) {
-    const d = Number(o.discount_amount ?? 0);
-    give(o.discount_label ?? (o.promo_code_id ? "Promo codes" : "Other discounts"), d);
+  for (const o of sales.rows) {
+    give(o.discount_label ?? (o.promo_code_id ? "Promo codes" : "Other discounts"), Number(o.discount_amount ?? 0));
     give("Reward points", Number(o.points_discount ?? 0));
     if (o.free_item_redeemed) give("Free reward items", freeItemPrice);
   }
+  const giveawayTotal = [...giveaways.values()].reduce((s, v) => s + v, 0);
 
-  // ── Last 6 months: spend vs revenue from campaigns ─────────────
+  // ── Last 6 months ────────────────────────────────────────────
+  const { data: trendBudgets } = await supabaseAdmin.from("marketing_budgets").select("month, amount")
+    .eq("category", "total").gte("month", monthStart(shiftMonth(ym, -5))).lte("month", from);
   const trend = Array.from({ length: 6 }, (_, i) => {
-    const from = addMonths(trendStart, i), to = addMonths(from, 1);
+    const m = shiftMonth(ym, i - 5), f = monthStart(m), t = monthStart(shiftMonth(m, 1));
+    const es = entries.filter((e) => e.entry_date >= f && e.entry_date < t);
     return {
-      label: monthLabel(from),
-      spend: costs.filter((k) => k.spent_on >= from && k.spent_on < to).reduce((s, k) => s + Number(k.amount), 0),
-      revenue: orders.filter((o) => { const d = nepalDay(o.created_at); return d >= from && d < to && campaignOf(o); }).reduce((s, o) => s + Number(o.total), 0),
+      label: monthShort(m),
+      expenses: es.filter((e) => e.kind === "expense").reduce((s, e) => s + e.amount, 0),
+      returns: es.filter((e) => e.kind === "return").reduce((s, e) => s + e.amount, 0),
+      budget: Number((trendBudgets ?? []).find((b) => b.month === f)?.amount ?? 0),
     };
   });
 
-  // ── Numbers for the ROI calculator ────────────────────────────
-  const since30 = Date.now() - 30 * 86400_000;
-  const recent = orders.filter((o) => new Date(o.created_at).getTime() >= since30);
-  const aov = recent.length ? recent.reduce((s, o) => s + Number(o.total), 0) / recent.length : 0;
-  const { data: regOrders } = await supabaseAdmin.from("orders").select("customer_id")
-    .not("customer_id", "is", null).neq("status", "cancelled").gte("created_at", since90);
+  // ── Activities (all time) ────────────────────────────────────
+  const activities: Activity[] = (activityRows ?? []).map((a) => {
+    const es = entries.filter((e) => e.activity_id === a.id);
+    const s = es.filter((e) => e.kind === "expense").reduce((t, e) => t + e.amount, 0);
+    const r = es.filter((e) => e.kind === "return").reduce((t, e) => t + e.amount, 0);
+    const b = a.budget != null ? Number(a.budget) : null;
+    return {
+      ...a, category: a.category as Category, budget: b, status: a.status as Activity["status"],
+      spent: s, returns: r, newCustomers: es.reduce((t, e) => t + (e.kind === "return" ? e.new_customers ?? 0 : 0), 0),
+      r: roiOf(s, r, margin), budgetUse: b ? s / b : null,
+    };
+  });
+
+  // ── Things to look at ────────────────────────────────────────
+  const alerts: Alert[] = [];
+  const isThisMonth = ym === thisYm;
+  if (budget.total != null && spent > budget.total) alerts.push({ tone: "red", text: `Marketing spend is over this month's budget by Rs ${Math.round(spent - budget.total).toLocaleString("en-IN")}.` });
+  else if (budget.total && spent >= budget.total * 0.8) alerts.push({ tone: "amber", text: `${Math.round((spent / budget.total) * 100)}% of this month's marketing budget is used.` });
+  if (isThisMonth && budget.total == null && Object.keys(budget.byCategory).length === 0) alerts.push({ tone: "amber", text: "No marketing budget is set for this month yet." });
+  for (const c of byCategory) if (c.budget != null && c.spent > c.budget) alerts.push({ tone: "red", text: `${CATEGORY_SHORT[c.category]} spending is over its budget for the month.` });
+  for (const a of activities) {
+    if (a.status !== "ended" && a.budget != null && a.spent > a.budget) alerts.push({ tone: "red", text: `“${a.name}” has spent more than its budget.` });
+    if (a.status === "active" && a.ends_on && a.ends_on < nepalToday()) alerts.push({ tone: "amber", text: `“${a.name}” is past its end date — mark it done when it's finished.` });
+  }
+  if (spent > 0 && returned === 0) alerts.push({ tone: "amber", text: "Money was spent this month but no returns are recorded yet — add what it brought in." });
+
+  // ── ROI planner starting numbers ─────────────────────────────
+  const since30 = new Date(Date.now() - 30 * 86400_000).toISOString();
+  const since90 = new Date(Date.now() - 90 * 86400_000).toISOString();
+  const [{ data: recent }, { data: regOrders }] = await Promise.all([
+    supabaseAdmin.from("orders").select("total").eq("payment_status", "paid").neq("status", "cancelled").gte("created_at", since30).limit(5000),
+    supabaseAdmin.from("orders").select("customer_id").not("customer_id", "is", null).neq("status", "cancelled").gte("created_at", since90).limit(5000),
+  ]);
+  const aov = recent?.length ? recent.reduce((s, o) => s + Number(o.total), 0) / recent.length : 0;
   const perCustomer = new Map<string, number>();
   for (const o of regOrders ?? []) perCustomer.set(o.customer_id as string, (perCustomer.get(o.customer_id as string) ?? 0) + 1);
   const ordersPerCustomer = perCustomer.size ? [...perCustomer.values()].reduce((s, n) => s + n, 0) / perCustomer.size : 1;
 
-  // ── Things to look at ─────────────────────────────────────────
-  const alerts: Alert[] = [];
-  if (monthlyBudget && monthSpend > monthlyBudget) alerts.push({ tone: "red", text: `This month's marketing spend (Rs ${Math.round(monthSpend).toLocaleString("en-IN")}) is over the monthly budget.` });
-  else if (monthlyBudget && monthSpend >= monthlyBudget * 0.8) alerts.push({ tone: "amber", text: `${Math.round((monthSpend / monthlyBudget) * 100)}% of this month's marketing budget is used.` });
-  for (const c of rows) {
-    if (c.budget != null && c.spend > c.budget) alerts.push({ tone: "red", text: `“${c.name}” has spent more than its budget.` });
-    const ageDays = (Date.parse(today) - Date.parse(c.starts_on)) / 86400_000;
-    if (c.status !== "ended" && c.spend > 0 && ageDays >= 14 && (c.m.roi ?? 0) < 0) alerts.push({ tone: "amber", text: `“${c.name}” isn't paying for itself yet (ROI ${Math.round((c.m.roi ?? 0) * 100)}%) after ${Math.floor(ageDays)} days.` });
-    if (c.status === "active" && c.ends_on && c.ends_on < today) alerts.push({ tone: "amber", text: `“${c.name}” is still active after its end date.` });
-    if (c.status === "active" && c.spend > 0 && ageDays >= 7 && !c.orders && !c.signups) alerts.push({ tone: "amber", text: `“${c.name}” has had no orders or sign-ups in ${Math.floor(ageDays)} days.` });
-  }
-
-  const giveawayTotal = [...giveaways.values()].reduce((s, v) => s + v, 0);
   return {
-    margin, monthlyBudget, monthLabel: monthLabel(monthStart),
-    campaigns: rows,
-    costs: costs.slice(0, 60).map((k) => ({ ...k, amount: Number(k.amount), campaign: campaigns.find((c) => c.id === k.campaign_id)?.name ?? "—" })),
-    promos: (promos ?? []).map((p) => ({ id: p.id, code: p.code as string, active: !!p.is_active })),
+    ym, label: monthName(ym), prevYm, nextYm: ym < thisYm ? shiftMonth(ym, 1) : null, isThisMonth, margin,
+    budget, prevBudget,
     month: {
-      spend: monthSpend,
-      revenue: monthAttributed.reduce((s, o) => s + Number(o.total), 0),
-      orders: monthAttributed.length,
-      signups: monthSignups,
-      allRevenue: monthOrders.reduce((s, o) => s + Number(o.total), 0),
-      m: metrics({ spend: monthSpend, revenue: monthAttributed.reduce((s, o) => s + Number(o.total), 0), orders: monthAttributed.length, signups: monthSignups, clicks: 0 }, margin),
-      byChannel: [...byChannel.entries()].map(([ch, amount]) => ({ channel: ch as Channel, amount })).sort((a, b) => b.amount - a.amount),
-      giveaways: [...giveaways.entries()].map(([name, amount]) => ({ name, amount })).sort((a, b) => b.amount - a.amount),
-      giveawayTotal,
+      spent, returned, newCustomers, ...roiOf(spent, returned, margin),
+      remaining: budget.total != null ? budget.total - spent : null,
+      budgetUse: budget.total ? spent / budget.total : null,
+      byCategory, byMethod,
+      entries: inMonth,
     },
+    sales: { thisMonth: sales.total, lastMonth: prevSales.total, share: sales.total ? spent / sales.total : null },
+    signups: { thisMonth: signups ?? 0, lastMonth: prevSignups ?? 0, costEach: signups ? spent / signups : null },
+    giveaways: [...giveaways.entries()].map(([name, amount]) => ({ name, amount })).sort((a, b) => b.amount - a.amount),
+    giveawayTotal,
     trend,
-    defaults: { aov: Math.round(aov) || 250, ordersPerCustomer: Math.round(ordersPerCustomer * 10) / 10 || 1, margin },
+    activities,
     alerts,
+    defaults: { aov: Math.round(aov) || 250, ordersPerCustomer: Math.round(ordersPerCustomer * 10) / 10 || 1, margin },
   };
 }
 export type MarketingData = Awaited<ReturnType<typeof getMarketing>>;

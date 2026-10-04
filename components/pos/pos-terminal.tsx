@@ -65,7 +65,7 @@ export default function PosTerminal({
   const [deal, setDeal] = useState<Deal>("none");
   const [done, setDone] = useState<Done | null>(null);
   const [members, setMembers] = useState<MemberForm[]>([]);
-  const [stock, setStock] = useState<PosStock>(initialStock ?? { warnings: [], byProduct: {} });
+  const [stock, setStock] = useState<PosStock>(initialStock ?? { all: [], warnings: [], byProduct: {} });
   const [stockOpen, setStockOpen] = useState(false);
   const [pending, start] = useTransition();
 
@@ -402,9 +402,10 @@ export default function PosTerminal({
                   ) : (
                     <div className="flex h-20 w-full items-center justify-center bg-brand-cream text-stone-300 dark:bg-stone-800 dark:text-stone-600"><UtensilsCrossed size={24} /></div>
                   )}
+                  {/* Every menu item linked to stock shows what's left (read-only — counted in Accounts → Stock) */}
                   {stock.byProduct[p.id] && (
                     <span className={cn("absolute right-2 top-2 rounded-full px-2 py-0.5 text-[10px] font-bold text-white shadow",
-                      stock.byProduct[p.id].state === "out" ? "bg-brand-red" : "bg-amber-500")}>
+                      stock.byProduct[p.id].state === "out" ? "bg-brand-red" : stock.byProduct[p.id].state === "low" ? "bg-amber-500" : "bg-stone-900/70")}>
                       {stock.byProduct[p.id].state === "out" ? "Stock out" : `${stock.byProduct[p.id].remaining} left`}
                     </span>
                   )}
