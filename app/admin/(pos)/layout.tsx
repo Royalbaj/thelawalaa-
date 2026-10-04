@@ -6,6 +6,7 @@ import PosHeader from "@/components/admin/pos-header";
 import SessionGuard from "@/components/session-guard";
 import { PosThemeRoot } from "@/components/pos/pos-theme";
 import PosFooter from "@/components/pos/pos-footer";
+import PosSession from "@/components/pos/pos-session";
 
 export const dynamic = "force-dynamic";
 
@@ -33,7 +34,7 @@ export const viewport: Viewport = { themeColor: "#0c0a09", viewportFit: "cover" 
 // interface at all (not just hidden from the nav). Counter operations
 // and business management are deliberately separate logins now.
 export default async function PosLayout({ children }: { children: React.ReactNode }) {
-  const { profile } = await getVerifiedUser();
+  const { user, profile } = await getVerifiedUser();
   if (!profile) redirect("/auth/login?redirect=/admin");
   // Other staff go to their own home, never back through login (a loop).
   if (profile.role !== "pos_user") redirect(ROLE_HOME[profile.role] ?? "/unauthorized");
@@ -42,6 +43,7 @@ export default async function PosLayout({ children }: { children: React.ReactNod
   return (
     <PosThemeRoot initialDark>
       <SessionGuard userId={profile.id} />
+      <PosSession signedInAt={user?.last_sign_in_at ?? null} />
       <PosHeader fullName={profile.full_name} />
       <main className="min-h-0 flex-1">{children}</main>
       <PosFooter />

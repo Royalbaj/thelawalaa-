@@ -69,7 +69,7 @@ function TrackContent() {
   const header = (
     <header className="sticky top-0 z-30 border-b border-stone-200/70 bg-white/95 backdrop-blur-md">
       <div className="mx-auto flex max-w-xl items-center justify-between px-4 py-3">
-        <Link href="/" aria-label="Thelawalaa home"><BrandLogo size="sm" /></Link>
+        <Link href="/"><BrandLogo size="sm" /></Link>
         <Link href="/order" className="rounded-full bg-brand-orange px-4 py-2 text-sm font-bold text-white shadow-sm shadow-orange-500/30">Order again</Link>
       </div>
     </header>

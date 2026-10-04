@@ -86,6 +86,11 @@ function LoginForm() {
           {params.get("reset") === "1" ? "Password changed — sign in with your new password." : "Email confirmed — sign in to start ordering."}
         </p>
       )}
+      {params.get("daily") === "1" && !error && (
+        <p role="status" className="rounded-xl bg-amber-50 px-4 py-3 text-sm font-bold text-amber-900">
+          The POS signs in for 24 hours at a time — please sign in again for today.
+        </p>
+      )}
       {error && <p role="alert" className="rounded-xl bg-red-50 px-4 py-3 text-sm font-bold text-brand-red">{error}</p>}
       {unverified && (
         <div role="alert" className="rounded-xl bg-amber-50 p-4 text-sm text-amber-900 ring-1 ring-amber-200">

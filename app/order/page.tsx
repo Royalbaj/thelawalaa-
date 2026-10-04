@@ -263,7 +263,7 @@ export default function OrderPage() {
       <div className="sticky top-0 z-40 bg-brand-cream/95 backdrop-blur-md border-b border-stone-200/50 shadow-sm py-3 px-4 mb-6">
         <div className="mx-auto max-w-4xl flex items-center justify-between gap-3">
           <div className="flex min-w-0 items-center gap-4">
-            <Link href={account ? "/account" : "/"} aria-label="Thelawalaa home" className="hidden shrink-0 sm:block"><BrandLogo size="sm" /></Link>
+            <Link href={account ? "/account" : "/"} className="hidden shrink-0 sm:block"><BrandLogo size="sm" /></Link>
             <div className="min-w-0 sm:border-l sm:border-stone-200 sm:pl-4">
               <h1 className="font-display text-2xl font-bold text-brand-brown">Place your order</h1>
               <p className="mt-0.5 text-xs text-stone-500 sm:text-sm">Browse menu → Add items → Checkout</p>
@@ -309,7 +309,7 @@ export default function OrderPage() {
                     <div className="mt-4 h-8 w-full rounded-full bg-stone-100" />
                   </div>
                 ))}
-                {!menuLoading && visible.map((p) => {
+                {!menuLoading && visible.map((p, idx) => {
                   const isFav = favorites.includes(p.id);
                   return (
                     <div key={p.id} className="card p-4 flex flex-col relative group">
@@ -330,7 +330,7 @@ export default function OrderPage() {
                       )}
                       {p.image_url ? (
                         <div className="relative mb-3 h-32 w-full overflow-hidden rounded-lg">
-                          <Image src={p.image_url} alt={p.name} fill sizes="(min-width: 640px) 300px, 50vw" className="object-cover" />
+                          <Image src={p.image_url} alt={p.name} fill sizes="(min-width: 640px) 300px, 50vw" className="object-cover" priority={idx < 2} />
                         </div>
                       ) : (
                         <div className="h-32 w-full bg-brand-cream rounded-lg mb-3 flex items-center justify-center text-stone-300" aria-hidden><UtensilsCrossed size={32} /></div>

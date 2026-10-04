@@ -13,7 +13,7 @@ export default function AuthShell({ title, subtitle, children }: { title: string
         <Image src={heroImage} alt="" fill priority placeholder="blur" sizes="46vw" className="object-cover opacity-80" />
         <div className="absolute inset-0 bg-gradient-to-t from-[#0e0805] via-[#0e0805]/40 to-[#0e0805]/30" />
         <div className="relative flex h-full flex-col justify-between p-10 text-amber-50">
-          <Link href="/" aria-label="Thelawalaa home" className="w-fit"><BrandLogo size="lg" tone="dark" tagline /></Link>
+          <Link href="/" className="w-fit"><BrandLogo size="lg" tone="dark" tagline /></Link>
           <div>
             <p className="font-display text-4xl font-extrabold leading-tight">Hygienic street food,<br />bold flavour.</p>
             <ul className="mt-6 space-y-3 text-sm text-amber-100/90">
@@ -28,7 +28,7 @@ export default function AuthShell({ title, subtitle, children }: { title: string
       <main className="flex flex-1 flex-col">
         {/* Phones: a compact brand bar */}
         <div className="border-b border-stone-100 bg-white px-5 py-3.5 lg:hidden">
-          <Link href="/" aria-label="Thelawalaa home" className="inline-flex"><BrandLogo size="md" tagline /></Link>
+          <Link href="/" className="inline-flex"><BrandLogo size="md" tagline /></Link>
         </div>
         <div className="flex flex-1 items-start justify-center px-5 py-8 sm:items-center sm:py-12">
           <div className="w-full max-w-md">

@@ -16,7 +16,8 @@ import { SprayCan, Salad, Bike, Store, Zap, Flame, MapPin, Clock, UtensilsCrosse
 export const revalidate = 300;
 
 export const metadata: Metadata = {
-  title: `${SITE.name} — ${SITE.tagline}`,
+  // absolute: the layout's "%s · Thelawalaa" template would repeat the name.
+  title: { absolute: `${SITE.name} — ${SITE.tagline}` },
   description: SITE.description,
   alternates: { canonical: "/" },
 };

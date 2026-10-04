@@ -22,7 +22,7 @@ export default async function AccountLayout({ children }: { children: React.Reac
       <SessionGuard userId={profile.id} />
       <header className="sticky top-0 z-30 border-b border-stone-200/70 bg-white/95 backdrop-blur-md">
         <div className="mx-auto flex max-w-5xl items-center justify-between gap-3 px-4 py-2.5">
-          <Link href="/account" aria-label="Your account home" className="min-w-0"><BrandLogo size="sm" /></Link>
+          <Link href="/account" className="min-w-0"><BrandLogo size="sm" /></Link>
           <AccountNav />
           <div className="flex shrink-0 items-center gap-2">
             <Link href="/account/notifications" aria-label={unread ? `Inbox, ${unread} new` : "Inbox"}

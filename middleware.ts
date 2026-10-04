@@ -28,16 +28,23 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(target);
   }
 
-  const response = NextResponse.next({ request: { headers: request.headers } });
+  let response = NextResponse.next({ request });
 
+  // A refreshed sign-in (every hour) must reach BOTH the browser (response)
+  // and this request's server code (request) — otherwise the page renders
+  // with the old token and a long-open device, like the POS iPad app, can
+  // drop its session. This is Supabase's getAll/setAll pattern.
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL || "https://placeholder.supabase.co",
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "placeholder",
     {
       cookies: {
-        get: (name: string) => request.cookies.get(name)?.value,
-        set: (name: string, value: string, options: CookieOptions) => response.cookies.set({ name, value, ...options }),
-        remove: (name: string, options: CookieOptions) => response.cookies.set({ name, value: "", ...options }),
+        getAll: () => request.cookies.getAll(),
+        setAll: (cookiesToSet: { name: string; value: string; options: CookieOptions }[]) => {
+          cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value));
+          response = NextResponse.next({ request });
+          cookiesToSet.forEach(({ name, value, options }) => response.cookies.set(name, value, options));
+        },
       },
     }
   );
