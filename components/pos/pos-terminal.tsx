@@ -141,7 +141,7 @@ export default function PosTerminal({
     if (!p.is_available) return;
     // Stock says it's gone: sell it if it's really there, but say so once.
     if (stock.byProduct[p.id]?.state === "out" && qtyOf(p.id) === 0) {
-      toast(`Stock shows ${stock.byProduct[p.id].name} as finished — check before selling`, { icon: "⚠️", id: `stock-${p.id}` });
+      toast(`Stock shows ${stock.byProduct[p.id].name} as finished — check before selling`, { id: `stock-${p.id}` });
     }
     changeQty(p, (n) => n + 1);
   };

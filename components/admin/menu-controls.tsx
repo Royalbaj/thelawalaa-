@@ -109,12 +109,12 @@ export function ProductRow({ product, categories }: { product: EditableProduct; 
           </div>
           <div>
             <p className="font-bold">
-              {product.name} {product.is_bestseller && "⭐"}
+              {product.name} {product.is_bestseller && <span className="badge ml-1.5 bg-orange-100 text-brand-orange">Bestseller</span>}
               {product.pos_only && <span className="badge ml-1.5 bg-stone-800 text-white">POS only</span>}
               {product.is_membership_card && <span className="badge ml-1.5 bg-amber-100 text-amber-800">Membership card</span>}
             </p>
             <p className="text-xs text-stone-500">
-              {npr(Number(product.price))} · spice {"🌶".repeat(product.spice_level) || "—"}
+              {npr(Number(product.price))} · spice {product.spice_level ? `${product.spice_level}/3` : "mild"}
               {product.member_price != null && ` · member ${npr(Number(product.member_price))}`}
               {!product.student_discount_eligible && " · no student discount"}
             </p>

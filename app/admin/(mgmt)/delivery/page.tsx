@@ -75,7 +75,7 @@ export default async function DeliveryPage() {
                 <AssignDriver orderId={o.id} drivers={riderChoices} />
               </div>
             ))}
-            {(unassigned ?? []).length === 0 && <p className="px-4 py-6 text-center text-sm text-stone-500">Nothing waiting 🎉</p>}
+            {(unassigned ?? []).length === 0 && <p className="px-4 py-6 text-center text-sm text-stone-500">Nothing waiting.</p>}
           </div>
         </section>
         <section>

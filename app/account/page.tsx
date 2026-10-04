@@ -44,7 +44,7 @@ export default async function AccountHome({ searchParams }: { searchParams: Prom
       )}
 
       <div>
-        <h1 className="font-display text-2xl font-extrabold text-brand-brown sm:text-3xl">{greeting()}, {first} 👋</h1>
+        <h1 className="font-display text-2xl font-extrabold text-brand-brown sm:text-3xl">{greeting()}, {first}</h1>
         <p className="text-stone-500">What are you craving today?</p>
       </div>
 
@@ -56,13 +56,13 @@ export default async function AccountHome({ searchParams }: { searchParams: Prom
 
           <div className="grid grid-cols-4 gap-2 sm:gap-3">
             {[
-              { href: "/order", icon: ShoppingBag, label: "Order", tint: "bg-orange-50 text-brand-orange" },
-              { href: "/account/orders", icon: Package, label: "My orders", tint: "bg-blue-50 text-blue-600" },
-              { href: "/account/rewards", icon: Gift, label: "Rewards", tint: "bg-amber-50 text-amber-600" },
-              { href: "/whatsapp", icon: MessageCircle, label: "Help", tint: "bg-green-50 text-brand-green" },
+              { href: "/order", icon: ShoppingBag, label: "Order", tint: "text-brand-orange" },
+              { href: "/account/orders", icon: Package, label: "My orders", tint: "text-brand-brown" },
+              { href: "/account/rewards", icon: Gift, label: "Rewards", tint: "text-brand-brown" },
+              { href: "/whatsapp", icon: MessageCircle, label: "Help", tint: "text-brand-brown" },
             ].map((a) => (
               <Link key={a.label} href={a.href} className="flex flex-col items-center gap-1.5 rounded-2xl bg-white p-3 text-center shadow-sm ring-1 ring-stone-100 transition hover:shadow-md">
-                <span className={`flex h-10 w-10 items-center justify-center rounded-xl ${a.tint}`}><a.icon size={20} /></span>
+                <a.icon size={22} strokeWidth={1.75} className={a.tint} />
                 <span className="text-xs font-bold text-stone-700">{a.label}</span>
               </Link>
             ))}

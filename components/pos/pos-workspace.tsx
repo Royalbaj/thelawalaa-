@@ -1,7 +1,7 @@
 "use client";
 import { useCallback, useState } from "react";
 import toast from "react-hot-toast";
-import { ShoppingBag, ListOrdered } from "lucide-react";
+import { ShoppingBag, ListOrdered, Bell } from "lucide-react";
 import { cn } from "@/lib/utils";
 import PosTerminal from "@/components/pos/pos-terminal";
 import LiveOrdersPanel, { type Order } from "@/components/admin/live-orders-panel";
@@ -28,7 +28,7 @@ export default function PosWorkspace({ products, categories, openingPromo, initi
     const no = o.daily_number != null ? `#${String(o.daily_number).padStart(2, "0")}` : "";
     toast((t) => (
       <button className="text-left" onClick={() => { setTab("orders"); toast.dismiss(t.id); }}>
-        🔔 <b>New online order {no}</b>
+        <Bell size={15} className="mr-1.5 inline -mt-0.5 text-brand-orange" /><b>New online order {no}</b>
         <span className="ml-2 font-bold text-brand-orange xl:hidden">View</span>
       </button>
     ), { duration: 10_000 });

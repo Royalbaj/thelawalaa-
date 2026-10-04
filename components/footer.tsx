@@ -1,14 +1,15 @@
-import { Facebook, Instagram, Link2 } from "lucide-react";
+import { Link2 } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
-import TikTokIcon from "@/components/icons/tiktok";
+import { FacebookGlyph, InstagramGlyph, TikTokGlyph, WhatsAppGlyph } from "@/components/icons/brand-glyphs";
 import { getSiteText } from "@/lib/site-content";
 import BrandLogo from "@/components/brand-logo";
 
 function platformIcon(platform: string) {
   const p = platform.toLowerCase();
-  if (p === "facebook") return Facebook;
-  if (p === "instagram") return Instagram;
-  if (p === "tiktok") return TikTokIcon;
+  if (p === "facebook") return FacebookGlyph;
+  if (p === "instagram") return InstagramGlyph;
+  if (p === "tiktok") return TikTokGlyph;
+  if (p === "whatsapp") return WhatsAppGlyph;
   return Link2;
 }
 
@@ -37,7 +38,7 @@ export default async function Footer() {
                       aria-label={`Thelawalaa on ${s.platform}`}
                       className="flex h-9 w-9 items-center justify-center rounded-full bg-white/10 transition hover:bg-white/20"
                     >
-                      <Icon size={17} />
+                      <Icon size={16} />
                     </a>
                   );
                 })}
@@ -45,7 +46,7 @@ export default async function Footer() {
             </div>
           )}
         </div>
-        <nav className="flex flex-wrap gap-x-6 gap-y-2 text-sm font-bold text-orange-100/90">
+        <nav className="flex flex-wrap content-start gap-x-6 gap-y-2 text-sm font-bold text-orange-100/90">
           <a href="/#home" className="hover:text-white">Home</a>
           <a href="/#menu" className="hover:text-white">Menu</a>
           <a href="/order" className="hover:text-white">Order</a>

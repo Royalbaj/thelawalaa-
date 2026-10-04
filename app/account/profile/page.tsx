@@ -53,7 +53,7 @@ export default async function ProfilePage() {
           { href: "/terms", icon: FileText, title: "Terms & privacy", body: "Orders, offers, rewards and your data" },
         ].map((l) => (
           <Link key={l.href} href={l.href} className="flex items-center gap-3 px-5 py-4 transition hover:bg-stone-50">
-            <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-orange-50 text-brand-orange"><l.icon size={18} /></span>
+            <l.icon size={20} strokeWidth={1.75} className="shrink-0 text-brand-brown" />
             <span className="flex-1"><span className="block text-sm font-bold text-brand-brown">{l.title}</span><span className="block text-xs text-stone-500">{l.body}</span></span>
             <ChevronRight size={18} className="text-stone-300" />
           </Link>

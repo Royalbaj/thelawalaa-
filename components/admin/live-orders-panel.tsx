@@ -12,6 +12,7 @@ import { playOrderSound } from "@/lib/order-sound";
 import { adminUpdateOrderStatus, assignDriver, markOrderPaid, getOrderLines, getLiveOrders } from "@/app/actions/staff";
 import { REFRESH_EVENT } from "@/components/refresh-button";
 import { MEMBER_PRICE_LABEL } from "@/lib/discounts";
+import { CheckCircle2, ClipboardList, MessageSquareText, Crown, GraduationCap, Phone, MapPin, Navigation } from "lucide-react";
 
 interface Line { product_name: string; quantity: number }
 
@@ -78,7 +79,7 @@ export default function LiveOrdersPanel({
     known.current.add(o.id);
     if (o.status !== "pending") return;
     playOrderSound();
-    if (onNewOrder) onNewOrder(o); else toast("New online order!", { icon: "🔔" });
+    if (onNewOrder) onNewOrder(o); else toast("New online order!");
   };
 
   // A card that's just been closed stays put (dimmed) for a moment instead of
@@ -232,7 +233,7 @@ export default function LiveOrdersPanel({
       <div className="flex-1 overflow-y-auto p-2 space-y-2">
         {visible.length === 0 && (
           <div className="text-center py-8">
-            <p className="text-2xl mb-1">{filter === "active" ? "✅" : "📋"}</p>
+            <p className="mb-1 flex justify-center text-stone-300">{filter === "active" ? <CheckCircle2 size={28} /> : <ClipboardList size={28} />}</p>
             <p className="text-xs text-stone-400">{filter === "active" ? "All caught up" : "No orders"}</p>
           </div>
         )}
@@ -258,7 +259,7 @@ export default function LiveOrdersPanel({
                     <div className="min-w-0">
                       <p className="truncate text-xs font-bold text-stone-800 dark:text-stone-100">{customerName(o)}</p>
                       <p className="text-[10px] text-stone-400" suppressHydrationWarning>
-                        {o.type === "dine_in" ? "Dine-in" : o.type === "delivery" ? "🛵 Delivery" : "Pickup"}
+                        {o.type === "dine_in" ? "Dine-in" : o.type === "delivery" ? "Delivery" : "Pickup"}
                         {" · "}{formatDistanceToNowStrict(new Date(o.created_at), { addSuffix: true })}
                       </p>
                     </div>
@@ -272,17 +273,17 @@ export default function LiveOrdersPanel({
                     {o.items.map((i) => `${i.quantity}× ${i.product_name}`).join(", ")}
                   </p>
                 )}
-                {note && <p className="mt-1.5 rounded-lg bg-yellow-50 px-2 py-1 text-xs font-bold text-yellow-900 dark:bg-yellow-900/30 dark:text-yellow-200">📝 {note}</p>}
+                {note && <p className="mt-1.5 rounded-lg bg-yellow-50 px-2 py-1 text-xs font-bold text-yellow-900 dark:bg-yellow-900/30 dark:text-yellow-200"><MessageSquareText size={12} className="mr-1 inline -mt-0.5" />{note}</p>}
               </button>
 
               <div className="mt-2.5 flex items-center gap-2">
                 <span className={cn("shrink-0 rounded-lg px-2 py-1 text-[11px] font-bold",
                   unpaid ? "bg-amber-50 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300" : "bg-green-50 text-green-700 dark:bg-green-950/40 dark:text-green-400")}>
-                  {unpaid ? `${npr(Number(o.total))} due` : `✓ ${npr(Number(o.total))}`}
+                  {unpaid ? `${npr(Number(o.total))} due` : `Paid ${npr(Number(o.total))}`}
                 </span>
                 {o.discount_label && (
                   <span className="shrink-0 rounded-lg bg-sky-50 px-2 py-1 text-[11px] font-bold text-sky-700 dark:bg-sky-950/40 dark:text-sky-300" title={`Discount: ${o.discount_label}`}>
-                    {o.discount_label === MEMBER_PRICE_LABEL ? "👑" : "🎓"}
+                    {o.discount_label === MEMBER_PRICE_LABEL ? <Crown size={13} /> : <GraduationCap size={13} />}
                   </span>
                 )}
                 {next && (
@@ -303,14 +304,14 @@ export default function LiveOrdersPanel({
                     {o.payment_method ? ` · ${o.payment_method.toUpperCase()}` : ""}
                   </p>
                   {phone && (
-                    <a href={`tel:${phone}`} className="inline-block text-xs font-bold text-brand-orange">📞 {phone}</a>
+                    <a href={`tel:${phone}`} className="inline-flex items-center gap-1 text-xs font-bold text-brand-orange"><Phone size={12} /> {phone}</a>
                   )}
                   {o.type === "delivery" && (o.delivery_address || noteField(o.notes, "Address")) && (
-                    <p className="text-[11px] font-bold text-stone-600 bg-stone-50 p-1.5 rounded dark:bg-stone-800 dark:text-stone-300">📍 {o.delivery_address || noteField(o.notes, "Address")}</p>
+                    <p className="text-[11px] font-bold text-stone-600 bg-stone-50 p-1.5 rounded dark:bg-stone-800 dark:text-stone-300"><MapPin size={12} className="mr-1 inline -mt-0.5" />{o.delivery_address || noteField(o.notes, "Address")}</p>
                   )}
                   {o.type === "delivery" && o.delivery_lat != null && o.delivery_lng != null && (
                     <a href={directionsUrl({ lat: o.delivery_lat, lng: o.delivery_lng })} target="_blank" rel="noopener noreferrer"
-                      className="inline-block text-xs font-bold text-brand-orange">🗺️ Customer&apos;s pin on the map</a>
+                      className="inline-flex items-center gap-1 text-xs font-bold text-brand-orange"><Navigation size={12} /> Customer&apos;s pin on the map</a>
                   )}
                   <div className="flex flex-wrap gap-1.5">
                     {unpaid && !takePayment && o.status !== "cancelled" && (

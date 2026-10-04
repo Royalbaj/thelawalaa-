@@ -4,7 +4,7 @@ import { Suspense, useEffect, useState } from "react";
 import Link from "next/link";
 import { useParams, useSearchParams } from "next/navigation";
 import { format } from "date-fns";
-import { KeyRound, MapPin } from "lucide-react";
+import { KeyRound, MapPin, Star } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { npr, STATUS_COLORS, cn } from "@/lib/utils";
 import { orderSteps, orderStep, orderStatusLabel } from "@/lib/order-status";
@@ -210,9 +210,9 @@ function TrackContent() {
                           const res = await submitOrderRating(order.id, star, null, null);
                           if (res.ok) setRated(true);
                         }}
-                        className="text-3xl text-stone-300 transition hover:scale-110 hover:text-amber-400"
+                        className="text-stone-300 transition hover:scale-110 hover:text-amber-400"
                       >
-                        ★
+                        <Star size={32} strokeWidth={1.5} className="fill-current" />
                       </button>
                     ))}
                   </div>

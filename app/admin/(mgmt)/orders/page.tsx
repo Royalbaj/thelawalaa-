@@ -6,6 +6,7 @@ import { STATUS_FILTERS } from "@/lib/order-status";
 import OrderStatusSelect from "@/components/admin/order-status-select";
 import MarkPaidButton from "@/components/admin/mark-paid-button";
 import { ItemsSummary, OrderDetails } from "@/components/admin/order-details";
+import { ClipboardList, Bike, Store } from "lucide-react";
 
 export const dynamic = "force-dynamic";
 
@@ -87,14 +88,14 @@ export default async function AdminOrders(props: { searchParams: Promise<{ statu
                   <span className="font-mono text-sm font-bold text-brand-brown">{o.order_number}</span>
                 </p>
                 <p className="mt-0.5 truncate text-xs text-stone-500">
-                  {customerName}{isGuest && customerName !== "Guest" ? " (guest)" : ""} · {o.type === "delivery" ? "🛵 Delivery" : o.type === "dine_in" ? "🍽 Dine-in" : "🏪 Pickup"} · {format(new Date(o.created_at), "d MMM, h:mm a")}
+                  {customerName}{isGuest && customerName !== "Guest" ? " (guest)" : ""} · {o.type === "delivery" ? "Delivery" : o.type === "dine_in" ? "Dine-in" : "Pickup"} · {format(new Date(o.created_at), "d MMM, h:mm a")}
                 </p>
               </div>
               <p className="shrink-0 font-display text-lg font-bold text-brand-brown">{npr(Number(o.total))}</p>
             </div>
             <div className="mt-1.5"><ItemsSummary items={o.items ?? []} /></div>
             {Number(o.discount_amount) > 0 && o.promo_codes?.code && (
-              <p className="mt-1 inline-block rounded-full bg-green-50 px-2 py-0.5 text-[11px] font-bold text-brand-green">🎟️ {o.promo_codes.code} (−{npr(Number(o.discount_amount))})</p>
+              <p className="mt-1 inline-block rounded-full bg-green-50 px-2 py-0.5 text-[11px] font-bold text-brand-green">Code {o.promo_codes.code} (−{npr(Number(o.discount_amount))})</p>
             )}
             <OrderDetails o={{ ...o, items: o.items ?? [] }} />
             <div className="mt-2.5 flex flex-wrap items-center gap-2">
@@ -106,7 +107,7 @@ export default async function AdminOrders(props: { searchParams: Promise<{ statu
         ))}
         {rows.length === 0 && (
           <div className="rounded-2xl bg-white px-4 py-12 text-center">
-            <div className="mb-2 text-3xl">📋</div>
+            <ClipboardList size={30} className="mx-auto mb-2 text-stone-300" />
             <p className="font-bold text-stone-500">No orders found</p>
             <p className="mt-1 text-xs text-stone-400">Try a different filter or search term</p>
           </div>
@@ -153,14 +154,14 @@ export default async function AdminOrders(props: { searchParams: Promise<{ statu
                       "inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-bold",
                       o.type === "delivery" ? "bg-purple-50 text-purple-700" : "bg-blue-50 text-blue-700"
                     )}>
-                      {o.type === "delivery" ? "🛵 Delivery" : "🏪 Pickup"}
+                      {o.type === "delivery" ? <><Bike size={13} /> Delivery</> : <><Store size={13} /> Pickup</>}
                     </span>
                   </td>
                   <td className="px-4 py-3.5">
                     <div className="font-bold text-brand-brown">{npr(Number(o.total))}</div>
                     {Number(o.discount_amount) > 0 && o.promo_codes?.code && (
                       <div className="text-[10px] text-brand-green bg-green-50 px-1.5 py-0.5 rounded-full inline-block mt-1 font-bold">
-                        🎟️ {o.promo_codes.code} (-{npr(Number(o.discount_amount))})
+                        Code {o.promo_codes.code} (-{npr(Number(o.discount_amount))})
                       </div>
                     )}
                   </td>
@@ -183,7 +184,7 @@ export default async function AdminOrders(props: { searchParams: Promise<{ statu
             {(orders ?? []).length === 0 && (
               <tr>
                 <td colSpan={8} className="px-4 py-12 text-center">
-                  <div className="text-3xl mb-2">📋</div>
+                  <ClipboardList size={30} className="mx-auto mb-2 text-stone-300" />
                   <p className="font-bold text-stone-500">No orders found</p>
                   <p className="text-xs text-stone-400 mt-1">Try a different filter or search term</p>
                 </td>

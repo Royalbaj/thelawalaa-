@@ -103,7 +103,7 @@ export default function EmailSetupPanel({ initial }: { initial?: EmailSetup }) {
             const r = await recheckEmailDomain();
             if ("error" in r) toast.error(r.error ?? "Couldn't check"); else {
               setSetup(r.setup);
-              toast(r.setup.state === "added" && r.setup.status === "verified" ? "Verified — branded emails are on" : "Not yet — DNS can take a few minutes", { icon: r.setup.state === "added" && r.setup.status === "verified" ? "✅" : "⏳" });
+              toast(r.setup.state === "added" && r.setup.status === "verified" ? "Verified — branded emails are on" : "Not yet — DNS can take a few minutes", { duration: 5000 });
             }
           })} className="flex w-full items-center justify-center gap-2 rounded-full border-2 border-stone-200 py-2 text-sm font-bold text-brand-brown hover:bg-stone-50">
             <RefreshCw size={14} className={cn(pending && "animate-spin")} /> Check again

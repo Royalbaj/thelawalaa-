@@ -373,7 +373,7 @@ export default function OrderPage() {
                           <button aria-label={`Reduce ${i.name}`} onClick={() => setQty(i.product_id, i.quantity - 1)} className="h-7 w-7 rounded-full bg-brand-cream font-bold">−</button>
                           <span className="w-5 text-center font-bold">{i.quantity}</span>
                           <button aria-label={`Increase ${i.name}`} onClick={() => setQty(i.product_id, i.quantity + 1)} className="h-7 w-7 rounded-full bg-brand-cream font-bold">+</button>
-                          <button aria-label={`Remove ${i.name}`} onClick={() => remove(i.product_id)} className="ml-1 text-brand-red">✕</button>
+                          <button aria-label={`Remove ${i.name}`} onClick={() => remove(i.product_id)} className="ml-1 rounded-full p-1 text-stone-400 hover:text-brand-red"><X size={15} /></button>
                         </span>
                       </li>
                     ))}

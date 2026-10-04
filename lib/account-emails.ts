@@ -13,7 +13,7 @@ export function verifyEmail(name: string, url: string, welcomePoints: number) {
       name,
       blocks: [
         p("Thanks for joining Thelawalaa! Please confirm this is your email address so we can keep your account safe and send you order updates."),
-        ...(welcomePoints > 0 ? [callout(`🎁 <b>${fmtPoints(welcomePoints)} welcome points</b> are waiting in your account.`, `${fmtPoints(welcomePoints)} welcome points are waiting in your account.`)] : []),
+        ...(welcomePoints > 0 ? [callout(`<b>${fmtPoints(welcomePoints)} welcome points</b> are waiting in your account.`, `${fmtPoints(welcomePoints)} welcome points are waiting in your account.`)] : []),
       ],
       cta: { label: "Confirm my email", url },
       reason: "You're getting this because someone signed up at thelawalaa.com with this address. If it wasn't you, just ignore this email — no account will be activated.",
@@ -24,20 +24,20 @@ export function verifyEmail(name: string, url: string, welcomePoints: number) {
 export function welcomeEmail(name: string, rewards: RewardSettings, freeItemName: string | null, points: number) {
   const r = describeRewards(rewards, freeItemName);
   return {
-    subject: `Welcome to Thelawalaa, ${firstName(name)}! 🎉`,
+    subject: `Welcome to Thelawalaa, ${firstName(name)}!`,
     ...renderEmail({
       preheader: "Your account is ready — here's how your rewards work.",
       heading: "You're in! Welcome to Thelawalaa",
       name,
       blocks: [
         p("Your email is confirmed and your account is ready. Chatpate in four signature styles, juicy momo and ice-cold drinks — made fresh in our clean Godam Chowk kitchen."),
-        ...(points > 0 ? [callout(`🎁 You already have <b>${fmtPoints(points)} points</b> to start you off.`, `You already have ${fmtPoints(points)} points.`)] : []),
+        ...(points > 0 ? [callout(`You already have <b>${fmtPoints(points)} points</b> to start you off.`, `You already have ${fmtPoints(points)} points.`)] : []),
         ...(rewards.enabled ? [
           p("<b style=\"color:#78350F\">How your rewards work</b>", "How your rewards work"),
           list([
-            { icon: "⭐", html: r.earn },
-            { icon: "💸", html: r.value },
-            ...(r.free ? [{ icon: "🥤", html: r.free }] : []),
+            { html: r.earn },
+            { html: r.value },
+            ...(r.free ? [{ html: r.free }] : []),
           ]),
         ] : []),
         p("Order online for pickup, track it live, and your points add up automatically."),
@@ -86,7 +86,7 @@ export function alreadyRegisteredEmail(name: string) {
 
 export function testEmail(name: string) {
   return {
-    subject: "Thelawalaa email test ✅",
+    subject: "Thelawalaa email test",
     ...renderEmail({
       preheader: "If you can read this, customer emails are working.",
       heading: "Emails are working",
@@ -137,7 +137,7 @@ export function orderConfirmedEmail(o: {
           `Your delivery code<br><span style="font-size:30px;letter-spacing:8px;font-weight:bold;color:#78350F">${o.otp}</span><br><span style="font-size:13px;color:#78716C">Tell it to the driver when your food arrives — never before.</span>`,
           `Your delivery code: ${o.otp} — tell it to the driver when your food arrives.`,
         )] : []),
-        ...(o.pointsToEarn > 0 ? [p(`⭐ You'll earn <b>${fmtPoints(o.pointsToEarn)} points</b> once this order is paid.`, `You'll earn ${fmtPoints(o.pointsToEarn)} points once this order is paid.`)] : []),
+        ...(o.pointsToEarn > 0 ? [p(`You'll earn <b>${fmtPoints(o.pointsToEarn)} points</b> once this order is paid.`, `You'll earn ${fmtPoints(o.pointsToEarn)} points once this order is paid.`)] : []),
       ],
       cta: { label: "Track my order", url: `${EMAIL_SITE}/track/${o.orderId}` },
       secondary: { label: "See all my orders", url: `${EMAIL_SITE}/account/orders` },

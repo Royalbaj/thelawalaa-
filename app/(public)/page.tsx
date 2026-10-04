@@ -11,7 +11,11 @@ import { getSiteText, whatsappHref } from "@/lib/site-content";
 import Faq from "@/components/faq";
 import AddToCartButton from "@/components/add-to-cart-button";
 import StructuredData from "@/components/structured-data";
-import { SprayCan, Salad, Bike, Store, Zap, Flame, MapPin, Clock, UtensilsCrossed, MessageCircle } from "lucide-react";
+import HeroSteam from "@/components/hero-steam";
+import { WhatsAppGlyph } from "@/components/icons/brand-glyphs";
+
+const SPICE = ["Mild", "Medium", "Hot", "Extra hot"];
+import { Bike, MapPin, Clock, UtensilsCrossed } from "lucide-react";
 
 export const revalidate = 300;
 
@@ -97,6 +101,9 @@ export default async function HomePage() {
                 sizes="(min-width: 1834px) 1100px, (min-width: 1024px) 60vw, 100vw"
                 className="object-cover"
               />
+              {/* Live steam off the momo — placed in the photo's own coordinates (3:2),
+                  from the momo tops up to the top edge. */}
+              <HeroSteam className="pointer-events-none absolute left-[50%] top-0 h-[52%] w-[46%]" />
             </div>
           </div>
 
@@ -129,15 +136,10 @@ export default async function HomePage() {
           3.5rem sits over the dark hero, the rest over the white section below). */}
       <div className="relative z-10 -mt-14 bg-[linear-gradient(to_bottom,transparent_3.5rem,#fff_3.5rem)] px-4">
         <ul className="mx-auto grid max-w-5xl grid-cols-2 gap-px overflow-hidden rounded-2xl bg-stone-100 shadow-xl shadow-stone-900/10 ring-1 ring-stone-200/70 md:grid-cols-4">
-          {[
-            [SprayCan, t["hero.badge1"]],
-            [Salad, t["hero.badge2"]],
-            deliveryEnabled ? [Bike, t["hero.badge3_delivery"]] : [Store, t["hero.badge3_pickup"]],
-            [Zap, t["hero.badge4"]],
-          ].map(([Icon, text]: any) => (
-            <li key={text} className="flex items-center gap-3 bg-white px-4 py-4 sm:px-5 sm:py-5">
-              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-orange-50 text-brand-orange"><Icon size={20} /></span>
-              <span className="text-sm font-bold leading-snug text-brand-brown">{text}</span>
+          {[t["hero.badge1"], t["hero.badge2"], deliveryEnabled ? t["hero.badge3_delivery"] : t["hero.badge3_pickup"], t["hero.badge4"]].map((text) => (
+            <li key={text} className="bg-white px-5 py-5 sm:px-6">
+              <span aria-hidden className="block h-0.5 w-8 rounded-full bg-brand-orange" />
+              <span className="mt-3 block text-sm font-bold leading-snug text-brand-brown">{text}</span>
             </li>
           ))}
         </ul>
@@ -153,19 +155,19 @@ export default async function HomePage() {
               {t["about.text"]}
             </p>
           </div>
-          <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
+          <div className="grid gap-x-8 gap-y-10 sm:grid-cols-2 lg:grid-cols-4">
             {[
-              [SprayCan, t["about.card1_title"], t["about.card1_text"]],
-              [Flame, t["about.card2_title"], t["about.card2_text"]],
-              [Salad, t["about.card3_title"], t["about.card3_text"]],
+              [t["about.card1_title"], t["about.card1_text"]],
+              [t["about.card2_title"], t["about.card2_text"]],
+              [t["about.card3_title"], t["about.card3_text"]],
               deliveryEnabled
-                ? [Bike, t["about.card4_delivery_title"], t["about.card4_delivery_text"]]
-                : [Store, t["about.card4_pickup_title"], t["about.card4_pickup_text"]],
-            ].map(([Icon, title, body]: any) => (
-              <div key={title} className="card p-6 text-center hover:shadow-xl transition-shadow duration-300 border border-orange-50">
-                <div className="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-2xl bg-orange-50 text-brand-orange"><Icon size={24} /></div>
-                <p className="font-display text-lg font-bold text-brand-brown">{title}</p>
-                <p className="mt-2 whitespace-pre-line text-sm text-stone-600 leading-relaxed">{body}</p>
+                ? [t["about.card4_delivery_title"], t["about.card4_delivery_text"]]
+                : [t["about.card4_pickup_title"], t["about.card4_pickup_text"]],
+            ].map(([title, body], i) => (
+              <div key={title} className="border-t-2 border-brand-brown pt-5">
+                <p className="font-display text-sm font-bold tracking-[0.2em] text-brand-orange">{String(i + 1).padStart(2, "0")}</p>
+                <p className="mt-2 font-display text-xl font-bold text-brand-brown">{title}</p>
+                <p className="mt-2 whitespace-pre-line text-sm leading-relaxed text-stone-600">{body}</p>
               </div>
             ))}
           </div>
@@ -198,8 +200,11 @@ export default async function HomePage() {
                 <div className="p-5">
                   <p className="font-display font-bold text-brand-brown">{p.name}</p>
                   <p className="mt-1 line-clamp-2 text-sm text-stone-500 leading-relaxed">{p.description}</p>
-                  <p className="mt-1 text-sm text-brand-red" aria-label={`Spice level ${p.spice_level} of 3`}>
-                    {"🌶".repeat(p.spice_level) || "Mild"}
+                  <p className="mt-2 flex items-center gap-2 text-xs font-bold text-stone-500" aria-label={`Spice: ${SPICE[p.spice_level] ?? "Mild"}`}>
+                    <span aria-hidden className="flex gap-0.5">
+                      {[1, 2, 3].map((n) => <span key={n} className={`h-1.5 w-4 rounded-full ${n <= p.spice_level ? "bg-brand-red" : "bg-stone-200"}`} />)}
+                    </span>
+                    {SPICE[p.spice_level] ?? "Mild"}
                   </p>
                   <div className="mt-3 flex items-center justify-between border-t border-orange-50 pt-3">
                     {promoActive && priceOf(p) !== Number(p.price) ? (
@@ -309,10 +314,10 @@ export default async function HomePage() {
               href={whatsappHref(t)}
               target="_blank"
               rel="noopener noreferrer"
-              className="fixed bottom-24 right-4 z-40 flex h-14 w-14 sm:bottom-6 sm:right-6 items-center justify-center rounded-full bg-brand-green text-white shadow-lg shadow-green-500/30 transition hover:scale-110"
+              className="fixed bottom-32 right-4 z-40 flex h-14 w-14 items-center justify-center rounded-full bg-[#25D366] text-white shadow-lg shadow-black/20 transition hover:scale-105 md:bottom-6 md:right-6"
               aria-label="Chat on WhatsApp"
             >
-              <MessageCircle size={26} />
+              <WhatsAppGlyph size={28} />
             </a>
           </div>
         </div>

@@ -2,21 +2,16 @@
 import { useState, useTransition } from "react";
 import Link from "next/link";
 import toast from "react-hot-toast";
-import { Send } from "lucide-react";
+import { Send, Star, CheckCircle2 } from "lucide-react";
 import { submitFeedback } from "@/app/actions/feedback";
 import { cn } from "@/lib/utils";
 
-const FACES = [
-  { value: 1, face: "😞", label: "Terrible" },
-  { value: 2, face: "😕", label: "Not good" },
-  { value: 3, face: "😐", label: "Okay" },
-  { value: 4, face: "🙂", label: "Good" },
-  { value: 5, face: "😍", label: "Loved it" },
-];
+const LABELS = ["", "Terrible", "Not good", "Okay", "Good", "Loved it"];
 const VISITS = [["dine_in", "Ate here"], ["pickup", "Picked up"], ["delivery", "Delivery"]] as const;
 
 export default function FeedbackForm({ orderRef }: { orderRef?: string }) {
   const [rating, setRating] = useState(0);
+  const [hover, setHover] = useState(0);
   const [visit, setVisit] = useState<string>("");
   const [sent, setSent] = useState(false);
   const [pending, start] = useTransition();
@@ -24,7 +19,7 @@ export default function FeedbackForm({ orderRef }: { orderRef?: string }) {
   if (sent) {
     return (
       <div className="card p-8 text-center">
-        <p className="text-5xl">🙏</p>
+        <CheckCircle2 size={48} className="mx-auto text-brand-green" />
         <h2 className="mt-3 font-display text-2xl font-bold text-brand-brown">Thank you!</h2>
         <p className="mt-2 text-stone-600">We read every message — it helps us make Thelawalaa better.</p>
         <div className="mt-6 flex flex-wrap justify-center gap-3">
@@ -38,7 +33,7 @@ export default function FeedbackForm({ orderRef }: { orderRef?: string }) {
   return (
     <form className="card space-y-6 p-5 sm:p-8" onSubmit={(e) => {
       e.preventDefault();
-      if (!rating) { toast.error("Tap a face to say how it was"); return; }
+      if (!rating) { toast.error("Tap the stars to say how it was"); return; }
       const fd = Object.fromEntries(new FormData(e.currentTarget));
       start(async () => {
         const r = await submitFeedback({ ...fd, rating, visit });
@@ -47,16 +42,20 @@ export default function FeedbackForm({ orderRef }: { orderRef?: string }) {
     }}>
       <fieldset>
         <legend className="font-display text-lg font-bold text-brand-brown">How was it?</legend>
-        <div className="mt-3 grid grid-cols-5 gap-2">
-          {FACES.map((f) => (
-            <button key={f.value} type="button" onClick={() => setRating(f.value)} aria-pressed={rating === f.value}
-              className={cn("flex flex-col items-center gap-1 rounded-2xl border-2 py-3 transition active:scale-95",
-                rating === f.value ? "border-brand-orange bg-orange-50" : "border-stone-100 bg-white hover:border-orange-200",
-                rating && rating !== f.value && "opacity-50")}>
-              <span className="text-3xl sm:text-4xl" aria-hidden>{f.face}</span>
-              <span className="text-[11px] font-bold text-stone-600 sm:text-xs">{f.label}</span>
-            </button>
-          ))}
+        <div className="mt-3 flex flex-col items-center gap-2 sm:flex-row sm:gap-4" onMouseLeave={() => setHover(0)}>
+          <div className="flex gap-1" role="radiogroup" aria-label="Your rating">
+            {[1, 2, 3, 4, 5].map((n) => (
+              <button key={n} type="button" role="radio" aria-checked={rating === n} aria-label={`${n} star${n > 1 ? "s" : ""} — ${LABELS[n]}`}
+                onClick={() => setRating(n)} onMouseEnter={() => setHover(n)}
+                className="rounded-lg p-1 transition active:scale-90">
+                <Star size={40} strokeWidth={1.5}
+                  className={cn("transition", n <= (hover || rating) ? "fill-amber-400 text-amber-400" : "fill-transparent text-stone-300")} />
+              </button>
+            ))}
+          </div>
+          <span className={cn("min-h-6 text-sm font-bold", hover || rating ? "text-brand-brown" : "text-stone-400")}>
+            {LABELS[hover || rating] || "Tap to rate"}
+          </span>
         </div>
       </fieldset>
 

@@ -35,7 +35,7 @@ export default function TrainingList({ videos, completedIds }: { videos: Video[]
   return (
     <div className="space-y-5">
       <p className="text-sm font-bold text-stone-500 dark:text-stone-400">
-        {doneCount === videos.length ? "✅ All training watched — thank you!" : `${doneCount} of ${videos.length} watched`}
+        {doneCount === videos.length ? "All training watched — thank you!" : `${doneCount} of ${videos.length} watched`}
       </p>
       {videos.map((v) => (
         <div key={v.id} className="card p-4">

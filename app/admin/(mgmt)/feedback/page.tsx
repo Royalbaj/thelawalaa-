@@ -2,10 +2,10 @@ import { requireRole } from "@/lib/supabase/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { MarkReadButton, MarkAllReadButton } from "@/components/admin/feedback-controls";
 import { cn } from "@/lib/utils";
+import Stars from "@/components/stars";
 
 export const dynamic = "force-dynamic";
 
-const FACES = ["", "😞", "😕", "😐", "🙂", "😍"];
 const LABELS = ["", "Terrible", "Not good", "Okay", "Good", "Loved it"];
 const VISIT: Record<string, string> = { dine_in: "Ate here", pickup: "Picked up", delivery: "Delivery" };
 const FILTERS = [["all", "All"], ["new", "New"], ["low", "Unhappy (1–2)"]] as const;
@@ -44,7 +44,7 @@ export default async function FeedbackAdminPage({ searchParams }: { searchParams
           <ul className="space-y-2">
             {dist.map((d) => (
               <li key={d.n} className="flex items-center gap-3 text-sm">
-                <span className="w-24 shrink-0 font-bold text-stone-700"><span aria-hidden>{FACES[d.n]}</span> {LABELS[d.n]}</span>
+                <span className="w-24 shrink-0 font-bold text-stone-700">{LABELS[d.n]}</span>
                 <span className="h-2 flex-1 rounded-full bg-stone-100"><span className="block h-2 rounded-full bg-[#2a78d6]" style={{ width: `${(d.count / top) * 100}%` }} /></span>
                 <span className="w-8 shrink-0 text-right font-bold tabular-nums text-stone-700">{d.count}</span>
               </li>
@@ -70,7 +70,7 @@ export default async function FeedbackAdminPage({ searchParams }: { searchParams
           <article key={f.id} className={cn("card p-4", !f.is_read && "ring-2 ring-orange-200", f.rating <= 2 && "border-l-4 border-l-red-400")}>
             <div className="flex flex-wrap items-start justify-between gap-2">
               <p className="flex items-center gap-2">
-                <span className="text-2xl" aria-hidden>{FACES[f.rating]}</span>
+                <Stars value={f.rating} />
                 <span className="font-bold text-stone-800">{LABELS[f.rating]} · {f.rating}/5</span>
                 {!f.is_read && <span className="badge bg-orange-100 text-brand-orange">New</span>}
               </p>

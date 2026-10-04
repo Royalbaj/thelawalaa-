@@ -62,10 +62,10 @@ export const callout = (html: string, text: string): Block => ({
   html: `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:4px 0 20px"><tr><td style="background:${C.cream};border:1px solid ${C.line};border-radius:14px;padding:16px 18px;font:15px/1.6 ${FONT};color:${C.ink}">${html}</td></tr></table>`,
   text,
 });
-/** Rows of "icon + line", for how-it-works lists. */
-export const list = (items: { icon: string; html: string }[]): Block => ({
+/** A short list with small brand-orange bullets, for how-it-works lines. */
+export const list = (items: { html: string }[]): Block => ({
   html: `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 20px">${items.map((i) =>
-    `<tr><td width="36" valign="top" style="padding:6px 0;font:20px/1 ${FONT}">${i.icon}</td><td style="padding:6px 0;font:15px/1.55 ${FONT};color:${C.ink}">${i.html}</td></tr>`).join("")}</table>`,
+    `<tr><td width="22" valign="top" style="padding:13px 0 0"><div style="width:8px;height:8px;border-radius:4px;background:${C.orange}"></div></td><td style="padding:6px 0;font:15px/1.55 ${FONT};color:${C.ink}">${i.html}</td></tr>`).join("")}</table>`,
   text: items.map((i) => `- ${i.html.replace(/<[^>]+>/g, "")}`).join("\n"),
 });
 

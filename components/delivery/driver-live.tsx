@@ -19,7 +19,7 @@ export default function DriverLive({ jobIds }: { jobIds: string[] }) {
     const fresh = known.current ? jobIds.filter((id) => !known.current!.has(id)) : [];
     if (fresh.length && document.visibilityState === "visible") {
       playOrderSound();
-      toast.success(fresh.length === 1 ? "New delivery for you" : `${fresh.length} new deliveries for you`, { icon: "🛵" });
+      toast.success(fresh.length === 1 ? "New delivery for you" : `${fresh.length} new deliveries for you`);
     }
     known.current = new Set(jobIds);
   }, [jobIds]);

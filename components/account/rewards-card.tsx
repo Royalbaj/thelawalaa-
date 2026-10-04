@@ -26,7 +26,7 @@ export default function RewardsCard({ r, compact = false }: { r: RewardsState; c
         {s.enabled && (
           <div className="mt-4">
             {usable.points > 0 ? (
-              <p className="rounded-xl bg-white/10 px-3 py-2 text-sm font-bold">💸 Use {fmtRupees(usable.rupees)} off your next order at checkout</p>
+              <p className="rounded-xl bg-white/10 px-3 py-2 text-sm font-bold">Use {fmtRupees(usable.rupees)} off your next order at checkout</p>
             ) : (
               <>
                 <div className="h-2 rounded-full bg-white/15"><div className="h-2 rounded-full bg-brand-yellow" style={{ width: `${Math.min(100, (r.points / Math.max(1, s.min_redeem_points)) * 100)}%` }} /></div>

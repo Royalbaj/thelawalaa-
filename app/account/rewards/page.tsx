@@ -43,7 +43,7 @@ export default async function RewardsPage() {
               ))}
             </div>
             <p className="mt-3 text-sm font-bold text-brand-brown">
-              {r.freeItems > 0 ? `🎉 ${r.freeItems} free ${r.freeItemName} ready — tick it at checkout` : `${stamps - r.orderCount} more ${stamps - r.orderCount === 1 ? "order" : "orders"} to go`}
+              {r.freeItems > 0 ? `${r.freeItems} free ${r.freeItemName} ready — tick it at checkout` : `${stamps - r.orderCount} more ${stamps - r.orderCount === 1 ? "order" : "orders"} to go`}
             </p>
           </section>
         )}

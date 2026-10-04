@@ -1,6 +1,5 @@
 import Image from "next/image";
 import Link from "next/link";
-import { Star, Gift, Bike } from "lucide-react";
 import heroImage from "@/public/images/hero/thelawalaa-chatpate-momo.webp";
 import BrandLogo from "@/components/brand-logo";
 
@@ -17,9 +16,9 @@ export default function AuthShell({ title, subtitle, children }: { title: string
           <div>
             <p className="font-display text-4xl font-extrabold leading-tight">Hygienic street food,<br />bold flavour.</p>
             <ul className="mt-6 space-y-3 text-sm text-amber-100/90">
-              <li className="flex items-center gap-3"><span className="flex h-8 w-8 items-center justify-center rounded-full bg-white/10"><Star size={16} className="text-brand-yellow" /></span> Earn points on every order</li>
-              <li className="flex items-center gap-3"><span className="flex h-8 w-8 items-center justify-center rounded-full bg-white/10"><Gift size={16} className="text-brand-orange" /></span> Free drinks as a regular</li>
-              <li className="flex items-center gap-3"><span className="flex h-8 w-8 items-center justify-center rounded-full bg-white/10"><Bike size={16} className="text-green-400" /></span> Order ahead and track it live</li>
+              {["Earn points on every order", "Free drinks as a regular", "Order ahead and track it live"].map((x) => (
+                <li key={x} className="flex items-center gap-3"><span aria-hidden className="h-0.5 w-5 rounded-full bg-brand-orange" /> {x}</li>
+              ))}
             </ul>
           </div>
         </div>

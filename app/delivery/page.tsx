@@ -23,7 +23,7 @@ export default async function DeliveriesPage() {
     <div className="space-y-4">
       <DriverLive jobIds={jobs.map((j) => j.orderId)} />
       <div>
-        <h1 className="font-display text-2xl font-extrabold">Hi {first} 👋</h1>
+        <h1 className="font-display text-2xl font-extrabold">Hi {first}</h1>
         <p className="text-sm text-white/50">{jobs.length ? `You have ${jobs.length} deliver${jobs.length === 1 ? "y" : "ies"} to make.` : "Your deliveries show up here."}</p>
       </div>
 

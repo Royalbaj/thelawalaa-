@@ -36,7 +36,7 @@ export default function JobCard({ job }: { job: DriverJob }) {
   const confirm = () => start(async () => {
     const r = await verifyDeliveryOtp(job.orderId, code);
     if ("error" in r && r.error) { toast.error(r.error); setCode(""); return; }
-    toast.success("Delivered! Great job 🎉");
+    toast.success("Delivered — great job");
     setCodeOpen(false);
     router.refresh();
   });

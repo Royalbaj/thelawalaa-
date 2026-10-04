@@ -130,7 +130,7 @@ export default function TrainingPeople({ team, videos }: { team: TraineeStatus[]
       <div>
         <h3 className="font-display font-bold text-brand-brown">Team & PINs</h3>
         <p className="text-xs text-stone-500">
-          Give each staff member their own 4-digit PIN and pick their videos. On the POS they tap the 🎓 button, type their PIN,
+          Give each staff member their own 4-digit PIN and pick their videos. On the POS they tap the Training (graduation cap) button, type their PIN,
           and see only their videos — so you know exactly who has watched what, even on a shared login.
         </p>
       </div>

@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
 import toast from "react-hot-toast";
-import { Bell, BellOff, BellRing, X } from "lucide-react";
+import { Bell, BellOff, BellRing, X, Volume2, Smartphone } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { unlockOrderSound, orderSoundReady } from "@/lib/order-sound";
 import { sendTestPush } from "@/app/actions/push";
@@ -82,11 +82,11 @@ export default function OrderAlertsButton() {
             <p className="font-display font-bold text-brand-brown dark:text-orange-100">Order alerts</p>
             <button onClick={() => setOpen(false)} aria-label="Close" className="text-stone-400"><X size={16} /></button>
           </div>
-          <p className="font-bold">🔊 Sound on this screen</p>
+          <p className="flex items-center gap-1.5 font-bold"><Volume2 size={15} /> Sound on this screen</p>
           <p className={cn("mb-3 text-xs", soundOn ? "text-brand-green" : "text-amber-600")}>
             {soundOn ? "On — a chime plays for every new online order." : "Tap anywhere on the POS once to turn it on."}
           </p>
-          <p className="font-bold">📲 Alerts when the POS is closed</p>
+          <p className="flex items-center gap-1.5 font-bold"><Smartphone size={15} /> Alerts when the POS is closed</p>
           {push === "on" && (
             <div className="text-xs">
               <p className="text-brand-green">On for this device.</p>
