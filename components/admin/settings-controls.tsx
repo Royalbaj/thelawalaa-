@@ -73,17 +73,20 @@ export function PromoForm() {
   );
 }
 
-export function FeatureFlagsForm({ esewaEnabled, deliveryEnabled }: { esewaEnabled: boolean; deliveryEnabled: boolean }) {
+export function FeatureFlagsForm({ esewaEnabled, deliveryEnabled, posCanCancel }: { esewaEnabled: boolean; deliveryEnabled: boolean; posCanCancel: boolean }) {
   const [esewa, setEsewa] = useState(esewaEnabled);
   const [delivery, setDelivery] = useState(deliveryEnabled);
+  const [posCancel, setPosCancel] = useState(posCanCancel);
   const [pending, start] = useTransition();
 
-  function toggle(next: { esewa_enabled: boolean; delivery_enabled: boolean }) {
+  function toggle(change: Partial<{ esewa_enabled: boolean; delivery_enabled: boolean; pos_can_cancel: boolean }>) {
+    const next = { esewa_enabled: esewa, delivery_enabled: delivery, pos_can_cancel: posCancel, ...change };
     start(async () => {
       const r = await updateAppSettings(next);
       if (r?.error) { toast.error(r.error); return; }
       setEsewa(next.esewa_enabled);
       setDelivery(next.delivery_enabled);
+      setPosCancel(next.pos_can_cancel);
       toast.success("Updated");
     });
   }
@@ -98,7 +101,7 @@ export function FeatureFlagsForm({ esewaEnabled, deliveryEnabled }: { esewaEnabl
         </div>
         <button
           disabled={pending}
-          onClick={() => toggle({ esewa_enabled: esewa, delivery_enabled: !delivery })}
+          onClick={() => toggle({ delivery_enabled: !delivery })}
           className={delivery ? "badge bg-green-100 text-green-800" : "badge bg-stone-200 text-stone-600"}
         >
           {delivery ? "Enabled" : "Disabled"}
@@ -111,10 +114,23 @@ export function FeatureFlagsForm({ esewaEnabled, deliveryEnabled }: { esewaEnabl
         </div>
         <button
           disabled={pending}
-          onClick={() => toggle({ esewa_enabled: !esewa, delivery_enabled: delivery })}
+          onClick={() => toggle({ esewa_enabled: !esewa })}
           className={esewa ? "badge bg-green-100 text-green-800" : "badge bg-stone-200 text-stone-600"}
         >
           {esewa ? "Enabled" : "Disabled"}
+        </button>
+      </div>
+      <div className="flex items-center justify-between gap-3">
+        <div>
+          <p className="font-bold text-sm">Counter (POS) can cancel orders</p>
+          <p className="text-xs text-stone-500">When off, the POS has no Cancel button and can&apos;t cancel an order — only you can, from Orders</p>
+        </div>
+        <button
+          disabled={pending}
+          onClick={() => toggle({ pos_can_cancel: !posCancel })}
+          className={posCancel ? "badge bg-green-100 text-green-800" : "badge bg-stone-200 text-stone-600"}
+        >
+          {posCancel ? "Allowed" : "Not allowed"}
         </button>
       </div>
     </div>

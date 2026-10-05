@@ -1,13 +1,12 @@
 "use client";
 import { useCallback, useEffect, useMemo, useState, useTransition } from "react";
 import toast from "react-hot-toast";
-import { Calculator, X, RefreshCw, AlertTriangle, CheckCircle2, Banknote, QrCode, Smartphone, Store, Globe, Minus, Plus, History } from "lucide-react";
+import { Calculator, X, RefreshCw, AlertTriangle, CheckCircle2, Banknote, QrCode, Smartphone, Store, Globe, History } from "lucide-react";
 import { getDaySales, closeShift } from "@/app/actions/pos";
 import type { DaySales } from "@/lib/day-sales";
 import { npr, cn } from "@/lib/utils";
 import { fmtMinutes } from "@/lib/serving-time";
 
-const NOTES = ["1000", "500", "100", "50", "20", "10", "5"] as const;
 const FLOAT_KEY = "tw-pos-float"; // this till's usual opening float — a business number, not personal data
 const METHOD = { cash: { label: "Cash", icon: Banknote }, qr: { label: "QR", icon: QrCode }, esewa: { label: "eSewa", icon: Smartphone } } as Record<string, { label: string; icon: typeof Banknote }>;
 const time = (iso: string) => new Date(iso).toLocaleTimeString("en-GB", { timeZone: "Asia/Kathmandu", hour: "numeric", minute: "2-digit", hour12: true });
@@ -34,8 +33,7 @@ export function DaySalesSheet({ onClose, initial }: { onClose: () => void; initi
   const [loading, startLoad] = useTransition();
   const [saving, startSave] = useTransition();
   const [float, setFloat] = useState("");
-  const [counts, setCounts] = useState<Record<string, number>>({});
-  const [coins, setCoins] = useState("");
+  const [cash, setCash] = useState(""); // the total in the drawer — one number, no note-by-note count
   const [countedBy, setCountedBy] = useState("");
 
   const load = useCallback((p: "day" | "shift") => startLoad(async () => {
@@ -49,13 +47,11 @@ export function DaySalesSheet({ onClose, initial }: { onClose: () => void; initi
     return () => window.removeEventListener("keydown", onKey);
   }, [onClose]);
 
-  const counted = useMemo(() => NOTES.reduce((s, n) => s + Number(n) * (counts[n] ?? 0), 0) + num(coins), [counts, coins]);
-  const anyCounted = counted > 0;
+  const counted = useMemo(() => num(cash), [cash]);
+  const anyCounted = cash.trim() !== "";
   const expected = (data?.cashReceived ?? 0) + num(float);
   const diff = counted - expected;
   const problems = data?.problems.reduce((n, p) => n + p.orders.length, 0) ?? 0;
-
-  const bump = (n: string, by: number) => setCounts((c) => ({ ...c, [n]: Math.max(0, (c[n] ?? 0) + by) }));
 
   const save = () => {
     if (!data) return;
@@ -64,13 +60,13 @@ export function DaySalesSheet({ onClose, initial }: { onClose: () => void; initi
     startSave(async () => {
       const r = await closeShift({
         period, opening_float: num(float), counted_by: countedBy || undefined,
-        counts: { ...Object.fromEntries(NOTES.map((n) => [n, counts[n] ?? 0])), coins: num(coins) },
+        counted_cash: counted,
       });
       if ("error" in r && r.error) { toast.error(r.error); return; }
       try { localStorage.setItem(FLOAT_KEY, String(num(float))); } catch { /* storage blocked */ }
       const res = r as { difference: number };
       toast.success(Math.abs(res.difference) < 1 ? "Shift closed — the drawer balances ✓" : `Shift closed — ${res.difference < 0 ? "short" : "over"} by ${npr(Math.abs(res.difference))}`, { duration: 6000 });
-      setCounts({}); setCoins("");
+      setCash("");
       setPeriod("shift");
       load("shift");
     });
@@ -198,29 +194,17 @@ export function DaySalesSheet({ onClose, initial }: { onClose: () => void; initi
 
               {/* Cash count */}
               <div className={cn(card, "h-fit space-y-3")}>
-                <p className="text-sm font-bold">Count the cash drawer</p>
+                <p className="text-sm font-bold">Cash in the drawer</p>
                 <label className="flex items-center justify-between gap-3 text-sm">
                   <span>Opening float <span className={cn("block text-[11px]", muted)}>cash in the drawer at the start</span></span>
                   <input value={float} onChange={(e) => setFloat(e.target.value.replace(/[^\d]/g, ""))} inputMode="numeric" placeholder="0"
                     className="input !w-28 text-right" aria-label="Opening float" />
                 </label>
-                <div className="divide-y divide-stone-100 border-y border-stone-100 dark:divide-stone-800 dark:border-stone-800">
-                  {NOTES.map((n) => (
-                    <div key={n} className="flex items-center gap-2 py-1.5">
-                      <span className="w-16 text-sm font-bold">Rs {n}</span>
-                      <button onClick={() => bump(n, -1)} aria-label={`One less Rs ${n} note`} className="flex h-9 w-9 items-center justify-center rounded-full bg-stone-100 dark:bg-stone-800"><Minus size={15} /></button>
-                      <input value={counts[n] ? String(counts[n]) : ""} onChange={(e) => setCounts((c) => ({ ...c, [n]: num(e.target.value) }))}
-                        inputMode="numeric" placeholder="0" aria-label={`Number of Rs ${n} notes`} className="input !w-16 !px-2 text-center" />
-                      <button onClick={() => bump(n, 1)} aria-label={`One more Rs ${n} note`} className="flex h-9 w-9 items-center justify-center rounded-full bg-stone-100 dark:bg-stone-800"><Plus size={15} /></button>
-                      <span className={cn("ml-auto text-sm tabular-nums", muted)}>{counts[n] ? npr(Number(n) * counts[n]) : ""}</span>
-                    </div>
-                  ))}
-                  <label className="flex items-center gap-2 py-1.5">
-                    <span className="w-16 text-sm font-bold">Coins</span>
-                    <input value={coins} onChange={(e) => setCoins(e.target.value.replace(/[^\d]/g, ""))} inputMode="numeric" placeholder="Rs total"
-                      aria-label="Coins total in rupees" className="input !w-28 text-center" />
-                  </label>
-                </div>
+                <label className="flex items-center justify-between gap-3 border-y border-stone-100 py-3 text-sm dark:border-stone-800">
+                  <span>Total cash now <span className={cn("block text-[11px]", muted)}>everything in the drawer, notes and coins</span></span>
+                  <input value={cash} onChange={(e) => setCash(e.target.value.replace(/[^\d]/g, ""))} inputMode="numeric" placeholder="Rs"
+                    className="input !w-36 text-right text-lg font-bold" aria-label="Total cash in the drawer" />
+                </label>
                 <input value={countedBy} onChange={(e) => setCountedBy(e.target.value.slice(0, 40))} placeholder="Counted by (name)" aria-label="Counted by" className="input" />
               </div>
             </div>
@@ -242,7 +226,7 @@ export function DaySalesSheet({ onClose, initial }: { onClose: () => void; initi
               </div>
               <div className={cn("rounded-2xl px-4 py-2 text-sm font-extrabold",
                 !anyCounted ? "bg-stone-100 text-stone-500 dark:bg-stone-800" : Math.abs(diff) < 1 ? "bg-green-100 text-green-800 dark:bg-green-950/50 dark:text-green-300" : diff < 0 ? "bg-red-100 text-red-700 dark:bg-red-950/50 dark:text-red-300" : "bg-amber-100 text-amber-800 dark:bg-amber-950/50 dark:text-amber-300")}>
-                {!anyCounted ? "Count the notes above" : Math.abs(diff) < 1 ? "✓ Balanced" : diff < 0 ? `Short ${npr(-diff)}` : `Over ${npr(diff)}`}
+                {!anyCounted ? "Enter the cash in the drawer" : Math.abs(diff) < 1 ? "✓ Balanced" : diff < 0 ? `Short ${npr(-diff)}` : `Over ${npr(diff)}`}
               </div>
               <button onClick={save} disabled={saving || !anyCounted} className="btn-primary ml-auto !py-3">
                 {saving ? "Saving…" : "Close shift"}

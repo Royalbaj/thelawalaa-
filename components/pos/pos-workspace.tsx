@@ -15,12 +15,14 @@ type Props = {
   initialOrders: Order[];
   drivers: { id: string; full_name: string; is_online: boolean }[];
   stock: PosStock;
+  /** Admin → Settings: may the counter cancel orders? */
+  canCancel: boolean;
 };
 
 // Phones, iPads (portrait and the 1024px-wide landscape) and small laptops
 // get Sell / Orders tabs; from 1280px both sit side by side. Both panels stay
 // mounted when hidden, so Realtime, the chime and the cart all carry on.
-export default function PosWorkspace({ products, categories, openingPromo, initialOrders, drivers, stock }: Props) {
+export default function PosWorkspace({ products, categories, openingPromo, initialOrders, drivers, stock, canCancel }: Props) {
   const [tab, setTab] = useState<"sell" | "orders">("sell");
   const [newCount, setNewCount] = useState(0);
 
@@ -54,7 +56,7 @@ export default function PosWorkspace({ products, categories, openingPromo, initi
           <PosTerminal products={products} categories={categories} openingPromo={openingPromo} initialStock={stock} />
         </div>
         <div className={cn("min-h-0 flex-1 overflow-hidden xl:w-[400px] xl:flex-none", tab !== "orders" && "hidden xl:block")}>
-          <LiveOrdersPanel initialOrders={initialOrders} drivers={drivers} onNewOrder={onNewOrder} onNewCount={setNewCount} />
+          <LiveOrdersPanel initialOrders={initialOrders} drivers={drivers} onNewOrder={onNewOrder} onNewCount={setNewCount} canCancel={canCancel} />
         </div>
       </div>
     </div>

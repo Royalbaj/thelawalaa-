@@ -90,7 +90,7 @@ export default async function SettingsPage() {
         </section>
       </div>
       <div className="space-y-4">
-        <FeatureFlagsForm esewaEnabled={settings?.esewa_enabled ?? false} deliveryEnabled={settings?.delivery_enabled ?? false} />
+        <FeatureFlagsForm esewaEnabled={settings?.esewa_enabled ?? false} deliveryEnabled={settings?.delivery_enabled ?? false} posCanCancel={settings?.pos_can_cancel ?? true} />
         <DeliveryAreaForm radiusKm={Number(settings?.delivery_radius_km ?? 5)} storeLat={settings?.store_lat ?? null} storeLng={settings?.store_lng ?? null} />
         <OpeningPromoForm
           enabled={settings?.opening_promo_enabled ?? false}

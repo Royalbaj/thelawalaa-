@@ -53,7 +53,7 @@ const customerPhone = (o: Order) => noteField(o.notes, "Phone") ?? o.customer?.p
 const kitchenNote = (o: Order) => customerNote(o.notes);
 
 export default function LiveOrdersPanel({
-  initialOrders, drivers, onNewOrder, onNewCount,
+  initialOrders, drivers, onNewOrder, onNewCount, canCancel = true,
 }: {
   initialOrders: Order[];
   drivers: Driver[];
@@ -61,6 +61,8 @@ export default function LiveOrdersPanel({
   onNewOrder?: (o: Order) => void;
   /** How many orders are waiting to be confirmed — for a badge outside the panel. */
   onNewCount?: (n: number) => void;
+  /** Admin → Settings decides whether the counter may cancel; the server checks too. */
+  canCancel?: boolean;
 }) {
   const [orders, setOrders] = useState(initialOrders);
   const [filter, setFilter] = useState("active");
@@ -319,7 +321,7 @@ export default function LiveOrdersPanel({
                         Mark paid
                       </button>
                     )}
-                    {!CLOSED.includes(o.status) && (
+                    {canCancel && !CLOSED.includes(o.status) && (
                       <button disabled={busy} onClick={() => cancel(o)} className="touch-manipulation rounded-lg bg-red-100 text-red-600 px-3 py-2 text-[11px] font-bold hover:bg-red-200 transition dark:bg-red-950/50 dark:text-red-300 dark:hover:bg-red-900/50">
                         Cancel order
                       </button>

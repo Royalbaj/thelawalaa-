@@ -5,7 +5,7 @@ import { revalidatePath } from "next/cache";
 import { requireRole } from "@/lib/supabase/server";
 import { supabaseAdmin, audit } from "@/lib/supabase/admin";
 
-const schema = z.object({ esewa_enabled: z.boolean(), delivery_enabled: z.boolean() });
+const schema = z.object({ esewa_enabled: z.boolean(), delivery_enabled: z.boolean(), pos_can_cancel: z.boolean() });
 
 /** Site-wide feature flags — admin only, see app_settings migration. */
 export async function updateAppSettings(input: unknown) {
@@ -21,14 +21,15 @@ export async function updateAppSettings(input: unknown) {
 
   await audit({ actor_id: user.id, action: "UPDATE_APP_SETTINGS", target_table: "app_settings", target_id: "1", new_data: parsed.data });
   revalidatePath("/admin/settings");
+  revalidatePath("/admin");
   revalidatePath("/order");
   revalidatePath("/");
   return { ok: true };
 }
 
 export async function getAppSettings() {
-  const { data } = await supabaseAdmin.from("app_settings").select("esewa_enabled, delivery_enabled").eq("id", 1).single();
-  return data ?? { esewa_enabled: false, delivery_enabled: false };
+  const { data } = await supabaseAdmin.from("app_settings").select("esewa_enabled, delivery_enabled, pos_can_cancel").eq("id", 1).single();
+  return data ?? { esewa_enabled: false, delivery_enabled: false, pos_can_cancel: true };
 }
 
 // ── Opening-day promo (e.g. "Momo @ Rs 11/plate") ───────────────────

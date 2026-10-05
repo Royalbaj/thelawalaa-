@@ -165,8 +165,13 @@ const ALLOWED_STATUSES = [
 ];
 
 export async function adminUpdateOrderStatus(orderId: string, status: string) {
-  const { user } = await requireRole(["super_admin", "pos_user"]);
+  const { user, profile } = await requireRole(["super_admin", "pos_user"]);
   if (!ALLOWED_STATUSES.includes(status)) return { error: "Invalid status" };
+  // The manager decides whether the counter may cancel (Admin → Settings → Feature flags).
+  if (status === "cancelled" && profile.role === "pos_user") {
+    const { data: s } = await supabaseAdmin.from("app_settings").select("pos_can_cancel").eq("id", 1).single();
+    if (s?.pos_can_cancel === false) return { error: "Cancelling is switched off for the counter — ask the manager." };
+  }
   const { error } = await supabaseAdmin.from("orders").update({ status }).eq("id", orderId);
   if (error) return { error: "Couldn't update the order — try again" };
   // Cancelled: the customer gets back any points / free item it used, and loses what it earned.

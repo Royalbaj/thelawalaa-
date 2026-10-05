@@ -121,11 +121,10 @@ export async function getDaySales(period: "day" | "shift" = "day") {
   return loadDaySales(period === "shift" ? "shift" : "day");
 }
 
-const DENOMINATIONS = ["1000", "500", "100", "50", "20", "10", "5", "coins"] as const;
 const closeSchema = z.object({
   period: z.enum(["day", "shift"]),
   opening_float: z.number().min(0).max(1_000_000),
-  counts: z.record(z.enum(DENOMINATIONS), z.number().int().min(0).max(100_000)),
+  counted_cash: z.number().min(0).max(10_000_000), // one total — the counter isn't asked note by note
   counted_by: z.string().trim().max(40).optional(),
   note: z.string().trim().max(300).optional(),
 });
@@ -140,7 +139,7 @@ export async function closeShift(input: unknown) {
   const parsed = closeSchema.safeParse(input);
   if (!parsed.success) return { error: "Check the cash count" };
   const d = parsed.data;
-  const counted = Object.entries(d.counts).reduce((s, [k, n]) => s + (k === "coins" ? n : Number(k) * n), 0);
+  const counted = Math.round(d.counted_cash * 100) / 100;
   const day = await loadDaySales(d.period);
   const expected = Math.round((d.opening_float + day.cashReceived) * 100) / 100;
   const difference = Math.round((counted - expected) * 100) / 100;
@@ -148,7 +147,7 @@ export async function closeShift(input: unknown) {
     actor_id: user.id, action: "SHIFT_CLOSE", target_table: "orders",
     new_data: {
       from: day.from, period: d.period, opening_float: d.opening_float, cash_received: day.cashReceived,
-      expected_cash: expected, counted_cash: counted, difference, counts: d.counts,
+      expected_cash: expected, counted_cash: counted, difference,
       sales: day.sales, orders: day.orders, by_method: day.byMethod, to_collect: day.toCollect.amount,
       counted_by: d.counted_by || null, note: d.note || null, problems: day.problems.reduce((n, p) => n + p.orders.length, 0),
     },
