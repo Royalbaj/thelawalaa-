@@ -121,3 +121,19 @@ export async function updateDeliveryArea(input: unknown) {
   revalidatePath("/order");
   return { ok: true };
 }
+
+// ── Staff sale: how many items one staff sale gets free (migration 035) ──
+const staffSaleSchema = z.object({ staff_free_items: z.number().int().min(0).max(20, "At most 20 items") });
+
+export async function updateStaffSale(input: unknown) {
+  const { user } = await requireRole(["super_admin"]);
+  const parsed = staffSaleSchema.safeParse(input);
+  if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Enter a number of items from 0 to 20" };
+  const { error } = await supabaseAdmin.from("app_settings")
+    .update({ ...parsed.data, updated_at: new Date().toISOString() }).eq("id", 1);
+  if (error) return { error: "Could not save the staff sale limit" };
+  await audit({ actor_id: user.id, action: "UPDATE_STAFF_SALE", target_table: "app_settings", target_id: "1", new_data: parsed.data });
+  revalidatePath("/admin/settings");
+  revalidatePath("/admin");
+  return { ok: true };
+}

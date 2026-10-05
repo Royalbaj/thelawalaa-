@@ -2,6 +2,7 @@ import "server-only";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { nepalToday } from "@/lib/dates";
 import { servingStats, type ServingStats } from "@/lib/serving-time";
+import { STAFF_LABEL } from "@/lib/discounts";
 
 // The POS "Today" sheet: what was sold today (Nepal day) or since the last
 // shift close, how it was paid, how much cash should be in the drawer, and
@@ -26,7 +27,8 @@ export type DaySales = {
   byMethod: { method: string; amount: number; count: number }[];
   counter: { amount: number; count: number };
   online: { amount: number; count: number };
-  discounts: number;      // promo / member / student + points
+  discounts: number;      // promo / member / student / staff + points
+  staffFree: { amount: number; count: number }; // staff sales' free items (part of discounts)
   toCollect: { amount: number; count: number };
   cashReceived: number;   // cash paid in this period — what the drawer should hold above the float
   topItems: { name: string; qty: number }[];
@@ -37,7 +39,7 @@ export type DaySales = {
 
 type Row = {
   id: string; order_number: string; daily_number: number | null; created_at: string; status: string; type: string;
-  total: number; discount_amount: number; points_discount: number; payment_method: string | null; payment_status: string;
+  total: number; discount_amount: number; discount_label: string | null; points_discount: number; payment_method: string | null; payment_status: string;
   placed_by: string | null; paid_confirmed_at: string | null; ready_at: string | null; served_at: string | null;
 };
 
@@ -78,7 +80,7 @@ export async function getDaySales(period: "day" | "shift" = "day"): Promise<DayS
   const rows: Row[] = [];
   for (let offset = 0; ; offset += 1000) {
     const { data, error } = await supabaseAdmin.from("orders")
-      .select("id, order_number, daily_number, created_at, status, type, total, discount_amount, points_discount, payment_method, payment_status, placed_by, paid_confirmed_at, ready_at, served_at")
+      .select("id, order_number, daily_number, created_at, status, type, total, discount_amount, discount_label, points_discount, payment_method, payment_status, placed_by, paid_confirmed_at, ready_at, served_at")
       .or(`created_at.gte.${from},paid_confirmed_at.gte.${from}`)
       .order("created_at").range(offset, offset + 999);
     if (error) throw new Error(`Couldn't load today's orders: ${error.message}`);
@@ -145,6 +147,10 @@ export async function getDaySales(period: "day" | "shift" = "day"): Promise<DayS
     byMethod: [...methods.entries()].map(([method, v]) => ({ method, ...v })).sort((a, b) => b.amount - a.amount),
     counter, online,
     discounts: live.reduce((s, o) => s + Number(o.discount_amount ?? 0) + Number(o.points_discount ?? 0), 0),
+    staffFree: (() => {
+      const staff = live.filter((o) => o.discount_label === STAFF_LABEL);
+      return { amount: staff.reduce((s, o) => s + Number(o.discount_amount ?? 0), 0), count: staff.length };
+    })(),
     toCollect: { amount: unpaid.reduce((s, o) => s + Number(o.total), 0), count: unpaid.length },
     cashReceived,
     serving: servingStats(inPeriod),

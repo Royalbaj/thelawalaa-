@@ -26,7 +26,7 @@ export default async function AdminDashboard() {
       .eq("is_active", true),
     supabaseAdmin
       .from("app_settings")
-      .select("opening_promo_enabled, opening_promo_momo_price, opening_promo_starts_at, opening_promo_ends_at, pos_can_cancel")
+      .select("opening_promo_enabled, opening_promo_momo_price, opening_promo_starts_at, opening_promo_ends_at, pos_can_cancel, staff_free_items")
       .eq("id", 1)
       .single(),
     getPosStock(),
@@ -38,6 +38,7 @@ export default async function AdminDashboard() {
       categories={(categories ?? []) as any}
       openingPromo={settings ?? null}
       canCancel={settings?.pos_can_cancel ?? true}
+      staffFreeItems={Number(settings?.staff_free_items ?? 0)}
       initialOrders={(recentOrders ?? []) as any}
       drivers={(drivers ?? []) as any}
       stock={stock}

@@ -50,6 +50,7 @@ export const posOrderSchema = z.object({
   payment_method: z.enum(["cash", "qr"]),
   student_discount: z.boolean().optional(),
   member: z.boolean().optional(),
+  staff: z.boolean().optional(), // staff sale — up to app_settings.staff_free_items free
   members: z.array(newMemberSchema).max(10).optional(), // one per membership card sold
   items: z
     .array(z.object({ product_id: z.string().uuid(), quantity: z.number().int().min(1).max(50) }))

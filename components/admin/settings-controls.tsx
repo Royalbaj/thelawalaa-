@@ -4,7 +4,7 @@ import toast from "react-hot-toast";
 import { Facebook, Instagram, Link2, Trash2 } from "lucide-react";
 import TikTokIcon from "@/components/icons/tiktok";
 import { createBranch, setBranchActive, createPromoCode, setPromoActive } from "@/app/actions/admin-crud";
-import { updateAppSettings, updateOpeningPromo, addSocialLink, setSocialLinkActive, deleteSocialLink, updateDeliveryArea } from "@/app/actions/settings";
+import { updateAppSettings, updateOpeningPromo, addSocialLink, setSocialLinkActive, deleteSocialLink, updateDeliveryArea, updateStaffSale } from "@/app/actions/settings";
 
 function platformIcon(platform: string) {
   const p = platform.toLowerCase();
@@ -134,6 +134,48 @@ export function FeatureFlagsForm({ esewaEnabled, deliveryEnabled, posCanCancel }
         </button>
       </div>
     </div>
+  );
+}
+
+/** Staff sale at the POS: how many items one sale gets free. 0 hides the Staff button. */
+export function StaffSaleForm({ freeItems }: { freeItems: number }) {
+  const [value, setValue] = useState(String(freeItems));
+  const [saved, setSaved] = useState(freeItems);
+  const [pending, start] = useTransition();
+  const n = value.trim() === "" ? NaN : Number(value);
+  const valid = Number.isInteger(n) && n >= 0 && n <= 20;
+
+  return (
+    <form
+      className="card space-y-3 p-5"
+      onSubmit={(e) => {
+        e.preventDefault();
+        if (!valid) { toast.error("Enter a number of items from 0 to 20"); return; }
+        start(async () => {
+          const r = await updateStaffSale({ staff_free_items: n });
+          if (r?.error) { toast.error(r.error); return; }
+          setSaved(n);
+          toast.success(n ? `Staff sale: up to ${n} free item${n > 1 ? "s" : ""}` : "Staff sale switched off");
+        });
+      }}
+    >
+      <div className="flex items-center justify-between gap-3">
+        <h3 className="font-display font-bold text-brand-brown">Staff sale</h3>
+        <span className={saved ? "badge bg-green-100 text-green-800" : "badge bg-stone-200 text-stone-600"}>
+          {saved ? `${saved} free per sale` : "Off"}
+        </span>
+      </div>
+      <p className="text-xs text-stone-500">
+        The POS &quot;Staff&quot; button makes items free (price Rs 0) for a staff member, up to this many items in one sale —
+        the dearest go free first, anything more is charged as normal. Membership cards are never free. 0 hides the button.
+      </p>
+      <div>
+        <label className="label" htmlFor="staff_free_items">Free items per staff sale</label>
+        <input id="staff_free_items" type="number" inputMode="numeric" min={0} max={20} step={1} value={value}
+          onChange={(e) => setValue(e.target.value.replace(/\D/g, "").slice(0, 2))} className="input" />
+      </div>
+      <button disabled={pending || !valid || n === saved} className="btn-primary w-full">{pending ? "Saving…" : "Save"}</button>
+    </form>
   );
 }
 

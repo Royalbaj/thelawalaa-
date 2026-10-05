@@ -2,14 +2,14 @@
 import { useEffect, useMemo, useState, useTransition } from "react";
 import Image from "next/image";
 import toast from "react-hot-toast";
-import { Search, X, Trash2, ShoppingCart, ChevronUp, UtensilsCrossed, CheckCircle2, Minus, Plus, GraduationCap, Crown, IdCard, AlertTriangle, ChevronDown } from "lucide-react";
+import { Search, X, Trash2, ShoppingCart, ChevronUp, UtensilsCrossed, CheckCircle2, Minus, Plus, GraduationCap, Crown, ChefHat, IdCard, AlertTriangle, ChevronDown } from "lucide-react";
 import { createPosOrder, getPosStock } from "@/app/actions/pos";
 import { newMemberSchema } from "@/lib/validations/order";
 import { REFRESH_EVENT } from "@/components/refresh-button";
 import type { PosStock } from "@/lib/stock-alerts";
 import { npr, cn } from "@/lib/utils";
 import { applyOpeningPromoPrice, isOpeningPromoActive, type OpeningPromoSettings } from "@/lib/promo";
-import { studentDiscount, memberUnitPrice } from "@/lib/discounts";
+import { studentDiscount, memberUnitPrice, staffFreeItems } from "@/lib/discounts";
 
 type Product = {
   id: string; name: string; price: number; is_available: boolean; category_id: string | null;
@@ -18,7 +18,7 @@ type Product = {
 };
 type Category = { id: string; name: string };
 type Line = { product: Product; qty: number };
-type Deal = "none" | "student" | "member";
+type Deal = "none" | "student" | "member" | "staff";
 type Done = {
   orderNumber: string; dailyNumber: number | null; total: number;
   discount: number; discountLabel: string | null;
@@ -52,8 +52,11 @@ function Segmented<T extends string>({ value, onChange, options, activeClass }: 
 }
 
 export default function PosTerminal({
-  products, categories, openingPromo, initialStock,
-}: { products: Product[]; categories: Category[]; openingPromo?: OpeningPromoSettings | null; initialStock?: PosStock }) {
+  products, categories, openingPromo, initialStock, staffFreeItems: staffLimit = 0,
+}: {
+  products: Product[]; categories: Category[]; openingPromo?: OpeningPromoSettings | null; initialStock?: PosStock;
+  staffFreeItems?: number; // Admin → Settings → Staff sale; 0 = no Staff button
+}) {
   const [cat, setCat] = useState<string>("all");
   const [q, setQ] = useState("");
   const [cart, setCart] = useState<Line[]>([]);
@@ -61,7 +64,7 @@ export default function PosTerminal({
   const [type, setType] = useState<"dine_in" | "pickup">("dine_in");
   const [method, setMethod] = useState<"cash" | "qr">("cash");
   const [cashReceived, setCashReceived] = useState("");
-  // Student 5% and member price never stack — picking one switches the other off.
+  // Student 5%, member price and staff never stack — picking one switches the others off.
   const [deal, setDeal] = useState<Deal>("none");
   const [done, setDone] = useState<Done | null>(null);
   const [members, setMembers] = useState<MemberForm[]>([]);
@@ -72,6 +75,8 @@ export default function PosTerminal({
   // Stock warnings: fresh from the server on load, every minute while on screen,
   // after each sale and on the header's refresh button.
   useEffect(() => { if (initialStock) setStock(initialStock); }, [initialStock]);
+  // The manager switched staff sales off while this screen was open.
+  useEffect(() => { if (staffLimit <= 0) setDeal((d) => (d === "staff" ? "none" : d)); }, [staffLimit]);
   useEffect(() => {
     const reload = () => { if (document.visibilityState === "visible") getPosStock().then(setStock).catch(() => {}); };
     const poll = setInterval(reload, STOCK_POLL_MS);
@@ -112,7 +117,16 @@ export default function PosTerminal({
   const memberAt = (i: number) => members[i] ?? BLANK_MEMBER;
   const setMember = (i: number, patch: Partial<MemberForm>) =>
     setMembers((cur) => { const next = [...cur]; next[i] = { ...(cur[i] ?? BLANK_MEMBER), ...patch }; return next; });
-  const discount = deal === "member" ? Math.round(memberSaving * 100) / 100 : deal === "student" ? studentDiscount(eligible) : 0;
+  // Staff sale: the dearest items go free, up to the limit — same function createPosOrder uses.
+  const staff = deal === "staff"
+    ? staffFreeItems(cart.map((l) => ({ price: priceOf(l.product), qty: l.qty, eligible: !l.product.is_membership_card })), staffLimit)
+    : null;
+  const staffFreeLeft = staff ? staffLimit - staff.used : 0;
+  // A tile shows Rs 0 while this staff sale still has free items left.
+  const tileFree = (p: Product) => staffFreeLeft > 0 && !p.is_membership_card;
+  const discount = staff ? staff.saving
+    : deal === "member" ? Math.round(memberSaving * 100) / 100
+    : deal === "student" ? studentDiscount(eligible) : 0;
   const total = subtotal - discount;
   const received = Number(cashReceived) || 0;
   const change = method === "cash" && received > total ? received - total : 0;
@@ -167,6 +181,7 @@ export default function PosTerminal({
         type, payment_method: method,
         student_discount: deal === "student",
         member: deal === "member",
+        staff: deal === "staff",
         members: cardCount ? newMembers : undefined,
         items: cart.map((l) => ({ product_id: l.product.id, quantity: l.qty })),
       });
@@ -174,7 +189,7 @@ export default function PosTerminal({
       setDone({
         orderNumber: r.orderNumber!, dailyNumber: r.dailyNumber ?? null, total: Number(r.total),
         discount: Number(r.discount ?? 0), discountLabel: r.discountLabel ?? null,
-        method, received: method === "cash" && received > 0 ? received : null,
+        method, received: method === "cash" && received > 0 && total > 0 ? received : null,
         members: r.members ?? [],
       });
       // Ready for the next customer: back to cash, no discount.
@@ -183,19 +198,27 @@ export default function PosTerminal({
     });
   };
 
-  const dealButton = (d: Exclude<Deal, "none">, Icon: typeof Crown, label: string) => {
+  const threeDeals = staffLimit > 0;
+  const dealButton = (d: Exclude<Deal, "none">, Icon: typeof Crown, label: string, onText?: string) => {
     const on = deal === d;
     return (
       <button onClick={() => toggleDeal(d)} aria-pressed={on}
-        className={cn("flex touch-manipulation flex-col items-center justify-center rounded-xl border px-2 py-1.5 transition",
+        className={cn("flex touch-manipulation flex-col items-center justify-center rounded-xl border py-1.5 transition",
+          threeDeals ? "px-1" : "px-2",
           on
             ? "border-brand-green bg-green-50 text-brand-green dark:bg-green-950/40 dark:text-green-400"
             : "border-orange-100 bg-white text-stone-600 dark:border-stone-700 dark:bg-stone-800 dark:text-stone-300")}>
-        <span className="flex items-center gap-1.5 text-sm font-bold"><Icon size={15} /> {label}</span>
-        <span className="text-[11px] font-bold opacity-80">{on ? (discount ? `−${npr(discount)}` : "On") : "Off"}</span>
+        {/* Three across is narrow beside the cart on an iPad — the icon goes above the name. */}
+        <span className={cn("flex items-center font-bold", threeDeals ? "flex-col gap-0.5 text-[13px] leading-tight" : "gap-1.5 text-sm")}>
+          <Icon size={15} /> {label}
+        </span>
+        <span className="text-[11px] font-bold opacity-80">{on ? (onText ?? (discount ? `−${npr(discount)}` : "On")) : "Off"}</span>
       </button>
     );
   };
+  // What a cart line charges: free staff items cost nothing, member price where it applies.
+  const lineCharge = (l: Line, i: number) =>
+    staff ? (l.qty - staff.free[i]) * priceOf(l.product) : unitOf(l.product) * l.qty;
 
   const CartContents = (
     <>
@@ -227,13 +250,17 @@ export default function PosTerminal({
               <div className="flex items-baseline justify-between gap-2">
                 <p className="text-sm font-bold leading-snug">{l.product.name}</p>
                 <p className="shrink-0 text-sm font-bold">
-                  {unitOf(l.product) < priceOf(l.product) && (
+                  {lineCharge(l, lineIndex) < priceOf(l.product) * l.qty && (
                     <s className="mr-1.5 text-xs font-normal text-stone-400">{npr(priceOf(l.product) * l.qty)}</s>
                   )}
-                  {npr(unitOf(l.product) * l.qty)}
+                  {npr(lineCharge(l, lineIndex))}
                 </p>
               </div>
-              {memberApplies(l.product) ? (
+              {staff && staff.free[lineIndex] > 0 ? (
+                <p className="text-xs font-bold text-brand-green">
+                  Staff · {staff.free[lineIndex] === l.qty ? "free" : `${staff.free[lineIndex]} of ${l.qty} free`}
+                </p>
+              ) : memberApplies(l.product) ? (
                 <p className="text-xs font-bold text-brand-green">Member price {npr(unitOf(l.product))} each</p>
               ) : isPromo(l.product) && <p className="text-xs font-bold text-brand-green">Opening offer</p>}
               <div className="mt-1.5 flex items-center gap-1.5">
@@ -285,11 +312,13 @@ export default function PosTerminal({
             <Segmented value={method} onChange={setMethod} activeClass="bg-brand-green text-white shadow-sm"
               options={[["cash", "Cash"], ["qr", "QR"]] as const} />
           </div>
-          <div className="grid grid-cols-2 gap-2">
+          <div className={cn("grid gap-2", threeDeals ? "grid-cols-3" : "grid-cols-2")}>
             {dealButton("student", GraduationCap, "Student 5%")}
             {dealButton("member", Crown, "Member")}
+            {threeDeals && dealButton("staff", ChefHat, "Staff", `${staff?.used ?? 0} of ${staffLimit} free`)}
           </div>
-          {method === "cash" && (
+          {/* Nothing to collect (a staff sale that's all free) — no cash to count. */}
+          {method === "cash" && (cart.length === 0 || total > 0) && (
             <>
               <div className="flex items-center gap-2">
                 <label htmlFor="pos-cash-received" className="text-xs font-bold text-stone-500 dark:text-stone-400">
@@ -390,7 +419,7 @@ export default function PosTerminal({
         <div className="grid flex-1 auto-rows-min grid-cols-2 gap-3 overflow-y-auto overscroll-contain bg-brand-cream p-3 pb-24 dark:bg-stone-950 sm:grid-cols-3 sm:p-4 sm:pb-24 md:grid-cols-4 lg:grid-cols-3 lg:pb-4 2xl:grid-cols-4">
           {visible.map((p) => {
             const qty = qtyOf(p.id);
-            const shown = unitOf(p);
+            const shown = tileFree(p) ? 0 : unitOf(p);
             return (
               <div key={p.id} className={cn("card relative overflow-hidden", !p.is_available && "opacity-40", qty > 0 && "ring-2 ring-brand-orange")}>
                 <button onClick={() => add(p)} disabled={!p.is_available}
@@ -409,7 +438,9 @@ export default function PosTerminal({
                       {stock.byProduct[p.id].state === "out" ? "Stock out" : `${stock.byProduct[p.id].remaining} left`}
                     </span>
                   )}
-                  {memberApplies(p) ? (
+                  {tileFree(p) ? (
+                    <span className="absolute left-2 top-2 flex items-center gap-1 rounded-full bg-brand-green px-2 py-0.5 text-[10px] font-bold text-white shadow"><ChefHat size={10} /> Staff · free</span>
+                  ) : memberApplies(p) ? (
                     <span className="absolute left-2 top-2 flex items-center gap-1 rounded-full bg-amber-500 px-2 py-0.5 text-[10px] font-bold text-white shadow"><Crown size={10} /> Member</span>
                   ) : isPromo(p) && (
                     <span className="absolute left-2 top-2 rounded-full bg-brand-green px-2 py-0.5 text-[10px] font-bold text-white shadow">Opening offer</span>
@@ -483,7 +514,7 @@ export default function PosTerminal({
             )}
             <p className="mt-1 font-mono text-sm text-stone-500 dark:text-stone-400">{done.orderNumber}</p>
             {done.discount > 0 && <p className="mt-1 text-sm font-bold text-brand-green">{done.discountLabel ?? "Discount"} −{npr(done.discount)}</p>}
-            <p className="mt-1 font-bold">{npr(done.total)} · paid by {done.method === "cash" ? "cash" : "QR"}</p>
+            <p className="mt-1 font-bold">{done.total > 0 ? <>{npr(done.total)} · paid by {done.method === "cash" ? "cash" : "QR"}</> : "Nothing to pay"}</p>
             {done.members.map((m, i) => (
               <p key={i} className="mt-1.5 flex items-center justify-center gap-1.5 text-sm text-amber-800 dark:text-amber-300">
                 <IdCard size={15} className="shrink-0" /> New member: <b>{m.name}</b> · {m.phone}{m.card ? <> · card no. <b className="text-base">{m.card}</b></> : ""}
