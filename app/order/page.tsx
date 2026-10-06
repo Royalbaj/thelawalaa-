@@ -137,10 +137,9 @@ export default function OrderPage() {
   const farKm = checkPoint ? distanceKm(area.shop, checkPoint) : 0;
 
   const subtotal = useMemo(() => items.reduce((t, i) => t + i.price * i.quantity, 0), [items]);
-  const deliveryFee = type === "delivery" ? 20 : 0;
   // Same plan createOrder makes on the server (lib/rewards.ts) — this is only the preview.
-  const pointsPlan = usePoints && rewards ? redeemPlan(rewards.points, subtotal + deliveryFee - promoDiscount, rewards.settings) : { points: 0, rupees: 0 };
-  const finalTotal = Math.max(0, subtotal + deliveryFee - promoDiscount - pointsPlan.rupees);
+  const pointsPlan = usePoints && rewards ? redeemPlan(rewards.points, subtotal - promoDiscount, rewards.settings) : { points: 0, rupees: 0 };
+  const finalTotal = Math.max(0, subtotal - promoDiscount - pointsPlan.rupees);
 
   const visible = activeCat ? products.filter((p) => p.category_id === activeCat) : products;
 
@@ -528,7 +527,7 @@ export default function OrderPage() {
                         </div>
                       </div>
                     )}
-                    <p className="text-xs font-bold text-brand-green">Home delivery: flat Nrs 20 (within {area.radiusKm} km of Godam Chowk)</p>
+                    <p className="text-xs font-bold text-brand-green">Free home delivery within {area.radiusKm} km of Godam Chowk</p>
                   </div>
                 )}
               </div>
@@ -541,7 +540,7 @@ export default function OrderPage() {
                 <div className="rounded-2xl bg-gradient-to-br from-amber-50 to-orange-50 p-4 ring-1 ring-orange-100">
                   <p className="flex items-center gap-1.5 text-sm font-bold text-brand-brown"><Sparkles size={15} className="text-amber-500" /> Your rewards</p>
                   {(() => {
-                    const avail = redeemPlan(rewards.points, subtotal + deliveryFee - promoDiscount, rewards.settings);
+                    const avail = redeemPlan(rewards.points, subtotal - promoDiscount, rewards.settings);
                     return avail.points > 0 ? (
                       <label className="mt-3 flex cursor-pointer items-center justify-between gap-3">
                         <span className="text-sm text-stone-700">Use <b>{fmtPoints(avail.points)} points</b> — <b className="text-brand-green">−{fmtRupees(avail.rupees)}</b></span>

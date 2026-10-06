@@ -15,8 +15,6 @@ import { deliveryOtp, hashOtp } from "@/lib/delivery-otp";
 import { deliveryArea, outsideArea, distanceKm, fmtKm } from "@/lib/geo";
 import { getSiteText } from "@/lib/site-content";
 
-// USP: flat Nrs 20 home delivery within 5km of the store (Godam Chowk, Banepa at launch).
-const DELIVERY_FEE = 20; // NPR — flat
 
 /**
  * Creates an order. Security properties:
@@ -126,8 +124,6 @@ export async function createOrder(input: unknown) {
     return { error: "Add your mobile number so the rider can reach you" };
   }
 
-  const delivery_fee = data.type === "delivery" ? DELIVERY_FEE : 0;
-
   // ── Promo (atomic consume, race-safe) ────────────────────────
   let discount_amount = 0;
   let promo_code_id: string | null = null;
@@ -184,7 +180,7 @@ export async function createOrder(input: unknown) {
       rewardNote += `\nFree ${fp.name} (reward)`;
     }
     if (data.use_points) {
-      const plan = redeemPlan(bal?.points ?? 0, subtotal + delivery_fee - discount_amount, rewards);
+      const plan = redeemPlan(bal?.points ?? 0, subtotal - discount_amount, rewards);
       if (!plan.points) return { error: `You need at least ${fmtPoints(rewards.min_redeem_points)} points to use them` };
       points_redeemed = plan.points;
       points_discount = plan.rupees;
@@ -192,7 +188,7 @@ export async function createOrder(input: unknown) {
     }
   }
 
-  const total = Math.max(0, subtotal + delivery_fee - discount_amount - points_discount);
+  const total = Math.max(0, subtotal - discount_amount - points_discount);
   
   let finalNotes = data.notes ? data.notes.trim() : "";
   const addressLine = data.type === "delivery"
@@ -222,7 +218,7 @@ export async function createOrder(input: unknown) {
       branch_id: isStaff ? await resolveStaffBranchId(profile.branch_id) : (data.branch_id ?? null),
       type: data.type,
       subtotal,
-      delivery_fee,
+      delivery_fee: 0, // delivery is free within the delivery area (owner's call, Oct 2026)
       discount_amount,
       total,
       delivery_address_id: isSelfCheckout ? (data.delivery_address_id ?? null) : null,
@@ -290,7 +286,7 @@ export async function createOrder(input: unknown) {
           name: profile.full_name, orderId: order.id, orderNumber: order.order_number, dailyNumber: order.daily_number,
           type: data.type, paymentMethod: data.payment_method,
           items: itemRows.map((r) => ({ name: r.product_name, qty: r.quantity, lineTotal: r.line_total })),
-          subtotal, deliveryFee: delivery_fee, promoDiscount: discount_amount, pointsDiscount: points_discount, pointsUsed: points_redeemed,
+          subtotal, promoDiscount: discount_amount, pointsDiscount: points_discount, pointsUsed: points_redeemed,
           total, pointsToEarn: rewards.enabled ? pointsForTotal(total, rewards) : 0, otp: otpForEmail,
         }),
       });

@@ -102,7 +102,7 @@ export function orderConfirmedEmail(o: {
   name: string; orderId: string; orderNumber: string; dailyNumber: number | null;
   type: string; paymentMethod: string;
   items: { name: string; qty: number; lineTotal: number }[];
-  subtotal: number; deliveryFee: number; promoDiscount: number; pointsDiscount: number; pointsUsed: number; total: number;
+  subtotal: number; promoDiscount: number; pointsDiscount: number; pointsUsed: number; total: number;
   pointsToEarn: number; otp: string | null;
 }) {
   const rs = (n: number) => `Rs ${n.toLocaleString("en-IN")}`;
@@ -126,7 +126,7 @@ export function orderConfirmedEmail(o: {
           o.items.map((i) => ({ name: i.name, qty: i.qty, amount: i.lineTotal ? rs(i.lineTotal) : "FREE" })),
           [
             { label: "Subtotal", amount: rs(o.subtotal) },
-            ...(o.deliveryFee ? [{ label: "Delivery", amount: rs(o.deliveryFee) }] : []),
+            ...(o.type === "delivery" ? [{ label: "Delivery", amount: "FREE" }] : []),
             ...(o.promoDiscount ? [{ label: "Promo", amount: `− ${rs(o.promoDiscount)}` }] : []),
             ...(o.pointsDiscount ? [{ label: `${fmtPoints(o.pointsUsed)} points`, amount: `− ${rs(o.pointsDiscount)}` }] : []),
             { label: "Total", amount: rs(o.total) },
