@@ -3,7 +3,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
   LayoutDashboard, ShoppingBag, UtensilsCrossed, Gift, UserPlus,
-  Megaphone, Truck, Users, GraduationCap, BarChart3, Settings, LogOut, ExternalLink, HelpCircle, BookOpen, MessageSquareHeart, Type, Award, IdCard, Trophy, Send, TrendingUp,
+  Megaphone, Truck, Users, GraduationCap, BarChart3, Settings, LogOut, ExternalLink, HelpCircle, BookOpen, MessageSquareHeart, Type, Award, IdCard, Trophy, Send, TrendingUp, Clock,
 } from "lucide-react";
 import { signOutHere } from "@/lib/sign-out";
 import { ACCOUNTS_URL } from "@/lib/role-home";
@@ -29,6 +29,7 @@ export const NAV = [
   { href: "/admin/delivery", label: "Deliveries", icon: Truck, section: "operations" },
   { href: "/admin/staff", label: "Staff & Users", icon: Users, section: "operations" },
   { href: "/admin/training", label: "Staff Training", icon: GraduationCap, section: "operations" },
+  { href: "/admin/hours", label: "Staff Hours", icon: Clock, section: "operations" },
   { href: "/admin/reports", label: "Reports", icon: BarChart3, section: "operations" },
   { href: "/admin/website", label: "Website text", icon: Type, section: "settings" },
   { href: "/admin/settings", label: "Settings", icon: Settings, section: "settings" },

@@ -17,6 +17,7 @@ export type TrainingVideoStatus = {
 };
 export type TraineeStatus = {
   id: string; name: string; is_active: boolean;
+  pos_clock: boolean;                         // also clocks in on the POS (Admin → Staff Hours)
   videoIds: string[];                         // assigned (on or off)
   done: number; total: number;                // of their assigned videos that are switched on
   missing: string[];
@@ -26,7 +27,7 @@ export type TraineeStatus = {
 export async function getTrainingStatus() {
   const [{ data: videos }, { data: people }, { data: assigned }, { data: progress }] = await Promise.all([
     supabaseAdmin.from("training_videos").select("id, title, youtube_url, is_active").order("sort_order").order("created_at"),
-    supabaseAdmin.from("training_people").select("id, name, is_active").order("name"),
+    supabaseAdmin.from("training_people").select("id, name, is_active, pos_clock").order("name"),
     supabaseAdmin.from("training_assignments").select("person_id, video_id"),
     supabaseAdmin.from("training_people_progress").select("person_id, video_id, completed_at").order("completed_at"),
   ]);
@@ -50,7 +51,7 @@ export async function getTrainingStatus() {
     const due = videoIds.filter((id) => activeVideo.has(id));
     const missing = due.filter((id) => !watchedAt.has(`${p.id}:${id}`)).map((id) => titleOf.get(id) ?? "Video");
     return {
-      id: p.id, name: p.name, is_active: p.is_active, videoIds,
+      id: p.id, name: p.name, is_active: p.is_active, pos_clock: p.pos_clock, videoIds,
       done: due.length - missing.length, total: due.length, missing,
       watched: videoIds.filter((id) => watchedAt.has(`${p.id}:${id}`))
         .map((id) => ({ title: titleOf.get(id) ?? "Video", at: nepalTime(watchedAt.get(`${p.id}:${id}`)!) })),

@@ -8,11 +8,14 @@ import { supabaseAdmin, audit } from "@/lib/supabase/admin";
 import { extractYouTubeId } from "@/lib/youtube";
 import { hashPin, isPin, verifyPin } from "@/lib/accounts-pin";
 import { TRAINEE_COOKIE, TRAINEE_TTL_SECONDS, signTrainee, verifyTrainee } from "@/lib/training-pin-cookie";
+import { closeOpenShift } from "@/lib/time-clock";
 
 // Staff training. The POS login is shared, so training is per PERSON: the
 // admin adds each staff member with their own 4-digit PIN and picks which
 // videos they must watch (Admin → Staff Training). On /staff they enter the
 // PIN, see only their videos, and progress is saved against them.
+// The same person + PIN clocks in and out on the POS when pos_clock is on
+// (Admin → Staff Hours, app/actions/time-clock.ts).
 
 const STAFF_ROLES = ["pos_user", "delivery_driver", "super_admin"];
 
@@ -27,6 +30,7 @@ function revalidateTraining() {
   revalidatePath("/admin/training");
   revalidatePath("/admin/dashboard");
   revalidatePath("/staff");
+  revalidatePath("/admin/hours");
 }
 
 export async function addTrainingVideo(input: unknown) {
@@ -147,15 +151,15 @@ async function setAssignments(personId: string, videoIds: string[]) {
 
 export async function addTrainingPerson(input: unknown) {
   const { user } = await requireRole(["super_admin"]);
-  const parsed = z.object({ name: nameSchema, pin: pinSchema, video_ids: videoIdsSchema }).safeParse(input);
+  const parsed = z.object({ name: nameSchema, pin: pinSchema, video_ids: videoIdsSchema, pos_clock: z.boolean().default(false) }).safeParse(input);
   if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Check the name and PIN" };
   if (await pinTaken(parsed.data.pin)) return { error: "Someone already uses that PIN — pick another" };
   const { data, error } = await supabaseAdmin.from("training_people")
-    .insert({ name: parsed.data.name, pin_hash: hashPin(parsed.data.pin), created_by: user.id }).select("id").single();
+    .insert({ name: parsed.data.name, pin_hash: hashPin(parsed.data.pin), pos_clock: parsed.data.pos_clock, created_by: user.id }).select("id").single();
   if (error || !data) return { error: "Couldn't add them" };
   await setAssignments(data.id, parsed.data.video_ids);
   await audit({ actor_id: user.id, action: "TRAINING_PERSON_ADD", target_table: "training_people", target_id: data.id,
-    new_data: { name: parsed.data.name, videos: parsed.data.video_ids.length } });
+    new_data: { name: parsed.data.name, videos: parsed.data.video_ids.length, pos_clock: parsed.data.pos_clock } });
   revalidateTraining();
   return { ok: true };
 }
@@ -165,9 +169,10 @@ export async function updateTrainingPerson(id: string, input: unknown) {
   if (!uuid.safeParse(id).success) return { error: "Bad person" };
   const parsed = z.object({
     name: nameSchema.optional(), pin: pinSchema.optional(), is_active: z.boolean().optional(), video_ids: videoIdsSchema.optional(),
+    pos_clock: z.boolean().optional(),
   }).safeParse(input);
   if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Check the details" };
-  const { name, pin, is_active, video_ids } = parsed.data;
+  const { name, pin, is_active, video_ids, pos_clock } = parsed.data;
   // A PIN handed out while they were off could now clash (salted hashes can't be compared), so they come back with a fresh one.
   if (is_active === true && !pin) return { error: "Give them a new PIN to switch them back on" };
   if (pin && await pinTaken(pin, id)) return { error: "Someone already uses that PIN — pick another" };
@@ -175,11 +180,14 @@ export async function updateTrainingPerson(id: string, input: unknown) {
   if (name !== undefined) patch.name = name;
   if (pin) patch.pin_hash = hashPin(pin);
   if (is_active !== undefined) patch.is_active = is_active;
+  if (pos_clock !== undefined) patch.pos_clock = pos_clock;
   const { error } = await supabaseAdmin.from("training_people").update(patch).eq("id", id);
   if (error) return { error: "Couldn't save" };
   if (video_ids) await setAssignments(id, video_ids);
+  // Switched off or taken off the POS clock while clocked in: their PIN can't clock out any more, so end the shift now.
+  if (is_active === false || pos_clock === false) await closeOpenShift(id, user.id);
   await audit({ actor_id: user.id, action: "TRAINING_PERSON_EDIT", target_table: "training_people", target_id: id,
-    new_data: { name, is_active, pin_changed: !!pin, videos: video_ids?.length } });
+    new_data: { name, is_active, pos_clock, pin_changed: !!pin, videos: video_ids?.length } });
   revalidateTraining();
   return { ok: true };
 }
@@ -187,6 +195,7 @@ export async function updateTrainingPerson(id: string, input: unknown) {
 export async function deleteTrainingPerson(id: string) {
   const { user } = await requireRole(["super_admin"]);
   if (!uuid.safeParse(id).success) return { error: "Bad person" };
+  await closeOpenShift(id, user.id); // their hours stay (staff_shifts keeps the name)
   const { error } = await supabaseAdmin.from("training_people").delete().eq("id", id);
   if (error) return { error: "Couldn't remove them" };
   await audit({ actor_id: user.id, action: "TRAINING_PERSON_DELETE", target_table: "training_people", target_id: id });

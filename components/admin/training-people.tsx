@@ -52,7 +52,10 @@ function PersonRow({ p, videos }: { p: TraineeStatus; videos: Video[] }) {
     <li className={cn("py-3", !p.is_active && "opacity-60")}>
       <div className="flex items-start gap-2">
         <div className="min-w-0 flex-1">
-          <p className="text-sm font-bold">{p.name}{!p.is_active && <span className="ml-1.5 text-xs font-normal text-stone-500">(switched off)</span>}</p>
+          <p className="text-sm font-bold">
+            {p.name}{!p.is_active && <span className="ml-1.5 text-xs font-normal text-stone-500">(switched off)</span>}
+            {p.is_active && p.pos_clock && <span className="ml-1.5 rounded-full bg-stone-100 px-1.5 py-0.5 text-[10px] font-bold uppercase text-stone-500">POS clock</span>}
+          </p>
           {p.total === 0 ? (
             <p className="text-xs text-stone-400">No videos given yet</p>
           ) : p.missing.length ? (
@@ -85,7 +88,7 @@ function PersonRow({ p, videos }: { p: TraineeStatus; videos: Video[] }) {
           <>
             <button onClick={() => setMode(mode === "on" ? null : "on")} className="rounded-full px-3 py-1 text-xs font-bold text-green-700 ring-1 ring-green-200">Switch on</button>
             <button disabled={pending} onClick={() => {
-              if (!confirm(`Remove ${p.name} completely, with their training record?`)) return;
+              if (!confirm(`Remove ${p.name} completely, with their training record? Their clock-in hours are kept.`)) return;
               start(async () => { const r = await deleteTrainingPerson(p.id); r?.error ? toast.error(r.error) : toast.success("Removed"); });
             }} className="flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-bold text-stone-400 hover:text-brand-red">
               <Trash2 size={12} /> Remove
@@ -131,7 +134,8 @@ export default function TrainingPeople({ team, videos }: { team: TraineeStatus[]
         <h3 className="font-display font-bold text-brand-brown">Team & PINs</h3>
         <p className="text-xs text-stone-500">
           Give each staff member their own 4-digit PIN and pick their videos. On the POS they tap the Training (graduation cap) button, type their PIN,
-          and see only their videos — so you know exactly who has watched what, even on a shared login.
+          and see only their videos — so you know exactly who has watched what, even on a shared login. The same PIN clocks them in and out
+          on the POS if they&apos;re switched on in Staff Hours.
         </p>
       </div>
       <ul className="divide-y divide-orange-50">

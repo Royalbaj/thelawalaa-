@@ -7,6 +7,7 @@ import RefreshButton from "@/components/refresh-button";
 import BrandLogo, { BrandMark } from "@/components/brand-logo";
 import DaySalesButton from "@/components/pos/day-sales-sheet";
 import StockButton from "@/components/pos/stock-sheet";
+import TimeClockButton from "@/components/pos/time-clock";
 
 // pos_user only reaches this header now — super_admin no longer shares
 // the POS terminal, so there's no "back to dashboard" link to show here.
@@ -18,6 +19,8 @@ export default function PosHeader({ fullName }: { fullName: string }) {
       <BrandLogo size="sm" tone="dark" label="POS" className="hidden sm:inline-flex" />
       <div className="flex items-center gap-1.5">
         <span className="hidden text-xs font-bold text-white/60 lg:inline">{fullName}</span>
+        {/* Each counter person clocks in / out with their own PIN. */}
+        <TimeClockButton />
         {/* Today's sales + the end-of-shift cash count. */}
         <DaySalesButton />
         {/* Every stock item and what's left — look only. */}
