@@ -3,7 +3,7 @@ import { useEffect, useRef, useState, useTransition } from "react";
 import Link from "next/link";
 import { ChevronDown, GraduationCap, LogOut } from "lucide-react";
 import { posStaffLogout } from "@/app/actions/time-clock";
-import { signOutHere } from "@/lib/sign-out";
+import PosSignOutButton from "@/components/pos/pos-sign-out";
 import { cn } from "@/lib/utils";
 
 const time = (iso: string) => new Date(iso).toLocaleTimeString("en-GB", { timeZone: "Asia/Kathmandu", hour: "numeric", minute: "2-digit", hour12: true });
@@ -12,6 +12,7 @@ const time = (iso: string) => new Date(iso).toLocaleTimeString("en-GB", { timeZo
  * POS header: who's on the till (logged in with their PIN). "Log out" hands
  * the till over — back to the PIN screen — and never touches their clock-in
  * (that's the Clock button, once a shift). An amber dot = not clocked in yet.
+ * "Sign out of the POS" is the full one — the whole device (components/pos/pos-sign-out.tsx).
  * Logging out is a full page load, so the next person never sees the last one's screen.
  */
 export default function StaffMenu({ name, clockedInSince }: { name: string; clockedInSince: string | null }) {
@@ -56,9 +57,7 @@ export default function StaffMenu({ name, clockedInSince }: { name: string; cloc
             <GraduationCap size={16} className="shrink-0 text-stone-400" /> Staff training
           </Link>
           <div className="my-1 border-t border-stone-700" />
-          <button role="menuitem" onClick={signOutHere} className={cn(item, "text-xs font-normal text-stone-400")}>
-            Sign this device out of the POS
-          </button>
+          <PosSignOutButton variant="menu" />
         </div>
       )}
     </div>

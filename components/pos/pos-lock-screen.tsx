@@ -4,7 +4,7 @@ import { posStaffLogin } from "@/app/actions/time-clock";
 import PinPad from "@/components/pin-pad";
 import BrandLogo from "@/components/brand-logo";
 import TimeClockButton from "@/components/pos/time-clock";
-import { signOutHere } from "@/lib/sign-out";
+import PosSignOutButton from "@/components/pos/pos-sign-out";
 
 // The till is locked until a counter person types their own PIN (the same one
 // as training) — quick, every time they take over the till; their name goes on
@@ -30,13 +30,12 @@ export default function PosLockScreen() {
           <p className={`text-sm ${muted}`}>Type your PIN to use the POS.</p>
           <PinPad submit={submit} idle="Your 4-digit PIN — same as training" />
         </div>
-        <div className="mt-4 flex justify-center">
+        <div className="mt-4 flex flex-wrap justify-center gap-2">
           <TimeClockButton label="Clock in / out"
             className="flex h-12 items-center gap-2 rounded-full bg-white px-6 text-sm font-bold text-stone-700 ring-1 ring-stone-200 transition hover:bg-stone-50 dark:bg-stone-900 dark:text-stone-200 dark:ring-stone-700 dark:hover:bg-stone-800" />
+          {/* Closing time: the whole device signs out of the POS. */}
+          <PosSignOutButton variant="lock" />
         </div>
-        <button onClick={signOutHere} className={`mx-auto mt-4 block py-2 text-xs font-bold ${muted} hover:text-brand-red`}>
-          Sign this device out of the POS
-        </button>
       </div>
     </main>
   );

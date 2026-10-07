@@ -3,8 +3,10 @@ import { createHmac, timingSafeEqual } from "node:crypto";
 
 // POS staff login on the shared counter login: typing your PIN on the POS lock
 // screen sets this httpOnly cookie naming the person (training_people.id),
-// bound to the POS login that's signed in and signed with a key only the
-// server has — so it can't be forged, moved to another login or extended.
+// bound to THIS sign-in of the POS login (user id + sign-in time — see
+// posLoginKey) and signed with a key only the server has — so it can't be
+// forged, moved to another login or extended, and signing the device out and
+// in again (or the daily password check) always starts at the PIN screen.
 // It lasts at most a working day (16 h); "Log out" on the till ends it sooner.
 // Host-only, like every cookie here.
 
@@ -18,18 +20,18 @@ function sign(payload: string) {
   return createHmac("sha256", `pos-staff-cookie-v1|${secret ?? "local-dev-only"}`).update(payload).digest("base64url");
 }
 
-export function signPosStaff(userId: string, personId: string) {
+export function signPosStaff(loginKey: string, personId: string) {
   const exp = Math.floor(Date.now() / 1000) + POS_STAFF_TTL_SECONDS;
-  return `${exp}.${personId}.${sign(`${userId}.${personId}.${exp}`)}`;
+  return `${exp}.${personId}.${sign(`${loginKey}.${personId}.${exp}`)}`;
 }
 
-/** The person logged in on this POS device, if the cookie is genuine, unexpired and for this login. */
-export function verifyPosStaff(userId: string, value: string | undefined): string | null {
+/** The person logged in on this POS device, if the cookie is genuine, unexpired and for this sign-in. */
+export function verifyPosStaff(loginKey: string, value: string | undefined): string | null {
   if (!value) return null;
   const [expStr, person, sig] = value.split(".");
   const exp = Number(expStr);
   if (!sig || !person || !UUID.test(person) || !Number.isInteger(exp) || exp < Date.now() / 1000) return null;
-  const expected = Buffer.from(sign(`${userId}.${person}.${exp}`));
+  const expected = Buffer.from(sign(`${loginKey}.${person}.${exp}`));
   const given = Buffer.from(sig);
   return expected.length === given.length && timingSafeEqual(expected, given) ? person : null;
 }

@@ -8,7 +8,7 @@ import { PosThemeRoot } from "@/components/pos/pos-theme";
 import PosFooter from "@/components/pos/pos-footer";
 import PosSession from "@/components/pos/pos-session";
 import PosLockScreen from "@/components/pos/pos-lock-screen";
-import { getPosStaff, posLockOn } from "@/lib/pos-staff";
+import { getPosStaff, posLockOn, posLoginKey } from "@/lib/pos-staff";
 
 export const dynamic = "force-dynamic";
 
@@ -45,7 +45,7 @@ export default async function PosLayout({ children }: { children: React.ReactNod
   // stays locked until a counter person types their PIN (which clocks them in).
   // Until then — nobody set up yet — the POS works as it always did.
   const lockOn = await posLockOn();
-  const staff = lockOn ? await getPosStaff(profile.id) : null;
+  const staff = lockOn && user ? await getPosStaff(posLoginKey(user)) : null;
 
   // The POS is always dark (owner's call) — easier on the eyes all day at the counter.
   return (

@@ -9,7 +9,7 @@ import { requireRole } from "@/lib/supabase/server";
 import { supabaseAdmin, audit, resolveStaffBranchId } from "@/lib/supabase/admin";
 import { applyOpeningPromoPrice } from "@/lib/promo";
 import { studentDiscount, memberUnitPrice, staffFreeItems, STUDENT_DISCOUNT_LABEL, MEMBER_PRICE_LABEL, STAFF_LABEL } from "@/lib/discounts";
-import { getPosStaff, posLockOn } from "@/lib/pos-staff";
+import { getPosStaff, posLockOn, posLoginKey } from "@/lib/pos-staff";
 
 /** POS order: branch comes from the operator's OWN profile — never the client. */
 export async function createPosOrder(input: unknown) {
@@ -27,7 +27,7 @@ export async function createPosOrder(input: unknown) {
     return { error: "Your account isn't linked to a branch — ask an admin" };
   }
   // Who's on the till (their PIN — migration 037). Once staff log in with PINs, the till won't sell without one.
-  const seller = profile.role === "pos_user" ? await getPosStaff(user.id) : null;
+  const seller = profile.role === "pos_user" ? await getPosStaff(posLoginKey(user)) : null;
   if (!seller && profile.role === "pos_user" && await posLockOn()) {
     return { error: "Nobody is logged in on this till — tap Refresh and type your PIN" };
   }

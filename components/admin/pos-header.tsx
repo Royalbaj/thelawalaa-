@@ -1,7 +1,6 @@
 "use client";
 import Link from "next/link";
-import { GraduationCap, LogOut } from "lucide-react";
-import { signOutHere } from "@/lib/sign-out";
+import { GraduationCap } from "lucide-react";
 import OrderAlertsButton from "@/components/pos/order-alerts";
 import RefreshButton from "@/components/refresh-button";
 import BrandLogo, { BrandMark } from "@/components/brand-logo";
@@ -9,12 +8,14 @@ import DaySalesButton from "@/components/pos/day-sales-sheet";
 import StockButton from "@/components/pos/stock-sheet";
 import TimeClockButton from "@/components/pos/time-clock";
 import StaffMenu from "@/components/pos/staff-menu";
+import PosSignOutButton from "@/components/pos/pos-sign-out";
 
 // pos_user only reaches this header now — super_admin no longer shares
 // the POS terminal, so there's no "back to dashboard" link to show here.
 // `staff`: the person logged in to the till with their PIN (migration 037) —
-// their name menu holds Log out, Staff training and signing the device out.
-// The Clock button (clock in/out, once a shift) is always here.
+// their name menu holds Log out (hand the till over), Staff training and the
+// full "Sign out of the POS". The Clock button (clock in/out, once a shift) and
+// the full sign-out (power icon; in the name menu on phones) are always here.
 export default function PosHeader({ fullName, staff }: { fullName: string; staff?: { name: string; clockedInSince: string | null } | null }) {
   return (
     <header className="flex shrink-0 items-center justify-between border-b border-orange-900/20 bg-brand-dark px-4 py-2.5 text-white">
@@ -40,15 +41,8 @@ export default function PosHeader({ fullName, staff }: { fullName: string; staff
         <Link href="/staff" aria-label="Staff Portal" className={`${staff ? "hidden sm:flex" : "flex"} h-8 w-8 items-center justify-center rounded-full bg-white/10 text-white/70 transition hover:bg-white/20 hover:text-white`}>
           <GraduationCap size={15} />
         </Link>
-        {!staff && (
-          <button
-            onClick={signOutHere}
-            aria-label="Sign out"
-            className="flex h-8 w-8 items-center justify-center rounded-full bg-white/10 text-white/70 transition hover:bg-red-500/20 hover:text-red-300"
-          >
-            <LogOut size={15} />
-          </button>
-        )}
+        {/* The whole device signs out of the POS (closing time). Phones with someone on the till: it's in the name menu. */}
+        <span className={staff ? "hidden sm:flex" : "flex"}><PosSignOutButton variant="icon" /></span>
       </div>
     </header>
   );

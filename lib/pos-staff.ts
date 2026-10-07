@@ -19,9 +19,12 @@ export const posLockOn = cache(async () => {
 
 export type PosStaff = { id: string; name: string; clockedInSince: string | null };
 
-/** The person logged in on this POS device, or null (locked). */
-export const getPosStaff = cache(async (userId: string): Promise<PosStaff | null> => {
-  const personId = verifyPosStaff(userId, (await cookies()).get(POS_STAFF_COOKIE)?.value);
+/** This sign-in of the POS login: a new password sign-in changes it, so old till logins stop working. */
+export const posLoginKey = (user: { id: string; last_sign_in_at?: string | null }) => `${user.id}|${user.last_sign_in_at ?? ""}`;
+
+/** The person logged in on this POS device (pass posLoginKey(user)), or null (locked). */
+export const getPosStaff = cache(async (loginKey: string): Promise<PosStaff | null> => {
+  const personId = verifyPosStaff(loginKey, (await cookies()).get(POS_STAFF_COOKIE)?.value);
   if (!personId) return null;
   const [{ data: p }, { data: shift }] = await Promise.all([
     supabaseAdmin.from("training_people").select("id, name, is_active, pos_clock").eq("id", personId).maybeSingle(),

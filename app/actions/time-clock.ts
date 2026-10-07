@@ -8,7 +8,7 @@ import { supabaseAdmin, audit } from "@/lib/supabase/admin";
 import { isPin, verifyPin } from "@/lib/accounts-pin";
 import { isYmd } from "@/lib/dates";
 import { clockTime, fromNepal, isStale } from "@/lib/time-clock";
-import { getPosStaff } from "@/lib/pos-staff";
+import { getPosStaff, posLoginKey } from "@/lib/pos-staff";
 import { POS_STAFF_COOKIE, posStaffCookieOptions, signPosStaff } from "@/lib/pos-staff-cookie";
 
 // POS time clock (migration 036) and staff login (037). The POS login is
@@ -131,7 +131,7 @@ export async function posStaffLogin(pin: unknown) {
   const { user } = await requireRole(["pos_user"]);
   const r = await personForPin(user.id, pin);
   if ("error" in r) return r;
-  (await cookies()).set(POS_STAFF_COOKIE, signPosStaff(user.id, r.person.id), posStaffCookieOptions);
+  (await cookies()).set(POS_STAFF_COOKIE, signPosStaff(posLoginKey(user), r.person.id), posStaffCookieOptions);
   await audit({ actor_id: user.id, action: "POS_LOGIN", target_table: "training_people", target_id: r.person.id, new_data: { person: r.person.name } });
   return { ok: true as const, name: r.person.name };
 }
@@ -139,10 +139,40 @@ export async function posStaffLogin(pin: unknown) {
 /** Name menu → "Log out": back to the PIN screen for the next person. Their clock-in isn't touched. */
 export async function posStaffLogout() {
   const { user } = await requireRole(["pos_user"]);
-  const staff = await getPosStaff(user.id);
+  const staff = await getPosStaff(posLoginKey(user));
   (await cookies()).delete(POS_STAFF_COOKIE);
   if (staff) await audit({ actor_id: user.id, action: "POS_LOGOUT", target_table: "training_people", target_id: staff.id, new_data: { person: staff.name } });
   return { ok: true as const };
+}
+
+/**
+ * "Sign out of the POS" — the whole device, at closing time or to hand it in:
+ * logs the till's person out and (if ticked) clocks out everyone still on the
+ * clock. The screen then signs the POS login out of this device, so the POS
+ * email and password are needed to open it again.
+ */
+export async function signOutPos(input: unknown) {
+  const { user } = await requireRole(["pos_user"]);
+  const clockOutEveryone = z.object({ clockOutEveryone: z.boolean() }).safeParse(input).data?.clockOutEveryone ?? false;
+  const staff = await getPosStaff(posLoginKey(user));
+  (await cookies()).delete(POS_STAFF_COOKIE);
+
+  const clockedOut: string[] = [];
+  if (clockOutEveryone) {
+    const { data: open } = await supabaseAdmin.from("staff_shifts").select("id, clock_in, person_name")
+      .is("clock_out", null).eq("missed_out", false);
+    const now = new Date().toISOString();
+    for (const s of (open ?? []).filter((s) => !isStale(s.clock_in))) {
+      const { data } = await supabaseAdmin.from("staff_shifts").update({ clock_out: now, out_by: user.id })
+        .eq("id", s.id).is("clock_out", null).select("id");
+      if (!data?.length) continue;
+      clockedOut.push(s.person_name);
+      await audit({ actor_id: user.id, action: "CLOCK_OUT", target_table: "staff_shifts", target_id: s.id, new_data: { person: s.person_name, by: "POS sign-out" } });
+    }
+  }
+  await audit({ actor_id: user.id, action: "POS_SIGN_OUT", target_table: "profiles", target_id: user.id,
+    new_data: { on_till: staff?.name ?? null, clocked_out: clockedOut } });
+  return { ok: true as const, clockedOut };
 }
 
 // ── Admin → Staff Hours ─────────────────────────────────────────
