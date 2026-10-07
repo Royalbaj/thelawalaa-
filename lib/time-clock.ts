@@ -77,7 +77,7 @@ export async function getStaffHours(from: Ymd, to: Ymd) {
       .order("clock_in", { ascending: false }).limit(3000),
     // No clock-out yet — on the clock now, or forgotten (any date).
     supabaseAdmin.from("staff_shifts").select(COLUMNS).is("clock_out", null).order("clock_in"),
-    supabaseAdmin.from("training_people").select("id, name, pos_clock").eq("is_active", true).order("name"),
+    supabaseAdmin.from("training_people").select("id, name, pos_clock, is_manager").eq("is_active", true).order("name"),
   ]);
 
   const rows = ((shifts ?? []) as ShiftDb[]).map((s) => toRow(s, now));
@@ -107,7 +107,7 @@ export async function getStaffHours(from: Ymd, to: Ymd) {
     needsFixing: open.filter((r) => r.state === "missed"),
     truncated: (shifts?.length ?? 0) >= 3000,
     error: !!error,
-    people: (people ?? []) as { id: string; name: string; pos_clock: boolean }[],
+    people: (people ?? []) as { id: string; name: string; pos_clock: boolean; is_manager: boolean }[],
   };
 }
 

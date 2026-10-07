@@ -11,8 +11,8 @@ import { directionsUrl } from "@/lib/geo";
 import { playOrderSound } from "@/lib/order-sound";
 import { adminUpdateOrderStatus, assignDriver, markOrderPaid, getOrderLines, getLiveOrders } from "@/app/actions/staff";
 import { REFRESH_EVENT } from "@/components/refresh-button";
-import { MEMBER_PRICE_LABEL, STAFF_LABEL } from "@/lib/discounts";
-import { CheckCircle2, ClipboardList, MessageSquareText, Crown, ChefHat, GraduationCap, Phone, MapPin, Navigation } from "lucide-react";
+import { MANAGER_LABEL, MEMBER_PRICE_LABEL, STAFF_LABEL } from "@/lib/discounts";
+import { CheckCircle2, ClipboardList, MessageSquareText, Crown, ChefHat, GraduationCap, Phone, MapPin, Navigation, ShieldCheck } from "lucide-react";
 
 interface Line { product_name: string; quantity: number }
 
@@ -285,7 +285,7 @@ export default function LiveOrdersPanel({
                 </span>
                 {o.discount_label && (
                   <span className="shrink-0 rounded-lg bg-sky-50 px-2 py-1 text-[11px] font-bold text-sky-700 dark:bg-sky-950/40 dark:text-sky-300" title={`Discount: ${o.discount_label}`}>
-                    {o.discount_label === MEMBER_PRICE_LABEL ? <Crown size={13} /> : o.discount_label === STAFF_LABEL ? <ChefHat size={13} /> : <GraduationCap size={13} />}
+                    {o.discount_label === MEMBER_PRICE_LABEL ? <Crown size={13} /> : o.discount_label === STAFF_LABEL ? <ChefHat size={13} /> : o.discount_label === MANAGER_LABEL ? <ShieldCheck size={13} /> : <GraduationCap size={13} />}
                   </span>
                 )}
                 {next && (

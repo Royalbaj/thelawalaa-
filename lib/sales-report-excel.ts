@@ -202,7 +202,7 @@ export function buildSalesWorkbook(r: SalesReport, range: { from: Ymd; to: Ymd }
       const row = os.addRow({
         time: nepalTime(o.created_at), no: o.daily_number ?? "", num: o.order_number, ch: channelOf(o), type: TYPE_LABELS[o.type] ?? o.type,
         status: cancelled ? "Cancelled" : orderStatusLabel(o.status, o.type), method: METHOD_LABELS[o.payment_method ?? ""] ?? o.payment_method ?? "",
-        pay: unpaid ? "Unpaid" : "Paid", sub: o.subtotal, disc: o.discount_amount || null, dl: o.discount_label ?? "",
+        pay: unpaid ? "Unpaid" : "Paid", sub: o.subtotal, disc: o.discount_amount || null, dl: o.discount_label ? `${o.discount_label}${o.discount_approved_by ? ` (${o.discount_approved_by})` : ""}` : "",
         del: o.delivery_fee || null, total: o.total,
         served: o.served_at ? Math.round((new Date(o.served_at).getTime() - new Date(o.created_at).getTime()) / 6000) / 10 : null,
         seller: o.staff_name ?? "",

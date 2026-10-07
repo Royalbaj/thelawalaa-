@@ -51,6 +51,8 @@ export const posOrderSchema = z.object({
   student_discount: z.boolean().optional(),
   member: z.boolean().optional(),
   staff: z.boolean().optional(), // staff sale — up to app_settings.staff_free_items free
+  manager: z.boolean().optional(), // manager discount — everything but frozen items free
+  manager_pin: z.string().regex(/^\d{4}$/).optional(), // the approving manager's own PIN, checked again on the server
   members: z.array(newMemberSchema).max(10).optional(), // one per membership card sold
   items: z
     .array(z.object({ product_id: z.string().uuid(), quantity: z.number().int().min(1).max(50) }))

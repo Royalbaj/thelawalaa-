@@ -7,6 +7,7 @@ export type OrderLine = { product_name: string; quantity: number; product_price:
 export type DetailOrder = {
   type: string; notes: string | null; subtotal: number; delivery_fee: number; discount_amount: number; discount_label: string | null;
   points_discount: number; total: number; delivery_address: string | null; delivery_lat: number | null; delivery_lng: number | null;
+  discount_approved_by?: string | null; // the manager who approved a manager discount
   items: OrderLine[];
 };
 
@@ -41,7 +42,7 @@ export function OrderDetails({ o }: { o: DetailOrder }) {
         <dl className="space-y-0.5 border-t border-dashed border-stone-200 pt-2 text-xs">
           <div className="flex justify-between text-stone-500"><dt>Subtotal</dt><dd>{npr(Number(o.subtotal))}</dd></div>
           {Number(o.delivery_fee) > 0 && <div className="flex justify-between text-stone-500"><dt>Delivery</dt><dd>{npr(Number(o.delivery_fee))}</dd></div>}
-          {Number(o.discount_amount) > 0 && <div className="flex justify-between text-brand-green"><dt>{o.discount_label ?? "Discount"}</dt><dd>−{npr(Number(o.discount_amount))}</dd></div>}
+          {Number(o.discount_amount) > 0 && <div className="flex justify-between text-brand-green"><dt>{o.discount_label ?? "Discount"}{o.discount_approved_by ? ` · approved by ${o.discount_approved_by}` : ""}</dt><dd>−{npr(Number(o.discount_amount))}</dd></div>}
           {Number(o.points_discount) > 0 && <div className="flex justify-between text-brand-green"><dt>Points</dt><dd>−{npr(Number(o.points_discount))}</dd></div>}
           <div className="flex justify-between pt-1 text-sm font-extrabold text-brand-brown"><dt>Total</dt><dd>{npr(Number(o.total))}</dd></div>
         </dl>

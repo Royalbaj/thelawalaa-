@@ -8,8 +8,9 @@ import { checkStockAfterSale, getPosStock as loadPosStock } from "@/lib/stock-al
 import { requireRole } from "@/lib/supabase/server";
 import { supabaseAdmin, audit, resolveStaffBranchId } from "@/lib/supabase/admin";
 import { applyOpeningPromoPrice } from "@/lib/promo";
-import { studentDiscount, memberUnitPrice, staffFreeItems, STUDENT_DISCOUNT_LABEL, MEMBER_PRICE_LABEL, STAFF_LABEL } from "@/lib/discounts";
+import { studentDiscount, memberUnitPrice, staffFreeItems, managerFreeItems, STUDENT_DISCOUNT_LABEL, MEMBER_PRICE_LABEL, STAFF_LABEL, MANAGER_LABEL } from "@/lib/discounts";
 import { getPosStaff, posLockOn, posLoginKey } from "@/lib/pos-staff";
+import { managerForPin } from "@/lib/manager-pin";
 
 /** POS order: branch comes from the operator's OWN profile — never the client. */
 export async function createPosOrder(input: unknown) {
@@ -20,7 +21,7 @@ export async function createPosOrder(input: unknown) {
     return { error: memberIssue?.message ?? "Invalid order" };
   }
   const d = parsed.data;
-  if ([d.member, d.student_discount, d.staff].filter(Boolean).length > 1) return { error: "Pick one deal — student, member or staff" };
+  if ([d.member, d.student_discount, d.staff, d.manager].filter(Boolean).length > 1) return { error: "Pick one deal — student, member, staff or manager" };
 
   const branchId = await resolveStaffBranchId(profile.branch_id);
   if (!branchId && profile.role === "pos_user") {
@@ -34,7 +35,7 @@ export async function createPosOrder(input: unknown) {
 
   const ids = d.items.map((i) => i.product_id);
   const [{ data: products }, { data: settings }] = await Promise.all([
-    supabaseAdmin.from("products").select("id, name, price, is_available, student_discount_eligible, member_price, is_membership_card, categories(name)").in("id", ids),
+    supabaseAdmin.from("products").select("id, name, price, is_available, student_discount_eligible, member_price, is_membership_card, is_frozen, categories(name)").in("id", ids),
     supabaseAdmin.from("app_settings").select("*").eq("id", 1).single(),
   ]);
   if (!products || products.length !== new Set(ids).size) return { error: "Unknown items in cart" };
@@ -49,6 +50,13 @@ export async function createPosOrder(input: unknown) {
   }
   const staffLimit = Number(settings?.staff_free_items ?? 0);
   if (d.staff && staffLimit <= 0) return { error: "Staff sale is switched off — ask the manager" };
+  // Manager discount: the manager's own PIN, checked again here (migration 038).
+  let approver: { id: string; name: string } | null = null;
+  if (d.manager) {
+    const m = await managerForPin(d.manager_pin, user.id);
+    if ("error" in m) return { error: `Manager discount: ${m.error}` };
+    approver = m.manager;
+  }
 
   let subtotal = 0;
   let discountable = 0;
@@ -60,15 +68,17 @@ export async function createPosOrder(input: unknown) {
     subtotal += line;
     if (p.student_discount_eligible) discountable += line;
     memberSaving += (effectivePrice - memberUnitPrice(effectivePrice, p.member_price)) * i.quantity;
-    return { product_id: p.id, product_name: p.name, product_price: effectivePrice, quantity: i.quantity, line_total: line, card: !!p.is_membership_card };
+    return { product_id: p.id, product_name: p.name, product_price: effectivePrice, quantity: i.quantity, line_total: line, card: !!p.is_membership_card, frozen: !!p.is_frozen };
   });
   // Worked out here, never trusted from the screen — the toggles only ask for it.
-  // Lines keep the normal price; the member/student/staff saving is the order's discount.
+  // Lines keep the normal price; the member/student/staff/manager saving is the order's discount.
   const staff = d.staff ? staffFreeItems(rows.map((r) => ({ price: r.product_price, qty: r.quantity, eligible: !r.card })), staffLimit) : null;
-  const discount = staff ? staff.saving
+  const manager = approver ? managerFreeItems(rows.map((r) => ({ price: r.product_price, qty: r.quantity, eligible: !r.card && !r.frozen }))) : null;
+  const discount = manager ? manager.saving
+    : staff ? staff.saving
     : d.member ? Math.round(memberSaving * 100) / 100
     : d.student_discount ? studentDiscount(discountable) : 0;
-  const discountLabel = !discount ? null : staff ? STAFF_LABEL : d.member ? MEMBER_PRICE_LABEL : STUDENT_DISCOUNT_LABEL;
+  const discountLabel = !discount ? null : manager ? MANAGER_LABEL : staff ? STAFF_LABEL : d.member ? MEMBER_PRICE_LABEL : STUDENT_DISCOUNT_LABEL;
 
   // Counter sales are anonymous walk-ins — the POS no longer asks for a name or phone.
   const { data: order, error } = await supabaseAdmin
@@ -79,6 +89,7 @@ export async function createPosOrder(input: unknown) {
       placed_by: user.id,
       staff_person_id: seller?.id ?? null,
       staff_name: seller?.name ?? null,
+      discount_approved_by: manager && discount ? approver!.name : null,
       branch_id: branchId,
       type: d.type,
       status: "confirmed",
@@ -95,7 +106,7 @@ export async function createPosOrder(input: unknown) {
     .single();
   if (error || !order) return { error: "Order failed" };
 
-  await supabaseAdmin.from("order_items").insert(rows.map(({ card: _card, ...r }) => ({ ...r, order_id: order.id })));
+  await supabaseAdmin.from("order_items").insert(rows.map(({ card: _card, frozen: _frozen, ...r }) => ({ ...r, order_id: order.id })));
   // Card numbers come from the database (003, 004, … — migration 030). A clash
   // with a number the admin typed by hand just takes the next one.
   let savedMembers: { full_name: string; phone: string; card_number: string | null }[] = [];
@@ -110,7 +121,7 @@ export async function createPosOrder(input: unknown) {
   }
   await audit({
     actor_id: user.id, action: "POS_ORDER", target_table: "orders", target_id: order.id,
-    new_data: { total: order.total, ...(seller ? { sold_by: seller.name } : {}), ...(discount ? { discount, discount_label: discountLabel } : {}), ...(staff?.used ? { staff_free_items: staff.used } : {}), ...(members.length ? { memberships: members.length } : {}) },
+    new_data: { total: order.total, ...(seller ? { sold_by: seller.name } : {}), ...(discount ? { discount, discount_label: discountLabel } : {}), ...(staff?.used ? { staff_free_items: staff.used } : {}), ...(manager?.used ? { manager_free_items: manager.used, approved_by: approver!.name } : {}), ...(members.length ? { memberships: members.length } : {}) },
   });
   // Linked stock (Accounts → Stock) counts down with every sale; warn staff if it's running out.
   after(() => checkStockAfterSale(rows.map((r) => r.product_id)));
@@ -118,6 +129,14 @@ export async function createPosOrder(input: unknown) {
     ok: true, orderNumber: order.order_number, dailyNumber: order.daily_number, total: order.total, discount, discountLabel,
     members: savedMembers.map((m) => ({ name: m.full_name, phone: m.phone, card: m.card_number })),
   };
+}
+
+/** POS "Manager" deal: is this a manager's PIN? The order checks it again when it's placed. */
+export async function checkManagerPin(pin: unknown) {
+  const { user } = await requireRole(["pos_user", "super_admin"]);
+  const m = await managerForPin(pin, user.id);
+  if ("error" in m) return m;
+  return { ok: true as const, name: m.manager.name };
 }
 
 /** Stock that's running low or out, for the POS warnings (re-checked every minute and after each sale). */

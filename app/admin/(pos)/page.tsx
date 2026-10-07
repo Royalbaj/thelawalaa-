@@ -4,6 +4,7 @@ import { fetchLiveOrders } from "@/lib/live-orders";
 import { getPosStock } from "@/lib/stock-alerts";
 import PosWorkspace from "@/components/pos/pos-workspace";
 import { getPosStaff, posLockOn, posLoginKey } from "@/lib/pos-staff";
+import { hasManager } from "@/lib/manager-pin";
 
 export const dynamic = "force-dynamic";
 
@@ -14,10 +15,10 @@ export default async function AdminDashboard() {
   // Locked till: the layout shows the PIN screen, so don't load the menu and orders.
   if (await posLockOn() && !(await getPosStaff(posLoginKey(user)))) return null;
 
-  const [{ data: products }, { data: categories }, { data: recentOrders }, { data: drivers }, { data: settings }, stock] = await Promise.all([
+  const [{ data: products }, { data: categories }, { data: recentOrders }, { data: drivers }, { data: settings }, stock, managerDeal] = await Promise.all([
     supabaseAdmin
       .from("products")
-      .select("id, name, price, image_url, category_id, is_available, is_veg, student_discount_eligible, member_price, is_membership_card")
+      .select("id, name, price, image_url, category_id, is_available, is_veg, student_discount_eligible, member_price, is_membership_card, is_frozen")
       .eq("is_available", true)
       .order("sort_order"),
     supabaseAdmin.from("categories").select("id, name").order("sort_order"),
@@ -33,6 +34,7 @@ export default async function AdminDashboard() {
       .eq("id", 1)
       .single(),
     getPosStock(),
+    hasManager(), // the Manager button shows once the admin has picked a manager
   ]);
 
   return (
@@ -42,6 +44,7 @@ export default async function AdminDashboard() {
       openingPromo={settings ?? null}
       canCancel={settings?.pos_can_cancel ?? true}
       staffFreeItems={Number(settings?.staff_free_items ?? 0)}
+      managerDeal={managerDeal}
       initialOrders={(recentOrders ?? []) as any}
       drivers={(drivers ?? []) as any}
       stock={stock}

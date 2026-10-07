@@ -31,6 +31,7 @@ function revalidateTraining() {
   revalidatePath("/admin/dashboard");
   revalidatePath("/staff");
   revalidatePath("/admin/hours");
+  revalidatePath("/admin"); // the POS Manager button appears / goes
 }
 
 export async function addTrainingVideo(input: unknown) {
@@ -170,9 +171,10 @@ export async function updateTrainingPerson(id: string, input: unknown) {
   const parsed = z.object({
     name: nameSchema.optional(), pin: pinSchema.optional(), is_active: z.boolean().optional(), video_ids: videoIdsSchema.optional(),
     pos_clock: z.boolean().optional(),
+    is_manager: z.boolean().optional(), // their PIN approves the POS manager discount (migration 038)
   }).safeParse(input);
   if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Check the details" };
-  const { name, pin, is_active, video_ids, pos_clock } = parsed.data;
+  const { name, pin, is_active, video_ids, pos_clock, is_manager } = parsed.data;
   // A PIN handed out while they were off could now clash (salted hashes can't be compared), so they come back with a fresh one.
   if (is_active === true && !pin) return { error: "Give them a new PIN to switch them back on" };
   if (pin && await pinTaken(pin, id)) return { error: "Someone already uses that PIN — pick another" };
@@ -181,13 +183,14 @@ export async function updateTrainingPerson(id: string, input: unknown) {
   if (pin) patch.pin_hash = hashPin(pin);
   if (is_active !== undefined) patch.is_active = is_active;
   if (pos_clock !== undefined) patch.pos_clock = pos_clock;
+  if (is_manager !== undefined) patch.is_manager = is_manager;
   const { error } = await supabaseAdmin.from("training_people").update(patch).eq("id", id);
   if (error) return { error: "Couldn't save" };
   if (video_ids) await setAssignments(id, video_ids);
   // Switched off or taken off the POS clock while clocked in: their PIN can't clock out any more, so end the shift now.
   if (is_active === false || pos_clock === false) await closeOpenShift(id, user.id);
   await audit({ actor_id: user.id, action: "TRAINING_PERSON_EDIT", target_table: "training_people", target_id: id,
-    new_data: { name, is_active, pos_clock, pin_changed: !!pin, videos: video_ids?.length } });
+    new_data: { name, is_active, pos_clock, is_manager, pin_changed: !!pin, videos: video_ids?.length } });
   revalidateTraining();
   return { ok: true };
 }

@@ -5,7 +5,7 @@ import toast from "react-hot-toast";
 import { KeyRound, UserPlus, X } from "lucide-react";
 import { addTrainingPerson, updateTrainingPerson } from "@/app/actions/training";
 
-type Person = { id: string; name: string; pos_clock: boolean };
+type Person = { id: string; name: string; pos_clock: boolean; is_manager: boolean };
 
 const pinInput = "input !w-24 text-center text-base tracking-[0.4em] sm:text-sm";
 const onlyDigits = (v: string) => v.replace(/\D/g, "").slice(0, 4);
@@ -21,11 +21,24 @@ function PersonRow({ p }: { p: Person }) {
       r?.error ? toast.error(r.error) : toast.success(p.pos_clock ? `${p.name} can't use the POS any more` : `${p.name} can use the POS now`);
     });
   };
+  const toggleManager = () => {
+    if (!confirm(p.is_manager
+      ? `${p.name} stops being a manager — their PIN won't approve the manager discount any more.`
+      : `Make ${p.name} a manager? Their own PIN will approve the POS manager discount (everything free except frozen items).`)) return;
+    start(async () => {
+      const r = await updateTrainingPerson(p.id, { is_manager: !p.is_manager });
+      r?.error ? toast.error(r.error) : toast.success(p.is_manager ? `${p.name} isn't a manager now` : `${p.name} is a manager now`);
+    });
+  };
 
   return (
     <li className="py-3">
       <div className="flex flex-wrap items-center gap-2">
         <p className="min-w-0 flex-1 text-sm font-bold">{p.name}</p>
+        <button disabled={pending} onClick={toggleManager} aria-pressed={p.is_manager}
+          className={p.is_manager ? "badge bg-brand-brown text-white" : "badge bg-stone-100 text-stone-500 ring-1 ring-stone-200"}>
+          {p.is_manager ? "Manager" : "Make manager"}
+        </button>
         <button disabled={pending} onClick={toggle} aria-pressed={p.pos_clock}
           className={p.pos_clock ? "badge bg-green-100 text-green-800" : "badge bg-stone-200 text-stone-600"}>
           {p.pos_clock ? "Can use the POS" : "Not on the POS"}
@@ -63,6 +76,7 @@ export default function ClockPeople({ people, videoIds }: { people: Person[]; vi
       <div>
         <h3 className="font-display font-bold text-brand-brown">POS staff · PINs</h3>
         <p className="text-xs text-stone-500">
+          A manager&apos;s own PIN approves the POS Manager discount: everything in that sale is Rs 0 except frozen items (tick those in Admin → Menu).
           Each person has their own 4-digit PIN (the same one as Staff Training) for two things on the POS. Logging in: the till opens when they type
           it, every order they sell carries their name, and Log out (under their name) hands the till over. Clocking in and out: once a shift, with
           the Clock button, for their hours. They see their clock times, never their hours. PINs can&apos;t be shown again, so give a new one if

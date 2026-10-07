@@ -18,6 +18,8 @@ const productSchema = z.object({
   student_discount_eligible: z.boolean().default(true), // POS student 5% applies to it
   // Selling it at the POS asks for the member's name and number (memberships, migration 028).
   is_membership_card: z.boolean().default(false),
+  // Frozen items keep their full price under the POS manager discount (migration 038).
+  is_frozen: z.boolean().default(false),
   // What a member pays at the POS (lib/discounts.ts); blank = no member price.
   member_price: z.preprocess((v) => (v === "" || v == null ? null : v), z.coerce.number().positive().max(100000).nullable()).default(null),
 }).refine((p) => p.member_price == null || p.member_price < p.price, {

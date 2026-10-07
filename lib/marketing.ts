@@ -1,7 +1,7 @@
 import "server-only";
 import { supabaseAdmin, getRewardSettings } from "@/lib/supabase/admin";
 import { nepalToday } from "@/lib/dates";
-import { STAFF_LABEL } from "@/lib/discounts";
+import { MANAGER_LABEL, STAFF_LABEL } from "@/lib/discounts";
 import { CATEGORY_KEYS, CATEGORY_SHORT, roiOf, ymOf, monthStart, shiftMonth, monthName, monthShort, type Category, type PaymentMethod, type Ym } from "@/lib/marketing-shared";
 
 // Admin → Marketing & ROI (migration 032): the marketing budget per month,
@@ -107,8 +107,8 @@ export async function getMarketing(ymInput?: string) {
   const giveaways = new Map<string, number>();
   const give = (k: string, v: number) => { if (v > 0) giveaways.set(k, (giveaways.get(k) ?? 0) + v); };
   for (const o of sales.rows) {
-    // Staff sales' free items are a staff cost, not an offer to customers.
-    if (o.discount_label !== STAFF_LABEL) give(o.discount_label ?? (o.promo_code_id ? "Promo codes" : "Other discounts"), Number(o.discount_amount ?? 0));
+    // Staff sales' free items and manager-approved free sales are the shop's own cost, not offers to customers.
+    if (o.discount_label !== STAFF_LABEL && o.discount_label !== MANAGER_LABEL) give(o.discount_label ?? (o.promo_code_id ? "Promo codes" : "Other discounts"), Number(o.discount_amount ?? 0));
     give("Reward points", Number(o.points_discount ?? 0));
     if (o.free_item_redeemed) give("Free reward items", freeItemPrice);
   }

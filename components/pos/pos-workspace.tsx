@@ -18,12 +18,13 @@ type Props = {
   /** Admin → Settings: may the counter cancel orders? */
   canCancel: boolean;
   staffFreeItems: number; // 0 = no Staff button
+  managerDeal: boolean; // a manager exists → the Manager button
 };
 
 // Phones, iPads (portrait and the 1024px-wide landscape) and small laptops
 // get Sell / Orders tabs; from 1280px both sit side by side. Both panels stay
 // mounted when hidden, so Realtime, the chime and the cart all carry on.
-export default function PosWorkspace({ products, categories, openingPromo, initialOrders, drivers, stock, canCancel, staffFreeItems }: Props) {
+export default function PosWorkspace({ products, categories, openingPromo, initialOrders, drivers, stock, canCancel, staffFreeItems, managerDeal }: Props) {
   const [tab, setTab] = useState<"sell" | "orders">("sell");
   const [newCount, setNewCount] = useState(0);
 
@@ -54,7 +55,7 @@ export default function PosWorkspace({ products, categories, openingPromo, initi
 
       <div className="flex min-h-0 flex-1 gap-3 p-2 xl:gap-4 xl:p-4">
         <div className={cn("min-h-0 flex-1 overflow-hidden rounded-2xl border border-orange-100 dark:border-stone-800", tab !== "sell" && "hidden xl:block")}>
-          <PosTerminal products={products} categories={categories} openingPromo={openingPromo} initialStock={stock} staffFreeItems={staffFreeItems} />
+          <PosTerminal products={products} categories={categories} openingPromo={openingPromo} initialStock={stock} staffFreeItems={staffFreeItems} managerDeal={managerDeal} />
         </div>
         <div className={cn("min-h-0 flex-1 overflow-hidden xl:w-[400px] xl:flex-none", tab !== "orders" && "hidden xl:block")}>
           <LiveOrdersPanel initialOrders={initialOrders} drivers={drivers} onNewOrder={onNewOrder} onNewCount={setNewCount} canCancel={canCancel} />

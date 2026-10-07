@@ -17,6 +17,7 @@ export type ReportOrder = {
   subtotal: number; discount_amount: number; discount_label: string | null; delivery_fee: number; total: number;
   payment_method: string | null; payment_status: string; placed_by: string | null;
   staff_name: string | null;                  // who sold it at the POS (PIN login, migration 037)
+  discount_approved_by: string | null;        // the manager who approved a manager discount (migration 038)
   ready_at: string | null; served_at: string | null;
 };
 export type ReportItem = { order_id: string; product_id: string | null; product_name: string; quantity: number; line_total: number };
@@ -29,7 +30,7 @@ async function fetchOrders(from: Ymd, to: Ymd) {
   const out: ReportOrder[] = [];
   for (let offset = 0; ; offset += 1000) {
     const { data, error } = await supabaseAdmin.from("orders")
-      .select("id, order_number, daily_number, created_at, status, type, subtotal, discount_amount, discount_label, delivery_fee, total, payment_method, payment_status, placed_by, staff_name, ready_at, served_at")
+      .select("id, order_number, daily_number, created_at, status, type, subtotal, discount_amount, discount_label, delivery_fee, total, payment_method, payment_status, placed_by, staff_name, discount_approved_by, ready_at, served_at")
       .gte("created_at", startOf(from)).lt("created_at", startOf(addDays(to, 1)))
       .order("created_at").range(offset, offset + 999);
     if (error) throw new Error(`Couldn't load orders: ${error.message}`);

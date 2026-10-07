@@ -2,7 +2,7 @@ import "server-only";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { nepalToday } from "@/lib/dates";
 import { servingStats, type ServingStats } from "@/lib/serving-time";
-import { STAFF_LABEL } from "@/lib/discounts";
+import { MANAGER_LABEL, STAFF_LABEL } from "@/lib/discounts";
 
 // The POS "Today" sheet: what was sold today (Nepal day) or since the last
 // shift close, how it was paid, how much cash should be in the drawer, and
@@ -29,6 +29,7 @@ export type DaySales = {
   online: { amount: number; count: number };
   discounts: number;      // promo / member / student / staff + points
   staffFree: { amount: number; count: number }; // staff sales' free items (part of discounts)
+  managerFree: { amount: number; count: number }; // manager-approved free sales (part of discounts)
   toCollect: { amount: number; count: number };
   cashReceived: number;   // cash paid in this period — what the drawer should hold above the float
   topItems: { name: string; qty: number }[];
@@ -150,6 +151,10 @@ export async function getDaySales(period: "day" | "shift" = "day"): Promise<DayS
     staffFree: (() => {
       const staff = live.filter((o) => o.discount_label === STAFF_LABEL);
       return { amount: staff.reduce((s, o) => s + Number(o.discount_amount ?? 0), 0), count: staff.length };
+    })(),
+    managerFree: (() => {
+      const mgr = live.filter((o) => o.discount_label === MANAGER_LABEL);
+      return { amount: mgr.reduce((s, o) => s + Number(o.discount_amount ?? 0), 0), count: mgr.length };
     })(),
     toCollect: { amount: unpaid.reduce((s, o) => s + Number(o.total), 0), count: unpaid.length },
     cashReceived,

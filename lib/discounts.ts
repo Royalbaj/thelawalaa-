@@ -1,10 +1,11 @@
 // Shared by the POS screen (what it shows) and createPosOrder (what it
 // charges) so the two can never drift apart. An order gets one of these,
-// never two.
+// never two: Student 5%, Member price, Staff or Manager.
 
 export const STUDENT_DISCOUNT_LABEL = "Student 5%";
 export const MEMBER_PRICE_LABEL = "Member price";
 export const STAFF_LABEL = "Staff";
+export const MANAGER_LABEL = "Manager";
 
 /** 5% off the items it applies to (products.student_discount_eligible), in whole rupees — the counter deals in cash. */
 export function studentDiscount(eligibleSubtotal: number): number {
@@ -35,4 +36,14 @@ export function staffFreeItems(lines: { price: number; qty: number; eligible: bo
     saving += free[i] * lines[i].price;
   }
   return { free, saving, used: free.reduce((s, n) => s + n, 0) };
+}
+
+/**
+ * Manager discount (approved with a manager's own PIN): every item costs
+ * nothing except frozen items (products.is_frozen) and membership cards
+ * (`eligible: false`), which are charged as normal.
+ */
+export function managerFreeItems(lines: { price: number; qty: number; eligible: boolean }[]) {
+  const free = lines.map((l) => (l.eligible ? l.qty : 0));
+  return { free, saving: lines.reduce((s, l, i) => s + free[i] * l.price, 0), used: free.reduce((s, n) => s + n, 0) };
 }

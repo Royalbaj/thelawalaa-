@@ -117,7 +117,10 @@ export function DaySalesSheet({ onClose, initial, countedBy: loggedIn }: { onClo
                     { label: "Avg serving time", value: fmtMinutes(data.serving.avgServe), sub: data.serving.served ? `placed → handed over · ${data.serving.served} order${data.serving.served === 1 ? "" : "s"}` : "no orders handed over yet", tint: "text-brand-orange" },
                     { label: "Kitchen ready in", value: fmtMinutes(data.serving.avgReady), sub: data.serving.readied ? `placed → ready · ${data.serving.readied} order${data.serving.readied === 1 ? "" : "s"}` : "—", tint: "" },
                     { label: "Still to collect", value: npr(data.toCollect.amount), sub: `${data.toCollect.count} unpaid`, tint: data.toCollect.count ? "text-amber-600" : "" },
-                    { label: "Discounts given", value: npr(data.discounts), sub: data.staffFree.count ? `incl. staff ${npr(data.staffFree.amount)} · ${data.staffFree.count} sale${data.staffFree.count === 1 ? "" : "s"}` : undefined, tint: "" },
+                    { label: "Discounts given", value: npr(data.discounts), sub: [
+                      data.staffFree.count && `incl. staff ${npr(data.staffFree.amount)} · ${data.staffFree.count} sale${data.staffFree.count === 1 ? "" : "s"}`,
+                      data.managerFree?.count && `manager ${npr(data.managerFree.amount)} · ${data.managerFree.count} sale${data.managerFree.count === 1 ? "" : "s"}`,
+                    ].filter(Boolean).join(" · ") || undefined, tint: "" },
                   ].map((t) => (
                     <div key={t.label} className={card}>
                       <p className={cn("text-[11px] font-bold uppercase tracking-wide", muted)}>{t.label}</p>

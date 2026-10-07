@@ -14,12 +14,12 @@ type EditableProduct = {
   id: string; name: string; description: string | null; category_id: string;
   price: number; is_available: boolean; is_veg: boolean; spice_level: number; is_bestseller: boolean;
   image_url: string | null; pos_only: boolean; student_discount_eligible: boolean;
-  member_price: number | string | null; is_membership_card?: boolean;
+  member_price: number | string | null; is_membership_card?: boolean; is_frozen?: boolean;
 };
 
 /** "Where it's sold" + discount options, shared by the add and edit forms. */
-function SalesOptions({ posOnly = false, studentDiscount = true, memberPrice = null, membershipCard = false }: {
-  posOnly?: boolean; studentDiscount?: boolean; memberPrice?: number | string | null; membershipCard?: boolean;
+function SalesOptions({ posOnly = false, studentDiscount = true, memberPrice = null, membershipCard = false, frozen = false }: {
+  posOnly?: boolean; studentDiscount?: boolean; memberPrice?: number | string | null; membershipCard?: boolean; frozen?: boolean;
 }) {
   return (
     <div className="flex flex-wrap items-center gap-4 text-sm font-bold text-stone-600">
@@ -35,6 +35,9 @@ function SalesOptions({ posOnly = false, studentDiscount = true, memberPrice = n
       </label>
       <label className="flex items-center gap-2" title="Selling it at the POS asks for the new member's name and mobile number (Admin → Members). Always POS only.">
         <input type="checkbox" name="is_membership_card" defaultChecked={membershipCard} /> Membership card
+      </label>
+      <label className="flex items-center gap-2" title="Frozen items keep their full price when a manager makes a POS sale free">
+        <input type="checkbox" name="is_frozen" defaultChecked={frozen} /> Frozen item
       </label>
     </div>
   );
@@ -112,6 +115,7 @@ export function ProductRow({ product, categories }: { product: EditableProduct; 
               {product.name} {product.is_bestseller && <span className="badge ml-1.5 bg-orange-100 text-brand-orange">Bestseller</span>}
               {product.pos_only && <span className="badge ml-1.5 bg-stone-800 text-white">POS only</span>}
               {product.is_membership_card && <span className="badge ml-1.5 bg-amber-100 text-amber-800">Membership card</span>}
+              {product.is_frozen && <span className="badge ml-1.5 bg-sky-100 text-sky-800">Frozen</span>}
             </p>
             <p className="text-xs text-stone-500">
               {npr(Number(product.price))} · spice {product.spice_level ? `${product.spice_level}/3` : "mild"}
@@ -139,7 +143,7 @@ export function ProductRow({ product, categories }: { product: EditableProduct; 
                 price: fd.price, spice_level: fd.spice_level,
                 is_veg: fd.is_veg === "on", is_bestseller: fd.is_bestseller === "on",
                 pos_only: fd.pos_only === "on", student_discount_eligible: fd.student_discount_eligible === "on",
-                member_price: fd.member_price, is_membership_card: fd.is_membership_card === "on",
+                member_price: fd.member_price, is_membership_card: fd.is_membership_card === "on", is_frozen: fd.is_frozen === "on",
               });
               if (r?.error) toast.error(r.error);
               else { toast.success("Product updated"); setEditing(false); }
@@ -161,7 +165,7 @@ export function ProductRow({ product, categories }: { product: EditableProduct; 
               <select name="spice_level" defaultValue={product.spice_level} className="input !w-16 !py-1">{[0, 1, 2, 3].map((n) => <option key={n}>{n}</option>)}</select>
             </label>
           </div>
-          <SalesOptions posOnly={product.pos_only} studentDiscount={product.student_discount_eligible} memberPrice={product.member_price} membershipCard={product.is_membership_card} />
+          <SalesOptions posOnly={product.pos_only} studentDiscount={product.student_discount_eligible} memberPrice={product.member_price} membershipCard={product.is_membership_card} frozen={product.is_frozen} />
           <div className="flex gap-2">
             <button disabled={pending} className="btn-primary !py-1.5 text-sm">{pending ? "Saving…" : "Save"}</button>
             <button type="button" onClick={() => setEditing(false)} className="rounded-full bg-white px-4 py-1.5 text-sm font-bold border border-stone-200">Cancel</button>
@@ -222,7 +226,7 @@ export function AddProductForm({ categories }: { categories: { id: string; name:
             price: fd.price, spice_level: fd.spice_level,
             is_veg: fd.is_veg === "on", is_bestseller: fd.is_bestseller === "on",
             pos_only: fd.pos_only === "on", student_discount_eligible: fd.student_discount_eligible === "on",
-            member_price: fd.member_price, is_membership_card: fd.is_membership_card === "on",
+            member_price: fd.member_price, is_membership_card: fd.is_membership_card === "on", is_frozen: fd.is_frozen === "on",
           });
           if (r?.error) toast.error(r.error);
           else { toast.success("Product added"); form.reset(); }

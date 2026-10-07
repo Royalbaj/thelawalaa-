@@ -1,24 +1,25 @@
 "use client";
-import { useEffect, useMemo, useState, useTransition } from "react";
+import { useCallback, useEffect, useMemo, useState, useTransition } from "react";
 import Image from "next/image";
 import toast from "react-hot-toast";
-import { Search, X, Trash2, ShoppingCart, ChevronUp, UtensilsCrossed, CheckCircle2, Minus, Plus, GraduationCap, Crown, ChefHat, IdCard, AlertTriangle, ChevronDown } from "lucide-react";
-import { createPosOrder, getPosStock } from "@/app/actions/pos";
+import { Search, X, Trash2, ShoppingCart, ChevronUp, UtensilsCrossed, CheckCircle2, Minus, Plus, GraduationCap, Crown, ChefHat, IdCard, AlertTriangle, ChevronDown, ShieldCheck, Snowflake } from "lucide-react";
+import { createPosOrder, getPosStock, checkManagerPin } from "@/app/actions/pos";
+import PinPad from "@/components/pin-pad";
 import { newMemberSchema } from "@/lib/validations/order";
 import { REFRESH_EVENT } from "@/components/refresh-button";
 import type { PosStock } from "@/lib/stock-alerts";
 import { npr, cn } from "@/lib/utils";
 import { applyOpeningPromoPrice, isOpeningPromoActive, type OpeningPromoSettings } from "@/lib/promo";
-import { studentDiscount, memberUnitPrice, staffFreeItems } from "@/lib/discounts";
+import { studentDiscount, memberUnitPrice, staffFreeItems, managerFreeItems, MANAGER_LABEL } from "@/lib/discounts";
 
 type Product = {
   id: string; name: string; price: number; is_available: boolean; category_id: string | null;
   image_url?: string | null; student_discount_eligible?: boolean; member_price?: number | string | null;
-  is_membership_card?: boolean;
+  is_membership_card?: boolean; is_frozen?: boolean;
 };
 type Category = { id: string; name: string };
 type Line = { product: Product; qty: number };
-type Deal = "none" | "student" | "member" | "staff";
+type Deal = "none" | "student" | "member" | "staff" | "manager";
 type Done = {
   orderNumber: string; dailyNumber: number | null; total: number;
   discount: number; discountLabel: string | null;
@@ -33,6 +34,36 @@ const STOCK_POLL_MS = 60_000;
 const MAX_QTY = 50; // per line — the same cap createPosOrder enforces
 // After the exact amount, the next few notes a customer is likely to hand over.
 const NOTES = [100, 500, 1000, 2000, 5000];
+
+/** Manager deal: a manager types their own PIN to make this sale free (frozen items still charged). */
+function ManagerApproval({ onClose, onApproved }: { onClose: () => void; onApproved: (m: { pin: string; name: string }) => void }) {
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose]);
+  const submit = useCallback(async (pin: string) => {
+    const r = await checkManagerPin(pin);
+    if ("error" in r) return r.error;
+    onApproved({ pin, name: r.name });
+    return null;
+  }, [onApproved]);
+  return (
+    <div className="fixed inset-0 z-[80] flex items-end justify-center bg-black/60 p-4 sm:items-center" role="dialog" aria-modal="true" aria-label="Manager approval"
+      style={{ paddingBottom: "calc(env(safe-area-inset-bottom) + 1rem)" }}>
+      <div className="max-h-full w-full max-w-sm overflow-y-auto rounded-3xl bg-white p-5 text-center shadow-2xl ring-1 ring-stone-200 dark:bg-stone-900 dark:ring-stone-800">
+        <div className="flex items-start justify-between gap-2 text-left">
+          <div>
+            <p className="flex items-center gap-1.5 font-display text-lg font-extrabold text-brand-brown dark:text-orange-100"><ShieldCheck size={18} /> Manager discount</p>
+            <p className="text-sm text-stone-500 dark:text-stone-400">Everything in this sale becomes Rs 0, except frozen items. A manager types their own PIN.</p>
+          </div>
+          <button onClick={onClose} aria-label="Cancel" className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-stone-100 dark:bg-stone-800"><X size={18} /></button>
+        </div>
+        <PinPad submit={submit} idle="Manager's 4-digit PIN" />
+      </div>
+    </div>
+  );
+}
 
 /** Two-option switch (Dine-in/Pickup, Cash/QR) — one row instead of two. */
 function Segmented<T extends string>({ value, onChange, options, activeClass }: {
@@ -52,10 +83,11 @@ function Segmented<T extends string>({ value, onChange, options, activeClass }: 
 }
 
 export default function PosTerminal({
-  products, categories, openingPromo, initialStock, staffFreeItems: staffLimit = 0,
+  products, categories, openingPromo, initialStock, staffFreeItems: staffLimit = 0, managerDeal = false,
 }: {
   products: Product[]; categories: Category[]; openingPromo?: OpeningPromoSettings | null; initialStock?: PosStock;
   staffFreeItems?: number; // Admin → Settings → Staff sale; 0 = no Staff button
+  managerDeal?: boolean; // someone is a manager (Admin → Staff Hours) → the Manager button
 }) {
   const [cat, setCat] = useState<string>("all");
   const [q, setQ] = useState("");
@@ -64,8 +96,11 @@ export default function PosTerminal({
   const [type, setType] = useState<"dine_in" | "pickup">("dine_in");
   const [method, setMethod] = useState<"cash" | "qr">("cash");
   const [cashReceived, setCashReceived] = useState("");
-  // Student 5%, member price and staff never stack — picking one switches the others off.
+  // Student 5%, member price, staff and manager never stack — picking one switches the others off.
   const [deal, setDeal] = useState<Deal>("none");
+  // Manager discount: approved with a manager's own PIN, kept only for this sale (createPosOrder checks it again).
+  const [manager, setManager] = useState<{ pin: string; name: string } | null>(null);
+  const [askManager, setAskManager] = useState(false);
   const [done, setDone] = useState<Done | null>(null);
   const [members, setMembers] = useState<MemberForm[]>([]);
   const [stock, setStock] = useState<PosStock>(initialStock ?? { all: [], warnings: [], byProduct: {} });
@@ -77,6 +112,8 @@ export default function PosTerminal({
   useEffect(() => { if (initialStock) setStock(initialStock); }, [initialStock]);
   // The manager switched staff sales off while this screen was open.
   useEffect(() => { if (staffLimit <= 0) setDeal((d) => (d === "staff" ? "none" : d)); }, [staffLimit]);
+  // …or nobody is a manager any more.
+  useEffect(() => { if (!managerDeal) { setDeal((d) => (d === "manager" ? "none" : d)); setManager(null); } }, [managerDeal]);
   useEffect(() => {
     const reload = () => { if (document.visibilityState === "visible") getPosStock().then(setStock).catch(() => {}); };
     const poll = setInterval(reload, STOCK_POLL_MS);
@@ -122,9 +159,16 @@ export default function PosTerminal({
     ? staffFreeItems(cart.map((l) => ({ price: priceOf(l.product), qty: l.qty, eligible: !l.product.is_membership_card })), staffLimit)
     : null;
   const staffFreeLeft = staff ? staffLimit - staff.used : 0;
-  // A tile shows Rs 0 while this staff sale still has free items left.
-  const tileFree = (p: Product) => staffFreeLeft > 0 && !p.is_membership_card;
-  const discount = staff ? staff.saving
+  // Manager discount: everything free except frozen items and membership cards — same function createPosOrder uses.
+  const managerOn = deal === "manager" && !!manager;
+  const managerFree = managerOn
+    ? managerFreeItems(cart.map((l) => ({ price: priceOf(l.product), qty: l.qty, eligible: !l.product.is_membership_card && !l.product.is_frozen })))
+    : null;
+  const managerFreeOf = (p: Product) => managerOn && !p.is_membership_card && !p.is_frozen;
+  // A tile shows Rs 0 while this staff sale still has free items left, or under the manager discount.
+  const tileFree = (p: Product) => (staffFreeLeft > 0 && !p.is_membership_card) || managerFreeOf(p);
+  const discount = managerFree ? managerFree.saving
+    : staff ? staff.saving
     : deal === "member" ? Math.round(memberSaving * 100) / 100
     : deal === "student" ? studentDiscount(eligible) : 0;
   const total = subtotal - discount;
@@ -160,7 +204,12 @@ export default function PosTerminal({
     changeQty(p, (n) => n + 1);
   };
   const clearCart = () => { if (cart.length && confirm("Clear the whole cart?")) { setCart([]); setMembers([]); } };
-  const toggleDeal = (d: Exclude<Deal, "none">) => setDeal((cur) => (cur === d ? "none" : d));
+  const toggleDeal = (d: Exclude<Deal, "none">) => {
+    // Manager needs a manager's PIN first; switching it (or to another deal) off forgets the approval.
+    if (d === "manager" && deal !== "manager") { setAskManager(true); return; }
+    setManager(null);
+    setDeal((cur) => (cur === d ? "none" : d));
+  };
 
   const placeOrder = () => {
     // Selling membership cards: each needs the new member's name and number first.
@@ -182,23 +231,28 @@ export default function PosTerminal({
         student_discount: deal === "student",
         member: deal === "member",
         staff: deal === "staff",
+        manager: managerOn,
+        manager_pin: managerOn ? manager!.pin : undefined,
         members: cardCount ? newMembers : undefined,
         items: cart.map((l) => ({ product_id: l.product.id, quantity: l.qty })),
       });
       if (r?.error) { toast.error(r.error); return; }
       setDone({
         orderNumber: r.orderNumber!, dailyNumber: r.dailyNumber ?? null, total: Number(r.total),
-        discount: Number(r.discount ?? 0), discountLabel: r.discountLabel ?? null,
+        discount: Number(r.discount ?? 0),
+        discountLabel: r.discountLabel === MANAGER_LABEL && manager ? `${MANAGER_LABEL} · ${manager.name}` : r.discountLabel ?? null,
         method, received: method === "cash" && received > 0 && total > 0 ? received : null,
         members: r.members ?? [],
       });
       // Ready for the next customer: back to cash, no discount.
-      setCart([]); setMembers([]); setCashReceived(""); setDeal("none"); setMethod("cash"); setCartOpen(false);
+      setCart([]); setMembers([]); setCashReceived(""); setDeal("none"); setManager(null); setMethod("cash"); setCartOpen(false);
       getPosStock().then(setStock).catch(() => {}); // that sale may have used the last of something
     });
   };
 
-  const threeDeals = staffLimit > 0;
+  // Two or four deals: two across. Three: three across, compact (narrow beside the cart on an iPad).
+  const dealCount = 2 + (staffLimit > 0 ? 1 : 0) + (managerDeal ? 1 : 0);
+  const threeDeals = dealCount === 3;
   const dealButton = (d: Exclude<Deal, "none">, Icon: typeof Crown, label: string, onText?: string) => {
     const on = deal === d;
     return (
@@ -216,9 +270,10 @@ export default function PosTerminal({
       </button>
     );
   };
-  // What a cart line charges: free staff items cost nothing, member price where it applies.
+  // What a cart line charges: free staff/manager items cost nothing, member price where it applies.
+  const freeItems = managerFree ?? staff;
   const lineCharge = (l: Line, i: number) =>
-    staff ? (l.qty - staff.free[i]) * priceOf(l.product) : unitOf(l.product) * l.qty;
+    freeItems ? (l.qty - freeItems.free[i]) * priceOf(l.product) : unitOf(l.product) * l.qty;
 
   const CartContents = (
     <>
@@ -256,7 +311,11 @@ export default function PosTerminal({
                   {npr(lineCharge(l, lineIndex))}
                 </p>
               </div>
-              {staff && staff.free[lineIndex] > 0 ? (
+              {managerFree ? (
+                managerFree.free[lineIndex] > 0
+                  ? <p className="text-xs font-bold text-brand-green">Manager · free</p>
+                  : l.product.is_frozen ? <p className="text-xs font-bold text-sky-600 dark:text-sky-400">Frozen · full price</p> : null
+              ) : staff && staff.free[lineIndex] > 0 ? (
                 <p className="text-xs font-bold text-brand-green">
                   Staff · {staff.free[lineIndex] === l.qty ? "free" : `${staff.free[lineIndex]} of ${l.qty} free`}
                 </p>
@@ -315,7 +374,8 @@ export default function PosTerminal({
           <div className={cn("grid gap-2", threeDeals ? "grid-cols-3" : "grid-cols-2")}>
             {dealButton("student", GraduationCap, "Student 5%")}
             {dealButton("member", Crown, "Member")}
-            {threeDeals && dealButton("staff", ChefHat, "Staff", `${staff?.used ?? 0} of ${staffLimit} free`)}
+            {staffLimit > 0 && dealButton("staff", ChefHat, "Staff", `${staff?.used ?? 0} of ${staffLimit} free`)}
+            {managerDeal && dealButton("manager", ShieldCheck, "Manager", manager ? `${manager.name.split(" ")[0]} · ${discount ? `−${npr(discount)}` : "on"}` : undefined)}
           </div>
           {/* Nothing to collect (a staff sale that's all free) — no cash to count. */}
           {method === "cash" && (cart.length === 0 || total > 0) && (
@@ -438,7 +498,11 @@ export default function PosTerminal({
                       {stock.byProduct[p.id].state === "out" ? "Stock out" : `${stock.byProduct[p.id].remaining} left`}
                     </span>
                   )}
-                  {tileFree(p) ? (
+                  {managerFreeOf(p) ? (
+                    <span className="absolute left-2 top-2 flex items-center gap-1 rounded-full bg-brand-green px-2 py-0.5 text-[10px] font-bold text-white shadow"><ShieldCheck size={10} /> Manager · free</span>
+                  ) : managerOn && p.is_frozen ? (
+                    <span className="absolute left-2 top-2 flex items-center gap-1 rounded-full bg-sky-600 px-2 py-0.5 text-[10px] font-bold text-white shadow"><Snowflake size={10} /> Frozen · full price</span>
+                  ) : tileFree(p) ? (
                     <span className="absolute left-2 top-2 flex items-center gap-1 rounded-full bg-brand-green px-2 py-0.5 text-[10px] font-bold text-white shadow"><ChefHat size={10} /> Staff · free</span>
                   ) : memberApplies(p) ? (
                     <span className="absolute left-2 top-2 flex items-center gap-1 rounded-full bg-amber-500 px-2 py-0.5 text-[10px] font-bold text-white shadow"><Crown size={10} /> Member</span>
@@ -539,6 +603,12 @@ export default function PosTerminal({
             </div>
           </div>
         </div>
+      )}
+      {askManager && (
+        <ManagerApproval
+          onClose={() => setAskManager(false)}
+          onApproved={(m) => { setManager(m); setDeal("manager"); setAskManager(false); }}
+        />
       )}
       <style>{`
         @media print {
