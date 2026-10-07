@@ -7,6 +7,7 @@ import OrderStatusSelect from "@/components/admin/order-status-select";
 import MarkPaidButton from "@/components/admin/mark-paid-button";
 import { ItemsSummary, OrderDetails } from "@/components/admin/order-details";
 import { ClipboardList, Bike, Store } from "lucide-react";
+import { slotLabel } from "@/lib/delivery-hours";
 
 export const dynamic = "force-dynamic";
 
@@ -21,7 +22,7 @@ export default async function AdminOrders(props: { searchParams: Promise<{ statu
 
   let query = supabaseAdmin
     .from("orders")
-    .select("id, order_number, daily_number, status, type, subtotal, delivery_fee, total, payment_status, payment_method, created_at, notes, discount_amount, discount_label, points_discount, delivery_address, delivery_lat, delivery_lng, staff_name, discount_approved_by, promo_codes:promo_code_id(code), profiles:customer_id(full_name), items:order_items(product_name, quantity, product_price, line_total)")
+    .select("id, order_number, daily_number, status, type, subtotal, delivery_fee, total, payment_status, payment_method, created_at, notes, discount_amount, discount_label, points_discount, delivery_address, delivery_lat, delivery_lng, staff_name, discount_approved_by, scheduled_for, scheduled_until, promo_codes:promo_code_id(code), profiles:customer_id(full_name), items:order_items(product_name, quantity, product_price, line_total)")
     .order("created_at", { ascending: false })
     .limit(100);
   if (tab.statuses.length) query = query.in("status", tab.statuses);
@@ -91,6 +92,9 @@ export default async function AdminOrders(props: { searchParams: Promise<{ statu
                   {customerName}{isGuest && customerName !== "Guest" ? " (guest)" : ""} · {o.type === "delivery" ? "Delivery" : o.type === "dine_in" ? "Dine-in" : "Pickup"} · {format(new Date(o.created_at), "d MMM, h:mm a")}
                   {o.staff_name && <> · sold by <b className="text-stone-600">{o.staff_name}</b></>}
                 </p>
+                {o.scheduled_for && o.scheduled_until && (
+                  <p className="mt-1 inline-block rounded-full bg-sky-50 px-2 py-0.5 text-[11px] font-bold text-sky-800">Deliver {slotLabel({ start: o.scheduled_for, end: o.scheduled_until })}</p>
+                )}
               </div>
               <p className="shrink-0 font-display text-lg font-bold text-brand-brown">{npr(Number(o.total))}</p>
             </div>
@@ -157,6 +161,9 @@ export default async function AdminOrders(props: { searchParams: Promise<{ statu
                     )}>
                       {o.type === "delivery" ? <><Bike size={13} /> Delivery</> : <><Store size={13} /> Pickup</>}
                     </span>
+                    {o.scheduled_for && o.scheduled_until && (
+                      <div className="mt-1 text-[11px] font-bold text-sky-800">{slotLabel({ start: o.scheduled_for, end: o.scheduled_until })}</div>
+                    )}
                   </td>
                   <td className="px-4 py-3.5">
                     <div className="font-bold text-brand-brown">{npr(Number(o.total))}</div>

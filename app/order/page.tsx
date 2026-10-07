@@ -13,13 +13,14 @@ import { getCheckoutRewards } from "@/app/actions/customer";
 import { redeemPlan, fmtPoints, fmtRupees, pointsToRupees } from "@/lib/rewards";
 import { getEsewaPaymentForm } from "@/app/actions/payments";
 import { npr } from "@/lib/utils";
-import { UtensilsCrossed, Sparkles, CupSoda, LocateFixed, Loader2, X, MapPin, Phone, MapPinOff } from "lucide-react";
+import { UtensilsCrossed, Sparkles, CupSoda, LocateFixed, Loader2, X, MapPin, Phone, MapPinOff, Clock } from "lucide-react";
 import AddToCartButton from "@/components/add-to-cart-button";
 import BrandLogo from "@/components/brand-logo";
 import { applyOpeningPromoPrice, isOpeningPromoActive, type OpeningPromoSettings } from "@/lib/promo";
 import { deliveryArea, outsideArea, distanceKm, fmtKm } from "@/lib/geo";
 import { phoneDisplay, telHref } from "@/lib/utils";
 import { guestCodeKey } from "@/lib/guest-order";
+import { deliveryHours, deliveryOpenNow, deliverySlots, dayWord, minutesLabel, nextStartLabel, slotLabel } from "@/lib/delivery-hours";
 
 type Product = { id: string; name: string; description: string | null; price: number; category_id: string | null; spice_level: number; image_url?: string | null };
 type Category = { id: string; name: string };
@@ -76,7 +77,16 @@ export default function OrderPage() {
   const [locError, setLocError] = useState<string | null>(null);
 
   const [favorites, setFavorites] = useState<string[]>([]);
-  const [settings, setSettings] = useState<{ esewa_enabled: boolean; delivery_enabled: boolean; delivery_radius_km?: number | null; store_lat?: number | null; store_lng?: number | null }>({ esewa_enabled: false, delivery_enabled: false });
+  const [settings, setSettings] = useState<{
+    esewa_enabled: boolean; delivery_enabled: boolean; delivery_radius_km?: number | null; store_lat?: number | null; store_lng?: number | null;
+    // Delivery hours (Admin → Settings): ASAP only inside them; otherwise a booked slot.
+    delivery_hours_enabled?: boolean; delivery_start?: string; delivery_end?: string;
+    delivery_slot_minutes?: number; delivery_lead_minutes?: number; delivery_days_ahead?: number;
+  }>({ esewa_enabled: false, delivery_enabled: false });
+  // When to deliver: as soon as possible, or a booked slot (always a slot while delivery is closed).
+  const [when, setWhen] = useState<"asap" | "later">("asap");
+  const [slotStart, setSlotStart] = useState("");
+  const [now, setNow] = useState(() => Date.now());
   // The shop's number (Admin → Website text → WhatsApp number) for "call us to confirm".
   const [shopPhone, setShopPhone] = useState<string | null>(null);
   const [openingPromo, setOpeningPromo] = useState<OpeningPromoSettings | null>(null);
@@ -104,7 +114,7 @@ export default function OrderPage() {
       supabase.from("categories").select("id, name").order("sort_order"),
       supabase.from("branches").select("id, name, address"),
       supabase.from("addresses").select("id, label, full_address, lat, lng"),
-      supabase.from("app_settings").select("esewa_enabled, delivery_enabled, opening_promo_enabled, opening_promo_momo_price, opening_promo_starts_at, opening_promo_ends_at, delivery_radius_km, store_lat, store_lng").eq("id", 1).single(),
+      supabase.from("app_settings").select("esewa_enabled, delivery_enabled, opening_promo_enabled, opening_promo_momo_price, opening_promo_starts_at, opening_promo_ends_at, delivery_radius_km, store_lat, store_lng, delivery_hours_enabled, delivery_start, delivery_end, delivery_slot_minutes, delivery_lead_minutes, delivery_days_ahead").eq("id", 1).single(),
       supabase.from("site_content").select("value").eq("key", "contact.whatsapp").maybeSingle(),
     ]).then(([p, c, b, a, s, phone]) => {
       if (phone.data?.value) setShopPhone(phone.data.value as string);
@@ -134,6 +144,20 @@ export default function OrderPage() {
   const savedPinned = addresses.find((a) => a.id === addressId && a.lat != null && a.lng != null);
   const checkPoint = pin ?? (savedPinned ? { lat: Number(savedPinned.lat), lng: Number(savedPinned.lng) } : null);
   const tooFar = type === "delivery" && !!checkPoint && outsideArea(area, checkPoint);
+
+  // Delivery hours (Admin → Settings → Delivery hours). The clock ticks so slots
+  // that get too close (under the notice time) drop off while the page is open.
+  useEffect(() => { const t = setInterval(() => setNow(Date.now()), 30_000); return () => clearInterval(t); }, []);
+  const hours = useMemo(() => deliveryHours(settings), [settings]);
+  const openNow = deliveryOpenNow(hours, now);
+  const slots = useMemo(() => deliverySlots(hours, now), [hours, now]);
+  const scheduling = type === "delivery" && hours.enabled && (!openNow || when === "later");
+  const noSlots = type === "delivery" && hours.enabled && !openNow && slots.length === 0;
+  // Keep a slot that can still be booked picked (the earliest by default).
+  useEffect(() => {
+    if (scheduling && !slots.some((sl) => sl.start === slotStart)) setSlotStart(slots[0]?.start ?? "");
+  }, [scheduling, slots, slotStart]);
+  const pickedSlot = slots.find((sl) => sl.start === slotStart) ?? null;
   const farKm = checkPoint ? distanceKm(area.shop, checkPoint) : 0;
 
   const subtotal = useMemo(() => items.reduce((t, i) => t + i.price * i.quantity, 0), [items]);
@@ -224,6 +248,8 @@ export default function OrderPage() {
       }
       if (type === "pickup" && !branchId) { toast.error("Pick a branch"); return; }
       if (tooFar) { toast.error("We're not delivering to that location right now — please call us to confirm, or choose pickup"); return; }
+      if (noSlots) { toast.error("No delivery times left to book — please choose pickup"); return; }
+      if (scheduling && !pickedSlot) { toast.error("Pick a delivery time"); return; }
 
       const delivery_address_id = (type === "delivery" && !isGuest) ? await ensureAddress() : undefined;
 
@@ -239,6 +265,7 @@ export default function OrderPage() {
         guest_phone: needPhone ? guestPhone.trim() : undefined,
         guest_address: type === "delivery" && !delivery_address_id ? newAddress.trim() : undefined,
         delivery_location: type === "delivery" && pin ? pin : undefined,
+        scheduled_for: scheduling && pickedSlot ? pickedSlot.start : undefined,
         items: items.map((i) => ({ product_id: i.product_id, quantity: i.quantity })),
       });
       if ("error" in res && res.error) { toast.error(res.error); return; }
@@ -256,7 +283,7 @@ export default function OrderPage() {
 
       const collectionNote = type === "pickup"
         ? ` Your order number is ${ok.dailyNumber ?? ok.orderNumber} — tell this to our counter staff when you arrive.`
-        : ok.deliveryCode ? ` Your delivery code is ${ok.deliveryCode} — give it to the rider.` : "";
+        : `${scheduling && pickedSlot ? ` We'll deliver ${slotLabel(pickedSlot).replace(/^Today/, "today").replace(/^Tomorrow/, "tomorrow")}.` : ""}${ok.deliveryCode ? ` Your delivery code is ${ok.deliveryCode} — give it to the rider.` : ""}`;
       toast.success(
         `Order placed!${collectionNote} ${payment === "qr" ? "Scan the QR when your order arrives." : `Keep Rs ${ok.total} cash ready.`}`,
         { duration: 7000 }
@@ -527,6 +554,49 @@ export default function OrderPage() {
                         </div>
                       </div>
                     )}
+                    {hours.enabled && (
+                      <div className="rounded-2xl bg-white p-4 ring-1 ring-orange-100">
+                        {!openNow && (
+                          <p role="status" className="mb-3 flex items-start gap-2 rounded-xl bg-amber-50 p-3 text-sm text-amber-900 ring-1 ring-amber-200">
+                            <Clock size={17} className="mt-0.5 shrink-0" />
+                            <span>
+                              <b>Delivery isn&apos;t available right now.</b> We start delivering {nextStartLabel(hours, now)}
+                              {" "}({minutesLabel(hours.start)} – {minutesLabel(hours.end)}).
+                              {slots.length > 0 ? " You can book a delivery time below — or choose pickup." : " Please choose pickup for now."}
+                            </span>
+                          </p>
+                        )}
+                        <p className="label">When should we deliver?</p>
+                        {openNow && (
+                          <div className="grid grid-cols-2 gap-2">
+                            {([["asap", "As soon as possible"], ["later", "Schedule for later"]] as const).map(([k, label]) => (
+                              <button key={k} type="button" onClick={() => setWhen(k)} aria-pressed={when === k}
+                                className={`rounded-xl px-3 py-2.5 text-sm font-bold ring-1 transition ${when === k ? "bg-orange-50 text-brand-orange ring-2 ring-brand-orange" : "bg-white text-stone-600 ring-stone-200 hover:bg-orange-50"}`}>
+                                {label}
+                              </button>
+                            ))}
+                          </div>
+                        )}
+                        {scheduling && (
+                          slots.length > 0 ? (
+                            <select aria-label="Delivery time" className={`input ${openNow ? "mt-2" : ""}`} value={slotStart} onChange={(e) => setSlotStart(e.target.value)}>
+                              {[...new Set(slots.map((sl) => dayWord(new Date(sl.start).getTime(), now)))].map((day) => (
+                                <optgroup key={day} label={day}>
+                                  {slots.filter((sl) => dayWord(new Date(sl.start).getTime(), now) === day).map((sl) => (
+                                    <option key={sl.start} value={sl.start}>{slotLabel(sl, now)}</option>
+                                  ))}
+                                </optgroup>
+                              ))}
+                            </select>
+                          ) : (
+                            <p className="mt-2 text-sm font-bold text-stone-600">No delivery times left to book.</p>
+                          )
+                        )}
+                        <p className="mt-2 text-xs text-stone-500">
+                          We deliver {minutesLabel(hours.start)} – {minutesLabel(hours.end)} · book at least {hours.lead} minutes ahead
+                        </p>
+                      </div>
+                    )}
                     <p className="text-xs font-bold text-brand-green">Free home delivery within {area.radiusKm} km of Godam Chowk</p>
                   </div>
                 )}
@@ -602,7 +672,7 @@ export default function OrderPage() {
             </p>
             <div className="flex gap-3">
               <button onClick={() => setStep(1)} className="rounded-full bg-white px-6 py-3 font-bold border border-stone-200">← Back</button>
-              <button onClick={placeOrder} disabled={busy || items.length === 0 || tooFar} className="btn-primary flex-1 shadow-lg shadow-orange-500/30">
+              <button onClick={placeOrder} disabled={busy || items.length === 0 || tooFar || noSlots} className="btn-primary flex-1 shadow-lg shadow-orange-500/30">
                 {busy ? "Placing order…" : `Place order • ${npr(finalTotal)}`}
               </button>
             </div>

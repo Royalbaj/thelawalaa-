@@ -4,17 +4,19 @@ import { Suspense, useEffect, useState } from "react";
 import Link from "next/link";
 import { useParams, useSearchParams } from "next/navigation";
 import { format } from "date-fns";
-import { KeyRound, MapPin, Star } from "lucide-react";
+import { Clock, KeyRound, MapPin, Star } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { npr, STATUS_COLORS, cn } from "@/lib/utils";
 import { orderSteps, orderStep, orderStatusLabel } from "@/lib/order-status";
 import BrandLogo from "@/components/brand-logo";
 import { BrandLoader } from "@/components/brand-loader";
 import { guestCodeKey } from "@/lib/guest-order";
+import { slotLabel } from "@/lib/delivery-hours";
 
 type TrackOrder = {
   id: string; order_number: string; daily_number: number | null; status: string; type: string;
   total: number | null; payment_status: string; payment_method: string | null; created_at: string; delivery_address: string | null;
+  scheduled_for?: string | null; scheduled_until?: string | null; // a booked delivery slot
 };
 type TrackItem = { product_name: string; quantity: number; line_total: number | null };
 
@@ -168,6 +170,11 @@ function TrackContent() {
             </p>
           )}
 
+          {order.type === "delivery" && order.scheduled_for && order.scheduled_until && !done && (
+            <p className="mt-6 flex gap-2 rounded-xl bg-orange-50 p-3 text-sm font-bold text-brand-brown">
+              <Clock size={16} className="mt-0.5 shrink-0 text-brand-orange" /> Delivery booked for {slotLabel({ start: order.scheduled_for, end: order.scheduled_until })}
+            </p>
+          )}
           {order.type === "delivery" && order.delivery_address && !done && (
             <p className="mt-6 flex gap-2 rounded-xl bg-stone-50 p-3 text-sm text-stone-600"><MapPin size={16} className="mt-0.5 shrink-0 text-brand-orange" /> {order.delivery_address}</p>
           )}

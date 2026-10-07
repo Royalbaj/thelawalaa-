@@ -1,5 +1,5 @@
 import { format } from "date-fns";
-import { MapPin, Navigation, Bike } from "lucide-react";
+import { MapPin, Navigation, Bike, Clock } from "lucide-react";
 import { requireRole } from "@/lib/supabase/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { npr, cn } from "@/lib/utils";
@@ -8,23 +8,28 @@ import { noteField } from "@/lib/order-notes";
 import { directionsUrl, searchUrl, distanceKm, fmtKm, deliveryArea, type LatLng } from "@/lib/geo";
 import { nepalToday } from "@/lib/dates";
 import AssignDriver from "@/components/admin/assign-driver";
+import { slotLabel } from "@/lib/delivery-hours";
 
 export const dynamic = "force-dynamic";
 
 type Row = {
   id: string; order_number: string; daily_number: number | null; total: number; status: string; created_at: string; payment_status: string;
   notes: string | null; delivery_address: string | null; delivery_lat: number | null; delivery_lng: number | null;
+  scheduled_for: string | null; scheduled_until: string | null;
   items: { product_name: string; quantity: number }[];
   deliveries: { driver_id: string | null; assigned_at: string | null; profiles: { full_name: string } | null } | null;
 };
 
-const SELECT = "id, order_number, daily_number, total, status, created_at, payment_status, notes, delivery_address, delivery_lat, delivery_lng, items:order_items(product_name, quantity), deliveries!inner(driver_id, assigned_at, profiles:driver_id(full_name))";
+const SELECT = "id, order_number, daily_number, total, status, created_at, payment_status, notes, delivery_address, delivery_lat, delivery_lng, scheduled_for, scheduled_until, items:order_items(product_name, quantity), deliveries!inner(driver_id, assigned_at, profiles:driver_id(full_name))";
 
 function Where({ o, shop }: { o: Row; shop: LatLng }) {
   const address = o.delivery_address ?? noteField(o.notes, "Address");
   const pin = o.delivery_lat != null && o.delivery_lng != null ? { lat: o.delivery_lat, lng: o.delivery_lng } : null;
   return (
     <div className="mt-1.5 space-y-1 text-xs text-stone-600">
+      {o.scheduled_for && o.scheduled_until && (
+        <p className="flex gap-1.5 font-bold text-sky-800"><Clock size={13} className="mt-0.5 shrink-0" /> Deliver {slotLabel({ start: o.scheduled_for, end: o.scheduled_until })}</p>
+      )}
       <p className="flex gap-1.5"><MapPin size={13} className="mt-0.5 shrink-0 text-brand-orange" /> {address ?? "Shared location"}</p>
       <a href={pin ? directionsUrl(pin) : searchUrl(address ?? "")} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 font-bold text-brand-orange">
         <Navigation size={12} /> {pin ? `Exact pin · ${fmtKm(distanceKm(shop, pin))} away` : "No pin — find the address"}

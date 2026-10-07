@@ -22,6 +22,8 @@ export type DriverJob = {
   note: string | null;
   assignedAt: string | null;
   otpAttemptsLeft: number;
+  /** A booked delivery slot (Admin → Settings → Delivery hours); null = as soon as possible. */
+  slot: { start: string; end: string } | null;
 };
 
 export type DriverDone = {
@@ -34,7 +36,7 @@ export type DriverDone = {
 
 const SELECT = `id, assigned_at, picked_up_at, on_the_way_at, delivered_at, otp_verified, otp_attempts,
   orders!inner(id, order_number, daily_number, status, total, payment_status, payment_method, notes,
-    delivery_address, delivery_lat, delivery_lng, delivery_accuracy_m, items:order_items(product_name, quantity))`;
+    delivery_address, delivery_lat, delivery_lng, delivery_accuracy_m, scheduled_for, scheduled_until, items:order_items(product_name, quantity))`;
 
 type Row = {
   id: string; assigned_at: string | null; picked_up_at: string | null; on_the_way_at: string | null; delivered_at: string | null;
@@ -42,6 +44,7 @@ type Row = {
   orders: {
     id: string; order_number: string; daily_number: number | null; status: string; total: number; payment_status: string; payment_method: string | null;
     notes: string | null; delivery_address: string | null; delivery_lat: number | null; delivery_lng: number | null; delivery_accuracy_m: number | null;
+    scheduled_for: string | null; scheduled_until: string | null;
     items: { product_name: string; quantity: number }[];
   };
 };
@@ -68,6 +71,7 @@ export async function getDriverJobs(driverId: string) {
       note: customerNote(o.notes),
       assignedAt: d.assigned_at,
       otpAttemptsLeft: Math.max(0, 3 - (d.otp_attempts ?? 0)),
+      slot: o.scheduled_for && o.scheduled_until ? { start: o.scheduled_for, end: o.scheduled_until } : null,
     };
   });
 }

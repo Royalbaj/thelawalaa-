@@ -22,7 +22,7 @@ export async function GET(_req: Request, props: { params: Promise<{ orderId: str
 
   const { data: order } = await supabaseAdmin
     .from("orders")
-    .select("id, order_number, daily_number, status, type, total, payment_status, payment_method, created_at, customer_id, delivery_address")
+    .select("id, order_number, daily_number, status, type, total, payment_status, payment_method, created_at, customer_id, delivery_address, scheduled_for, scheduled_until")
     .eq("id", params.orderId)
     .maybeSingle();
   if (!order) return NextResponse.json({ error: "Not found" }, { status: 404 });

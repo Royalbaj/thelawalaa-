@@ -14,6 +14,7 @@ import { npr, phoneDisplay } from "@/lib/utils";
 import { deliveryOtp, hashOtp } from "@/lib/delivery-otp";
 import { deliveryArea, outsideArea, distanceKm, fmtKm } from "@/lib/geo";
 import { getSiteText } from "@/lib/site-content";
+import { bookableSlot, deliveryHours, deliveryOpenNow, nextStartLabel, slotLabel, type Slot } from "@/lib/delivery-hours";
 
 
 /**
@@ -35,6 +36,18 @@ export async function createOrder(input: unknown) {
   const { data: settings } = await supabaseAdmin.from("app_settings").select("*").eq("id", 1).single();
   if (data.type === "delivery" && !settings?.delivery_enabled) {
     return { error: "Delivery isn't available right now — please choose pickup" };
+  }
+  // Delivery hours (migration 039): "as soon as possible" only while delivery is
+  // open; otherwise (or by choice) a booked slot — re-checked here, never trusted.
+  let slot: Slot | null = null;
+  if (data.type === "delivery") {
+    const hours = deliveryHours(settings);
+    if (data.scheduled_for) {
+      slot = bookableSlot(hours, data.scheduled_for);
+      if (!slot) return { error: "That delivery time can't be booked any more — please pick another" };
+    } else if (!deliveryOpenNow(hours)) {
+      return { error: `We start delivering ${nextStartLabel(hours)} — please schedule your delivery for later, or choose pickup` };
+    }
   }
   if (data.payment_method === "esewa" && !settings?.esewa_enabled) {
     return { error: "eSewa isn't available right now — please choose cash or QR" };
@@ -227,6 +240,8 @@ export async function createOrder(input: unknown) {
       delivery_lng: pin?.lng ?? null,
       delivery_accuracy_m: pin?.accuracy ?? null,
       pickup_time: data.pickup_time ?? null,
+      scheduled_for: slot?.start ?? null,
+      scheduled_until: slot?.end ?? null,
       payment_method: data.payment_method,
       payment_status: "pending", // admin confirms cash/QR manually
       promo_code_id,
@@ -271,7 +286,7 @@ export async function createOrder(input: unknown) {
     action: "CREATE_ORDER",
     target_table: "orders",
     target_id: order.id,
-    new_data: { total, type: data.type, payment_method: data.payment_method },
+    new_data: { total, type: data.type, payment_method: data.payment_method, ...(slot ? { scheduled_for: slot.start } : {}) },
   });
 
   // The confirmation email (signed-in customers only — never the staff member
@@ -288,6 +303,7 @@ export async function createOrder(input: unknown) {
           items: itemRows.map((r) => ({ name: r.product_name, qty: r.quantity, lineTotal: r.line_total })),
           subtotal, promoDiscount: discount_amount, pointsDiscount: points_discount, pointsUsed: points_redeemed,
           total, pointsToEarn: rewards.enabled ? pointsForTotal(total, rewards) : 0, otp: otpForEmail,
+          scheduled: slot ? slotLabel(slot) : null,
         }),
       });
     });
@@ -299,7 +315,7 @@ export async function createOrder(input: unknown) {
     const no = order.daily_number != null ? `#${String(order.daily_number).padStart(2, "0")}` : order.order_number;
     after(() => pushToStaff({
       title: `New online order ${no}`,
-      body: `${data.type === "delivery" ? "Delivery" : "Pickup"} · ${itemRows.map((r) => `${r.quantity}× ${r.product_name}`).join(", ")} · ${npr(total)}`,
+      body: `${data.type === "delivery" ? (slot ? `Delivery for ${slotLabel(slot)}` : "Delivery") : "Pickup"} · ${itemRows.map((r) => `${r.quantity}× ${r.product_name}`).join(", ")} · ${npr(total)}`,
       tag: order.id,
       url: "/admin",
     }));

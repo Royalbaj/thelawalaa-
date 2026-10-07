@@ -4,7 +4,8 @@ import toast from "react-hot-toast";
 import { Facebook, Instagram, Link2, Trash2 } from "lucide-react";
 import TikTokIcon from "@/components/icons/tiktok";
 import { createBranch, setBranchActive, createPromoCode, setPromoActive } from "@/app/actions/admin-crud";
-import { updateAppSettings, updateOpeningPromo, addSocialLink, setSocialLinkActive, deleteSocialLink, updateDeliveryArea, updateStaffSale } from "@/app/actions/settings";
+import { updateAppSettings, updateOpeningPromo, addSocialLink, setSocialLinkActive, deleteSocialLink, updateDeliveryArea, updateStaffSale, updateDeliveryHours } from "@/app/actions/settings";
+import { deliveryHours, deliverySlots, minutesLabel, slotLabel } from "@/lib/delivery-hours";
 
 function platformIcon(platform: string) {
   const p = platform.toLowerCase();
@@ -370,6 +371,84 @@ export function DeliveryAreaForm({ radiusKm, storeLat, storeLng }: { radiusKm: n
         </p>
       </div>
       <button onClick={save} disabled={pending || !radius} className="btn-primary w-full !py-2.5 text-sm">{pending ? "Saving…" : "Save delivery area"}</button>
+    </div>
+  );
+}
+
+/**
+ * Delivery hours + booked slots (migration 039). On: website delivery "as soon
+ * as possible" only inside the hours; outside, checkout says when delivery
+ * starts and the customer books a later slot. Off: delivery any time.
+ */
+export function DeliveryHoursForm({ initial }: {
+  initial: { enabled: boolean; start: string; end: string; slot: number; lead: number; days: number };
+}) {
+  const [enabled, setEnabled] = useState(initial.enabled);
+  const [start, setStart] = useState(initial.start);
+  const [end, setEnd] = useState(initial.end);
+  const [slot, setSlot] = useState(initial.slot);
+  const [lead, setLead] = useState(initial.lead);
+  const [days, setDays] = useState(initial.days);
+  const [pending, startSave] = useTransition();
+
+  // What a customer would see on a day with nothing booked yet (from midnight, so every slot counts).
+  const h = deliveryHours({ delivery_hours_enabled: true, delivery_start: start, delivery_end: end, delivery_slot_minutes: slot, delivery_lead_minutes: lead, delivery_days_ahead: 1 });
+  const perDay = h.end > h.start ? Math.floor((h.end - h.start) / h.slot) : 0;
+  const sampleDay = Date.parse("2000-01-01T00:00:00+05:45");
+  const firstSlots = deliverySlots(h, sampleDay).slice(0, 3);
+  const save = () => startSave(async () => {
+    const r = await updateDeliveryHours({
+      delivery_hours_enabled: enabled, delivery_start: start, delivery_end: end,
+      delivery_slot_minutes: slot, delivery_lead_minutes: lead, delivery_days_ahead: days,
+    });
+    if (r?.error) toast.error(r.error); else toast.success("Delivery hours saved");
+  });
+  const select = "input !py-2 text-base sm:text-sm";
+
+  return (
+    <div className="card space-y-4 p-5">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <h3 className="font-display font-bold text-brand-brown">Delivery hours</h3>
+          <p className="text-xs text-stone-500">
+            Website delivery &ldquo;as soon as possible&rdquo; only inside these hours. Outside them, checkout says when you start delivering and
+            customers can book a later time slot (they can always book one).
+          </p>
+        </div>
+        <button onClick={() => setEnabled((v) => !v)} aria-pressed={enabled}
+          className={enabled ? "badge shrink-0 bg-green-100 text-green-800" : "badge shrink-0 bg-stone-200 text-stone-600"}>
+          {enabled ? "On" : "Off — any time"}
+        </button>
+      </div>
+      <div className="grid grid-cols-2 gap-3">
+        <label className="text-xs font-bold text-stone-500">Delivery starts
+          <input type="time" value={start} onChange={(e) => setStart(e.target.value)} className={`${select} mt-1`} />
+        </label>
+        <label className="text-xs font-bold text-stone-500">Delivery ends
+          <input type="time" value={end} onChange={(e) => setEnd(e.target.value)} className={`${select} mt-1`} />
+        </label>
+        <label className="text-xs font-bold text-stone-500">Time slot (timeframe)
+          <select value={slot} onChange={(e) => setSlot(Number(e.target.value))} className={`${select} mt-1`}>
+            {[15, 30, 45, 60, 90, 120].map((m) => <option key={m} value={m}>{m < 60 ? `${m} minutes` : `${m / 60} hour${m === 60 ? "" : "s"}`}</option>)}
+          </select>
+        </label>
+        <label className="text-xs font-bold text-stone-500">Notice before a slot
+          <select value={lead} onChange={(e) => setLead(Number(e.target.value))} className={`${select} mt-1`}>
+            {[30, 45, 60, 90, 120, 180].map((m) => <option key={m} value={m}>{m < 60 ? `${m} minutes` : `${m / 60} hour${m === 60 ? "" : "s"}`}</option>)}
+          </select>
+        </label>
+        <label className="col-span-2 text-xs font-bold text-stone-500">Customers can book
+          <select value={days} onChange={(e) => setDays(Number(e.target.value))} className={`${select} mt-1`}>
+            {[1, 2, 3, 4, 5, 6, 7].map((d) => <option key={d} value={d}>{d === 1 ? "Today only" : d === 2 ? "Today and tomorrow" : `Up to ${d} days ahead (incl. today)`}</option>)}
+          </select>
+        </label>
+      </div>
+      <p className="rounded-xl bg-orange-50 px-3 py-2 text-xs text-stone-600">
+        {perDay > 0
+          ? <>{perDay} slots a day ({minutesLabel(h.start)} – {minutesLabel(h.end)}): {firstSlots.map((s) => slotLabel(s, sampleDay).replace(/^Today /, "")).join(", ")}{perDay > 3 ? ", …" : ""} Each slot can be booked until {lead} minutes before it starts.</>
+          : "The end time has to be after the start time, with room for at least one slot."}
+      </p>
+      <button disabled={pending} onClick={save} className="btn-primary w-full !py-2.5 text-sm">{pending ? "Saving…" : "Save delivery hours"}</button>
     </div>
   );
 }

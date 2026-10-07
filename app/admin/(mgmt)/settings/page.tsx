@@ -1,7 +1,7 @@
 import { requireRole } from "@/lib/supabase/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { npr } from "@/lib/utils";
-import { BranchForm, PromoForm, ActiveToggle, FeatureFlagsForm, OpeningPromoForm, SocialLinksManager, DeliveryAreaForm, StaffSaleForm } from "@/components/admin/settings-controls";
+import { BranchForm, PromoForm, ActiveToggle, FeatureFlagsForm, OpeningPromoForm, SocialLinksManager, DeliveryAreaForm, StaffSaleForm, DeliveryHoursForm } from "@/components/admin/settings-controls";
 import ResetSalesData from "@/components/admin/reset-sales-data";
 import EmailSetupPanel from "@/components/admin/email-setup";
 
@@ -92,6 +92,14 @@ export default async function SettingsPage() {
       <div className="space-y-4">
         <FeatureFlagsForm esewaEnabled={settings?.esewa_enabled ?? false} deliveryEnabled={settings?.delivery_enabled ?? false} posCanCancel={settings?.pos_can_cancel ?? true} />
         <StaffSaleForm freeItems={Number(settings?.staff_free_items ?? 2)} />
+        <DeliveryHoursForm initial={{
+          enabled: settings?.delivery_hours_enabled ?? false,
+          start: String(settings?.delivery_start ?? "11:00").slice(0, 5),
+          end: String(settings?.delivery_end ?? "20:00").slice(0, 5),
+          slot: Number(settings?.delivery_slot_minutes ?? 30),
+          lead: Number(settings?.delivery_lead_minutes ?? 30),
+          days: Number(settings?.delivery_days_ahead ?? 2),
+        }} />
         <DeliveryAreaForm radiusKm={Number(settings?.delivery_radius_km ?? 5)} storeLat={settings?.store_lat ?? null} storeLng={settings?.store_lng ?? null} />
         <OpeningPromoForm
           enabled={settings?.opening_promo_enabled ?? false}

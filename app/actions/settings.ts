@@ -122,6 +122,34 @@ export async function updateDeliveryArea(input: unknown) {
   return { ok: true };
 }
 
+// ── Delivery hours + booked slots (migration 039) ─────────────────
+const hm = z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, "Pick a time");
+const toMin = (t: string) => Number(t.slice(0, 2)) * 60 + Number(t.slice(3, 5));
+const deliveryHoursSchema = z.object({
+  delivery_hours_enabled: z.boolean(),
+  delivery_start: hm,
+  delivery_end: hm,
+  delivery_slot_minutes: z.number().int().min(15, "Slots are at least 15 minutes").max(240, "Slots are at most 4 hours"),
+  delivery_lead_minutes: z.number().int().min(30, "Customers book at least 30 minutes ahead").max(720),
+  delivery_days_ahead: z.number().int().min(1).max(7),
+})
+  .refine((d) => toMin(d.delivery_end) > toMin(d.delivery_start), { message: "Delivery has to end after it starts (same day)" })
+  .refine((d) => toMin(d.delivery_end) - toMin(d.delivery_start) >= d.delivery_slot_minutes, { message: "A slot is longer than the delivery hours" });
+
+export async function updateDeliveryHours(input: unknown) {
+  const { user } = await requireRole(["super_admin"]);
+  const parsed = deliveryHoursSchema.safeParse(input);
+  if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Check the delivery hours" };
+  const { error } = await supabaseAdmin.from("app_settings")
+    .update({ ...parsed.data, updated_at: new Date().toISOString() }).eq("id", 1);
+  if (error) return { error: "Could not save the delivery hours" };
+  await audit({ actor_id: user.id, action: "UPDATE_DELIVERY_HOURS", target_table: "app_settings", target_id: "1", new_data: parsed.data });
+  revalidatePath("/admin/settings");
+  revalidatePath("/order");
+  revalidatePath("/");
+  return { ok: true };
+}
+
 // ── Staff sale: how many items one staff sale gets free (migration 035) ──
 const staffSaleSchema = z.object({ staff_free_items: z.number().int().min(0).max(20, "At most 20 items") });
 

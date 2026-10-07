@@ -2,11 +2,12 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import toast from "react-hot-toast";
-import { Navigation, Phone, MapPin, Package, Banknote, QrCode, CheckCircle2, KeyRound, MessageSquareText, Map as MapIcon } from "lucide-react";
+import { Navigation, Phone, MapPin, Package, Banknote, QrCode, CheckCircle2, KeyRound, MessageSquareText, Map as MapIcon, Clock } from "lucide-react";
 import { driverAdvanceStatus, verifyDeliveryOtp, getCustomerTelLink } from "@/app/actions/delivery";
 import { directionsUrl, embedUrl, searchUrl, distanceKm, fmtKm, STORE, type LatLng } from "@/lib/geo";
 import type { DriverJob } from "@/lib/driver-jobs";
 import { npr, cn } from "@/lib/utils";
+import { slotLabel } from "@/lib/delivery-hours";
 
 const STEPS = [
   { key: "assigned", label: "Assigned" },
@@ -74,6 +75,14 @@ export default function JobCard({ job, shop = STORE }: { job: DriverJob; shop?: 
             </button>
           </div>
         </div>
+
+        {/* A booked delivery time — deliver inside this window, not before */}
+        {job.slot && (
+          <div className="flex items-center gap-3 rounded-2xl bg-sky-500/15 px-4 py-3 text-sky-200">
+            <Clock size={18} className="shrink-0" />
+            <p className="text-sm font-bold">Deliver {slotLabel(job.slot)}</p>
+          </div>
+        )}
 
         {/* What to collect at the door — only while the delivery is open */}
         <div className={cn("flex items-center gap-3 rounded-2xl px-4 py-3",

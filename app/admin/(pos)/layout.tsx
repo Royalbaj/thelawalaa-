@@ -8,6 +8,7 @@ import { PosThemeRoot } from "@/components/pos/pos-theme";
 import PosFooter from "@/components/pos/pos-footer";
 import PosSession from "@/components/pos/pos-session";
 import PosLockScreen from "@/components/pos/pos-lock-screen";
+import OrderSoundKeeper from "@/components/pos/order-sound-keeper";
 import { getPosStaff, posLockOn, posLoginKey } from "@/lib/pos-staff";
 
 export const dynamic = "force-dynamic";
@@ -52,6 +53,8 @@ export default async function PosLayout({ children }: { children: React.ReactNod
     <PosThemeRoot initialDark>
       <SessionGuard userId={profile.id} />
       <PosSession signedInAt={user?.last_sign_in_at ?? null} />
+      {/* Order sound always on: any tap (PIN screen too) turns it on; a bar shows while it's off. */}
+      <OrderSoundKeeper />
       {lockOn && !staff ? (
         <PosLockScreen />
       ) : (

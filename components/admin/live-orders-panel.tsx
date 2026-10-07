@@ -12,7 +12,8 @@ import { playOrderSound } from "@/lib/order-sound";
 import { adminUpdateOrderStatus, assignDriver, markOrderPaid, getOrderLines, getLiveOrders } from "@/app/actions/staff";
 import { REFRESH_EVENT } from "@/components/refresh-button";
 import { MANAGER_LABEL, MEMBER_PRICE_LABEL, STAFF_LABEL } from "@/lib/discounts";
-import { CheckCircle2, ClipboardList, MessageSquareText, Crown, ChefHat, GraduationCap, Phone, MapPin, Navigation, ShieldCheck } from "lucide-react";
+import { CheckCircle2, ClipboardList, MessageSquareText, Crown, ChefHat, GraduationCap, Phone, MapPin, Navigation, ShieldCheck, Clock } from "lucide-react";
+import { slotLabel } from "@/lib/delivery-hours";
 
 interface Line { product_name: string; quantity: number }
 
@@ -27,6 +28,8 @@ export interface Order {
   payment_status: string;
   payment_method: string | null;
   placed_by?: string | null; // set = a POS (counter) order: one tap to Served/Collected
+  scheduled_for?: string | null; // a booked delivery slot (Admin → Settings → Delivery hours)
+  scheduled_until?: string | null;
   created_at: string;
   notes: string | null;
   delivery_address?: string | null;
@@ -274,6 +277,11 @@ export default function LiveOrdersPanel({
                 {o.items && o.items.length > 0 && (
                   <p className="mt-2 text-sm font-bold leading-snug text-stone-800 dark:text-stone-100">
                     {o.items.map((i) => `${i.quantity}× ${i.product_name}`).join(", ")}
+                  </p>
+                )}
+                {o.scheduled_for && o.scheduled_until && !CLOSED.includes(o.status) && (
+                  <p className="mt-1.5 flex items-center gap-1.5 rounded-lg bg-sky-50 px-2 py-1 text-xs font-extrabold text-sky-800 dark:bg-sky-950/40 dark:text-sky-300">
+                    <Clock size={13} className="shrink-0" /> Deliver {slotLabel({ start: o.scheduled_for, end: o.scheduled_until })}
                   </p>
                 )}
                 {note && <p className="mt-1.5 rounded-lg bg-yellow-50 px-2 py-1 text-xs font-bold text-yellow-900 dark:bg-yellow-900/30 dark:text-yellow-200"><MessageSquareText size={12} className="mr-1 inline -mt-0.5" />{note}</p>}

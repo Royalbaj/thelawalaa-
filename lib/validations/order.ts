@@ -5,6 +5,8 @@ export const orderSchema = z.object({
   branch_id: z.string().uuid().optional(),
   delivery_address_id: z.string().uuid().optional(),
   pickup_time: z.string().datetime().optional(),
+  // A booked delivery slot's start (Admin → Settings → Delivery hours); none = as soon as possible.
+  scheduled_for: z.string().datetime({ offset: true }).optional(),
   payment_method: z.enum(["cash", "qr", "esewa"]),
   promo_code: z.string().trim().max(30).optional(),
   notes: z.string().max(500).optional(),

@@ -104,6 +104,7 @@ export function orderConfirmedEmail(o: {
   items: { name: string; qty: number; lineTotal: number }[];
   subtotal: number; promoDiscount: number; pointsDiscount: number; pointsUsed: number; total: number;
   pointsToEarn: number; otp: string | null;
+  scheduled?: string | null; // a booked delivery slot, e.g. "Tomorrow 11:00 am – 11:30 am"
 }) {
   const rs = (n: number) => `Rs ${n.toLocaleString("en-IN")}`;
   const no = o.dailyNumber != null ? `#${String(o.dailyNumber).padStart(2, "0")}` : o.orderNumber;
@@ -119,7 +120,9 @@ export function orderConfirmedEmail(o: {
       heading: `Thanks — we've got your order ${no}`,
       name: o.name,
       blocks: [
-        p(o.type === "delivery"
+        p(o.type === "delivery" && o.scheduled
+          ? `Your order is in. We'll bring it to your door <b>${o.scheduled}</b> — you can follow every step live.`
+          : o.type === "delivery"
           ? "Your order is in. We'll cook it fresh and bring it to your door — you can follow every step live."
           : "Your order is in. We'll cook it fresh at Godam Chowk — you can follow every step live and we'll tell you when it's ready to collect."),
         receipt(
