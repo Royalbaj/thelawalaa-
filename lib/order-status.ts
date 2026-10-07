@@ -30,11 +30,17 @@ export function orderStatusLabel(status: string, type: string): string {
   return orderSteps(type)[orderStep(status, type)] ?? status;
 }
 
-/** The one tap that moves an order on at the counter — null once it's out of the counter's hands. */
-export function nextCounterAction(status: string, type: string): { status: string; label: string } | null {
+/**
+ * The one tap that moves an order on at the counter — null once it's out of the counter's hands.
+ * `counter`: a POS order (placed_by set) — ONE tap after the sale, straight to
+ * Served/Collected (owner's call); online orders keep "Ready" so customers know when to come.
+ */
+export function nextCounterAction(status: string, type: string, counter = false): { status: string; label: string } | null {
   switch (status) {
     case "pending": return { status: "confirmed", label: "Confirm" };
-    case "confirmed": case "preparing": return { status: "ready", label: type === "delivery" ? "Ready for driver" : "Ready" };
+    case "confirmed": case "preparing":
+      if (counter && type !== "delivery") return { status: "delivered", label: type === "dine_in" ? "Served" : "Collected" };
+      return { status: "ready", label: type === "delivery" ? "Ready for driver" : "Ready" };
     case "ready": return type === "delivery" ? null : { status: "delivered", label: type === "dine_in" ? "Served" : "Collected" };
     default: return null;
   }

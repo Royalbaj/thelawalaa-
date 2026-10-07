@@ -1,6 +1,6 @@
 import "server-only";
 import { supabaseAdmin, audit } from "@/lib/supabase/admin";
-import { addDays, type Ymd } from "@/lib/dates";
+import { addDays, nepalToday, startOfMonth, startOfWeek, type Ymd } from "@/lib/dates";
 
 // POS time clock (migration 036). Counter staff clock in and out on the
 // shared POS login with their own PIN (training_people, pos_clock = true).
@@ -109,6 +109,39 @@ export async function getStaffHours(from: Ymd, to: Ymd) {
     error: !!error,
     people: (people ?? []) as { id: string; name: string; pos_clock: boolean; is_manager: boolean }[],
   };
+}
+
+export type HoursSummaryRow = {
+  key: string; name: string; on: boolean; missed: number;
+  today: number; week: number; month: number; all: number; // minutes
+};
+
+/**
+ * Total hours per person — today, this week (Sun–Sat), this month and all
+ * time, in Nepal days (a shift counts on the day it started). The shift
+ * running now counts so far; one that was never clocked out counts 0 until fixed.
+ * For the Admin dashboard and the top of Admin → Staff Hours.
+ */
+export async function getHoursSummary() {
+  const now = Date.now();
+  const today = nepalToday(), week = startOfWeek(today), month = startOfMonth(today);
+  const { data } = await supabaseAdmin.from("staff_shifts").select(COLUMNS).order("clock_in", { ascending: false }).limit(20000);
+  const byPerson = new Map<string, HoursSummaryRow>();
+  for (const r of ((data ?? []) as ShiftDb[]).map((s) => toRow(s, now))) {
+    const key = r.personId ?? `name:${r.name}`;
+    const p = byPerson.get(key) ?? { key, name: r.name, on: false, missed: 0, today: 0, week: 0, month: 0, all: 0 };
+    const min = r.state === "done" ? r.minutes ?? 0 : r.state === "on" ? (now - new Date(r.clockIn).getTime()) / 60_000 : 0;
+    if (r.state === "on") p.on = true;
+    if (r.state === "missed") p.missed += 1;
+    p.all += min;
+    if (r.date >= month) p.month += min;
+    if (r.date >= week) p.week += min;
+    if (r.date === today) p.today += min;
+    byPerson.set(key, p);
+  }
+  const rows = [...byPerson.values()].sort((a, b) => b.month - a.month || b.all - a.all);
+  const sum = (k: "today" | "week" | "month" | "all") => rows.reduce((s, r) => s + r[k], 0);
+  return { rows, total: { today: sum("today"), week: sum("week"), month: sum("month"), all: sum("all") } };
 }
 
 /**

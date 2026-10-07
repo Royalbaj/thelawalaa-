@@ -2,11 +2,12 @@ import { Download } from "lucide-react";
 import { requireRole } from "@/lib/supabase/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { nepalToday, prettyDate, rangeQuery, resolveRange, type RangeKey } from "@/lib/dates";
-import { getStaffHours, hoursLabel, MAX_SHIFT_HOURS } from "@/lib/time-clock";
+import { getHoursSummary, getStaffHours, hoursLabel, MAX_SHIFT_HOURS } from "@/lib/time-clock";
 import RangePicker from "@/components/admin/range-picker";
 import ShiftRow, { ClockOutNow } from "@/components/admin/hours/shift-row";
 import AddShift from "@/components/admin/hours/add-shift";
 import ClockPeople from "@/components/admin/hours/clock-people";
+import HoursSummary from "@/components/admin/hours/hours-summary";
 
 export const dynamic = "force-dynamic";
 
@@ -17,8 +18,9 @@ const KEYS: RangeKey[] = ["today", "week", "month", "last-month", "custom"];
 export default async function StaffHoursPage({ searchParams }: { searchParams: Promise<Record<string, string | undefined>> }) {
   await requireRole(["super_admin"]);
   const range = resolveRange(await searchParams, "month");
-  const [h, { data: videos }] = await Promise.all([
+  const [h, summary, { data: videos }] = await Promise.all([
     getStaffHours(range.from, range.to),
+    getHoursSummary(),
     supabaseAdmin.from("training_videos").select("id").eq("is_active", true),
   ]);
   const clockers = h.people.filter((p) => p.pos_clock);
@@ -57,6 +59,8 @@ export default async function StaffHoursPage({ searchParams }: { searchParams: P
           <div className="space-y-2">{h.needsFixing.map((s) => <ShiftRow key={s.id} s={s} />)}</div>
         </section>
       )}
+
+      <HoursSummary s={summary} />
 
       <section className="card p-4 sm:p-5">
         <h2 className="mb-2 font-bold text-brand-brown">On the clock now</h2>

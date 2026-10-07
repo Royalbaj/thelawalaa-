@@ -26,6 +26,7 @@ export interface Order {
   discount_label?: string | null;
   payment_status: string;
   payment_method: string | null;
+  placed_by?: string | null; // set = a POS (counter) order: one tap to Served/Collected
   created_at: string;
   notes: string | null;
   delivery_address?: string | null;
@@ -240,7 +241,7 @@ export default function LiveOrdersPanel({
           </div>
         )}
         {visible.map((o) => {
-          const next = nextCounterAction(o.status, o.type);
+          const next = nextCounterAction(o.status, o.type, !!o.placed_by);
           const unpaid = o.payment_status !== "paid";
           const takePayment = next?.status === "delivered" && unpaid;
           const note = kitchenNote(o);
