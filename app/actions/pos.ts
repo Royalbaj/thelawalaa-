@@ -9,6 +9,7 @@ import { requireRole } from "@/lib/supabase/server";
 import { supabaseAdmin, audit, resolveStaffBranchId } from "@/lib/supabase/admin";
 import { applyOpeningPromoPrice } from "@/lib/promo";
 import { studentDiscount, memberUnitPrice, staffFreeItems, STUDENT_DISCOUNT_LABEL, MEMBER_PRICE_LABEL, STAFF_LABEL } from "@/lib/discounts";
+import { getPosStaff, posLockOn } from "@/lib/pos-staff";
 
 /** POS order: branch comes from the operator's OWN profile — never the client. */
 export async function createPosOrder(input: unknown) {
@@ -24,6 +25,11 @@ export async function createPosOrder(input: unknown) {
   const branchId = await resolveStaffBranchId(profile.branch_id);
   if (!branchId && profile.role === "pos_user") {
     return { error: "Your account isn't linked to a branch — ask an admin" };
+  }
+  // Who's on the till (their PIN — migration 037). Once staff log in with PINs, the till won't sell without one.
+  const seller = profile.role === "pos_user" ? await getPosStaff(user.id) : null;
+  if (!seller && profile.role === "pos_user" && await posLockOn()) {
+    return { error: "Your shift has ended on this till — tap Refresh and type your PIN" };
   }
 
   const ids = d.items.map((i) => i.product_id);
@@ -71,6 +77,8 @@ export async function createPosOrder(input: unknown) {
       order_number: "pending",
       customer_id: null,
       placed_by: user.id,
+      staff_person_id: seller?.id ?? null,
+      staff_name: seller?.name ?? null,
       branch_id: branchId,
       type: d.type,
       status: "confirmed",
@@ -102,7 +110,7 @@ export async function createPosOrder(input: unknown) {
   }
   await audit({
     actor_id: user.id, action: "POS_ORDER", target_table: "orders", target_id: order.id,
-    new_data: { total: order.total, ...(discount ? { discount, discount_label: discountLabel } : {}), ...(staff?.used ? { staff_free_items: staff.used } : {}), ...(members.length ? { memberships: members.length } : {}) },
+    new_data: { total: order.total, ...(seller ? { sold_by: seller.name } : {}), ...(discount ? { discount, discount_label: discountLabel } : {}), ...(staff?.used ? { staff_free_items: staff.used } : {}), ...(members.length ? { memberships: members.length } : {}) },
   });
   // Linked stock (Accounts → Stock) counts down with every sale; warn staff if it's running out.
   after(() => checkStockAfterSale(rows.map((r) => r.product_id)));

@@ -30,7 +30,7 @@ export default async function StaffHoursPage({ searchParams }: { searchParams: P
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <h1 className="font-display text-xl font-bold text-brand-brown">Staff Hours</h1>
-          <p className="text-sm text-stone-500">Clock-ins from the POS. Only you see the hours; staff see their clock times only.</p>
+          <p className="text-sm text-stone-500">Staff clock in by typing their PIN on the POS. Only you see the hours; staff see their clock times only.</p>
         </div>
         <a href={`/admin/hours/export?${rangeQuery(range)}`}
           className="flex items-center gap-1.5 rounded-full bg-white px-4 py-2 text-sm font-bold text-green-800 ring-1 ring-stone-200 hover:bg-green-50">
@@ -40,7 +40,8 @@ export default async function StaffHoursPage({ searchParams }: { searchParams: P
 
       {clockers.length === 0 && (
         <p className="rounded-2xl bg-amber-50 p-4 text-sm text-amber-900 ring-1 ring-amber-200">
-          Nobody can clock in yet. Under <b>Who can clock in · PINs</b> below, switch on your counter staff (or add them with a PIN).
+          Nobody can clock in yet, so the POS opens without a PIN. Under <b>Who can clock in · PINs</b> below, switch on your counter staff (or add them
+          with a PIN). From then on the POS asks for a PIN, which logs them in and clocks them in.
         </p>
       )}
       {h.error && <p className="rounded-xl bg-red-50 p-3 text-sm font-bold text-brand-red">Couldn&apos;t load the shifts. Refresh to try again.</p>}

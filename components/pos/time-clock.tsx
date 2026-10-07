@@ -10,6 +10,9 @@ import { cn } from "@/lib/utils";
 // The POS login is shared, so each counter person clocks in and out with
 // their own PIN (the same one as training). The counter sees names and
 // clock times only — hours worked are for the manager (Admin → Staff Hours).
+// Once staff log in to the till with their PIN (components/pos/pos-lock-screen.tsx),
+// this sheet lives in the name menu: it clocks anyone in or out without
+// changing who's on the till — unless it's the till's own person clocking out.
 
 const time = (iso: string) => new Date(iso).toLocaleTimeString("en-GB", { timeZone: "Asia/Kathmandu", hour: "numeric", minute: "2-digit", hour12: true });
 const day = (iso: string) => new Date(iso).toLocaleDateString("en-GB", { timeZone: "Asia/Kathmandu", weekday: "short", day: "numeric", month: "short" });
@@ -18,7 +21,7 @@ type Board = { name: string; since: string }[];
 type Step =
   | { kind: "pin" }
   | { kind: "who"; pin: string; name: string; clockedIn: boolean; since: string | null; missedSince: string | null }
-  | { kind: "done"; name: string; action: "in" | "out"; at: string };
+  | { kind: "done"; name: string; action: "in" | "out"; at: string; loggedOut: boolean };
 
 /** POS header → "Clock": who's on, and the PIN pad to clock in or out. */
 export default function TimeClockButton() {
@@ -42,26 +45,34 @@ export default function TimeClockButton() {
           </span>
         )}
       </button>
-      {open && <TimeClockSheet board={board} onChanged={load} onClose={() => setOpen(false)} />}
+      {open && <TimeClockSheet onChanged={load} onClose={() => setOpen(false)} />}
     </>
   );
 }
 
-function TimeClockSheet({ board, onChanged, onClose }: { board: Board | null; onChanged: () => void; onClose: () => void }) {
+export function TimeClockSheet({ onChanged, onClose }: { onChanged?: () => void; onClose: () => void }) {
   const [step, setStep] = useState<Step>({ kind: "pin" });
+  const [board, setBoard] = useState<Board | null>(null);
   const [pending, start] = useTransition();
+  const load = useCallback(() => { getClockBoard().then(setBoard).catch(() => { /* offline — keep the last list */ }); }, []);
+  useEffect(load, [load]);
+  // The till's own person clocked out: it locks (full load — back to the PIN screen).
+  const finish = useCallback(() => {
+    if (step.kind === "done" && step.loggedOut) window.location.replace("/admin");
+    else onClose();
+  }, [step, onClose]);
 
   useEffect(() => {
-    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") finish(); };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [onClose]);
+  }, [finish]);
   // A typed PIN never waits on a shared screen: back to the keypad after 30 s. The "done" note closes itself.
   useEffect(() => {
     if (step.kind === "pin") return;
-    const t = setTimeout(() => (step.kind === "done" ? onClose() : setStep({ kind: "pin" })), step.kind === "done" ? 4000 : 30_000);
+    const t = setTimeout(() => (step.kind === "done" ? finish() : setStep({ kind: "pin" })), step.kind === "done" ? 4000 : 30_000);
     return () => clearTimeout(t);
-  }, [step, onClose]);
+  }, [step, finish]);
 
   const submitPin = useCallback(async (pin: string) => {
     const r = await checkClockPin(pin);
@@ -75,8 +86,9 @@ function TimeClockSheet({ board, onChanged, onClose }: { board: Board | null; on
     start(async () => {
       const r = await punchClock(step.pin, action).catch(() => ({ error: "No connection — try again" }));
       if ("error" in r) { toast.error(r.error); return; }
-      setStep({ kind: "done", name: r.name, action: r.action, at: r.at });
-      onChanged();
+      setStep({ kind: "done", name: r.name, action: r.action, at: r.at, loggedOut: r.loggedOut });
+      load();
+      onChanged?.();
     });
   };
 
@@ -90,7 +102,7 @@ function TimeClockSheet({ board, onChanged, onClose }: { board: Board | null; on
             <p className="font-display text-lg font-extrabold text-brand-brown dark:text-orange-100">Clock in / out</p>
             <p className={cn("text-xs", muted)}>Use your own PIN — the same one as training.</p>
           </div>
-          <button onClick={onClose} aria-label="Close" className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-stone-100 dark:bg-stone-800"><X size={18} /></button>
+          <button onClick={finish} aria-label="Close" className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-stone-100 dark:bg-stone-800"><X size={18} /></button>
         </div>
 
         <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-4" style={{ paddingBottom: "calc(env(safe-area-inset-bottom) + 1rem)" }}>
@@ -147,8 +159,10 @@ function TimeClockSheet({ board, onChanged, onClose }: { board: Board | null; on
                 <CheckCircle2 size={40} className={cn("mx-auto", step.action === "in" ? "text-brand-green" : "text-brand-orange")} />
                 <p className="mt-3 font-display text-xl font-extrabold">{step.name} clocked {step.action}</p>
                 <p className="mt-1 font-display text-4xl font-extrabold tabular-nums text-brand-brown dark:text-orange-100">{time(step.at)}</p>
-                <p className={cn("mt-2 text-sm", muted)}>{step.action === "in" ? "Have a good shift." : "Thanks — see you next time."}</p>
-                <button onClick={onClose} className="btn-primary mt-5 w-full !py-3">Done</button>
+                <p className={cn("mt-2 text-sm", muted)}>
+                  {step.action === "in" ? "Have a good shift." : step.loggedOut ? "Thanks — see you next time. The till is locked now." : "Thanks — see you next time."}
+                </p>
+                <button onClick={finish} className="btn-primary mt-5 w-full !py-3">Done</button>
               </div>
             )}
           </div>

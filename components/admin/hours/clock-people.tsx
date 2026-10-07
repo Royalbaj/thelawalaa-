@@ -15,7 +15,7 @@ function PersonRow({ p }: { p: Person }) {
   const [pin, setPin] = useState("");
   const [pending, start] = useTransition();
   const toggle = () => {
-    if (p.pos_clock && !confirm(`Stop ${p.name} clocking in at the POS? If they're clocked in now, they're clocked out.`)) return;
+    if (p.pos_clock && !confirm(`Stop ${p.name} using the POS? If they're clocked in now, they're clocked out and the till locks.`)) return;
     start(async () => {
       const r = await updateTrainingPerson(p.id, { pos_clock: !p.pos_clock });
       r?.error ? toast.error(r.error) : toast.success(p.pos_clock ? `${p.name} can't clock in any more` : `${p.name} can clock in now`);
@@ -63,13 +63,17 @@ export default function ClockPeople({ people, videoIds }: { people: Person[]; vi
       <div>
         <h3 className="font-display font-bold text-brand-brown">Who can clock in · PINs</h3>
         <p className="text-xs text-stone-500">
-          On the POS they tap Clock and type their own 4-digit PIN to clock in or out. It&apos;s the same PIN they use for Staff Training.
-          They see their clock times, never their hours. PINs can&apos;t be shown again, so give a new one if someone forgets theirs.
+          The POS is locked until someone types their own 4-digit PIN. That opens the till for them and clocks them in, and every order they sell
+          carries their name. Their name menu has Lock screen (stay clocked in) and Clock out &amp; log out. It&apos;s the same PIN they use for Staff
+          Training. They see their clock times, never their hours. PINs can&apos;t be shown again, so give a new one if someone forgets theirs.
         </p>
       </div>
       <ul className="divide-y divide-orange-50">
         {people.map((p) => <PersonRow key={p.id} p={p} />)}
         {people.length === 0 && <li className="py-3 text-sm text-stone-500">Nobody yet. Add your counter staff below.</li>}
+        {people.length > 0 && !people.some((p) => p.pos_clock) && (
+          <li className="py-3 text-xs text-amber-800">As soon as one person here can clock in, the POS asks for a PIN before anyone can sell.</li>
+        )}
       </ul>
       <form className="space-y-2 border-t border-orange-50 pt-3" onSubmit={(e) => {
         e.preventDefault();

@@ -13,7 +13,7 @@ const time = (iso: string) => new Date(iso).toLocaleTimeString("en-GB", { timeZo
 const num = (v: string) => Math.max(0, Math.floor(Number(v.replace(/[^\d]/g, "")) || 0));
 
 /** POS header button → today's sales and the end-of-shift cash count. */
-export default function DaySalesButton() {
+export default function DaySalesButton({ countedBy }: { countedBy?: string }) {
   const [open, setOpen] = useState(false);
   return (
     <>
@@ -21,12 +21,12 @@ export default function DaySalesButton() {
         className="flex h-8 items-center gap-1.5 rounded-full bg-white/10 px-2.5 text-xs font-bold text-white/80 transition hover:bg-white/20 hover:text-white">
         <Calculator size={15} /> <span className="hidden sm:inline">Today</span>
       </button>
-      {open && <DaySalesSheet onClose={() => setOpen(false)} />}
+      {open && <DaySalesSheet onClose={() => setOpen(false)} countedBy={countedBy} />}
     </>
   );
 }
 
-export function DaySalesSheet({ onClose, initial }: { onClose: () => void; initial?: DaySales }) {
+export function DaySalesSheet({ onClose, initial, countedBy: loggedIn }: { onClose: () => void; initial?: DaySales; countedBy?: string }) {
   const [period, setPeriod] = useState<"day" | "shift">("day");
   const [data, setData] = useState<DaySales | null>(initial ?? null);
   const [loadError, setLoadError] = useState(false);
@@ -34,7 +34,7 @@ export function DaySalesSheet({ onClose, initial }: { onClose: () => void; initi
   const [saving, startSave] = useTransition();
   const [float, setFloat] = useState("");
   const [cash, setCash] = useState(""); // the total in the drawer — one number, no note-by-note count
-  const [countedBy, setCountedBy] = useState("");
+  const [countedBy, setCountedBy] = useState(loggedIn ?? ""); // the person logged in on the till, if any
 
   const load = useCallback((p: "day" | "shift") => startLoad(async () => {
     try { setData(await getDaySales(p)); setLoadError(false); } catch { setLoadError(true); }

@@ -1,39 +1,46 @@
 "use server";
 
 import { z } from "zod";
+import { cookies } from "next/headers";
 import { revalidatePath } from "next/cache";
 import { requireRole } from "@/lib/supabase/server";
 import { supabaseAdmin, audit } from "@/lib/supabase/admin";
 import { isPin, verifyPin } from "@/lib/accounts-pin";
 import { isYmd } from "@/lib/dates";
 import { clockTime, fromNepal, isStale } from "@/lib/time-clock";
+import { getPosStaff } from "@/lib/pos-staff";
+import { POS_STAFF_COOKIE, posStaffCookieOptions, signPosStaff, verifyPosStaff } from "@/lib/pos-staff-cookie";
 
-// POS time clock (migration 036). The POS login is shared, so each counter
-// person clocks in and out with their own 4-digit PIN — the same person and
-// PIN as staff training. The POS is told names and times only, never hours
-// worked; hours are for the admin (Admin → Staff Hours).
+// POS time clock (migration 036) and staff login (037). The POS login is
+// shared, so each counter person uses their own 4-digit PIN — the same person
+// and PIN as staff training. The PIN lock screen logs them in to the till AND
+// clocks them in; logging out clocks them out. The Clock sheet clocks anyone
+// in or out without changing who's on the till. The POS is told names and
+// times only, never hours worked; hours are for the admin (Admin → Staff Hours).
 
 const uuid = z.string().uuid();
 const DAY = 86_400_000;
 
 // ── POS ──────────────────────────────────────────────────────────
 
-/** 5 wrong PINs in 15 minutes on this login locks the clock for a while. */
+/** 10 wrong PINs in 15 minutes on this login locks the PIN pad for a while (it also guards the till). */
 async function pinLocked(userId: string) {
   const since = new Date(Date.now() - 15 * 60_000).toISOString();
   const { count } = await supabaseAdmin.from("audit_logs").select("id", { count: "exact", head: true })
     .eq("action", "CLOCK_PIN_FAIL").eq("actor_id", userId).gte("created_at", since);
-  return (count ?? 0) >= 5;
+  return (count ?? 0) >= 10;
 }
 
+type Person = { id: string; name: string };
+
 /** The PIN alone says who is at the counter (active PINs are unique). */
-async function personForPin(userId: string, pin: unknown): Promise<{ person: { id: string; name: string } } | { error: string }> {
+async function personForPin(userId: string, pin: unknown): Promise<{ person: Person } | { error: string }> {
   if (!isPin(pin)) return { error: "Enter your 4-digit PIN" };
   if (await pinLocked(userId)) return { error: "Too many wrong PINs — wait 15 minutes, or ask the manager" };
   const { data: people } = await supabaseAdmin.from("training_people").select("id, name, pin_hash, pos_clock").eq("is_active", true);
   for (const p of people ?? []) {
     if (!(await verifyPin(pin, p.pin_hash))) continue;
-    if (!p.pos_clock) return { error: `${p.name}, you're not set up to clock in here — ask the manager` };
+    if (!p.pos_clock) return { error: `${p.name}, you're not set up for the POS — ask the manager` };
     return { person: { id: p.id, name: p.name } };
   }
   await audit({ actor_id: userId, action: "CLOCK_PIN_FAIL", target_table: "staff_shifts" });
@@ -46,6 +53,39 @@ async function openShift(personId: string) {
   return data;
 }
 
+/**
+ * Clocks them in. A shift still open from more than 16 h ago was a forgotten
+ * clock-out: it's marked missed (the admin puts in the time) and a new one starts.
+ */
+async function clockIn(person: Person, userId: string): Promise<{ id: string; since: string; missedSince: string | null } | { error: string }> {
+  const open = await openShift(person.id);
+  if (open && !isStale(open.clock_in)) return { error: `${person.name} is already clocked in` };
+  if (open) {
+    await supabaseAdmin.from("staff_shifts").update({ missed_out: true }).eq("id", open.id);
+    await audit({ actor_id: userId, action: "SHIFT_MISSED", target_table: "staff_shifts", target_id: open.id, new_data: { person: person.name } });
+  }
+  const now = new Date().toISOString();
+  const { data, error } = await supabaseAdmin.from("staff_shifts")
+    .insert({ person_id: person.id, person_name: person.name, clock_in: now, in_by: userId }).select("id").single();
+  if (error || !data) return { error: error?.code === "23505" ? `${person.name} is already clocked in` : "Couldn't clock in — try again" };
+  await audit({ actor_id: userId, action: "CLOCK_IN", target_table: "staff_shifts", target_id: data.id, new_data: { person: person.name } });
+  return { id: data.id, since: now, missedSince: open?.clock_in ?? null };
+}
+
+async function clockOut(shiftId: string, person: Person, userId: string): Promise<{ at: string } | { error: string }> {
+  const now = new Date().toISOString();
+  const { data } = await supabaseAdmin.from("staff_shifts").update({ clock_out: now, out_by: userId })
+    .eq("id", shiftId).is("clock_out", null).select("id");
+  if (!data?.length) return { error: "Already clocked out" };
+  await audit({ actor_id: userId, action: "CLOCK_OUT", target_table: "staff_shifts", target_id: shiftId, new_data: { person: person.name } });
+  return { at: now };
+}
+
+/** Is this the person logged in on the till on this device? */
+async function loggedInHere(userId: string, personId: string) {
+  return verifyPosStaff(userId, (await cookies()).get(POS_STAFF_COOKIE)?.value) === personId;
+}
+
 /** POS → Clock: who is clocked in right now, and since when. No hours. */
 export async function getClockBoard() {
   await requireRole(["pos_user"]);
@@ -54,7 +94,7 @@ export async function getClockBoard() {
   return (data ?? []).filter((s) => !isStale(s.clock_in)).map((s) => ({ name: s.person_name, since: s.clock_in }));
 }
 
-/** Step 1 — the PIN: who it is, and whether they're clocking in or out. */
+/** Clock sheet, step 1 — the PIN: who it is, and whether they're clocking in or out. */
 export async function checkClockPin(pin: unknown) {
   const { user } = await requireRole(["pos_user"]);
   const r = await personForPin(user.id, pin);
@@ -69,36 +109,76 @@ export async function checkClockPin(pin: unknown) {
   };
 }
 
-/** Step 2 — clock in or out. The PIN is checked again: the screen never says who. */
+/** Clock sheet, step 2 — clock in or out. The PIN is checked again: the screen never says who. */
 export async function punchClock(pin: unknown, action: unknown) {
   const { user } = await requireRole(["pos_user"]);
   if (action !== "in" && action !== "out") return { error: "Pick clock in or clock out" };
   const r = await personForPin(user.id, pin);
   if ("error" in r) return r;
   const { person } = r;
-  const open = await openShift(person.id);
-  const on = !!open && !isStale(open.clock_in);
-  const now = new Date().toISOString();
 
   if (action === "out") {
-    if (!on) return { error: `${person.name} isn't clocked in` };
-    const { data } = await supabaseAdmin.from("staff_shifts").update({ clock_out: now, out_by: user.id })
-      .eq("id", open!.id).is("clock_out", null).select("id");
-    if (!data?.length) return { error: "Already clocked out" };
-    await audit({ actor_id: user.id, action: "CLOCK_OUT", target_table: "staff_shifts", target_id: open!.id, new_data: { person: person.name } });
-    return { ok: true as const, name: person.name, action: "out" as const, at: now };
+    const open = await openShift(person.id);
+    if (!open || isStale(open.clock_in)) return { error: `${person.name} isn't clocked in` };
+    const out = await clockOut(open.id, person, user.id);
+    if ("error" in out) return out;
+    // Clocking out the person on this till logs them out of it too.
+    const loggedOut = await loggedInHere(user.id, person.id);
+    if (loggedOut) (await cookies()).delete(POS_STAFF_COOKIE);
+    return { ok: true as const, name: person.name, action: "out" as const, at: out.at, loggedOut };
   }
 
-  if (on) return { error: `${person.name} is already clocked in` };
-  if (open) {
-    await supabaseAdmin.from("staff_shifts").update({ missed_out: true }).eq("id", open.id);
-    await audit({ actor_id: user.id, action: "SHIFT_MISSED", target_table: "staff_shifts", target_id: open.id, new_data: { person: person.name } });
+  const c = await clockIn(person, user.id);
+  if ("error" in c) return c;
+  return { ok: true as const, name: person.name, action: "in" as const, at: c.since, loggedOut: false };
+}
+
+/** POS lock screen: the PIN opens the till for this person and clocks them in if they aren't already. */
+export async function posStaffLogin(pin: unknown) {
+  const { user } = await requireRole(["pos_user"]);
+  const r = await personForPin(user.id, pin);
+  if ("error" in r) return r;
+  const { person } = r;
+  const open = await openShift(person.id);
+  let since = open && !isStale(open.clock_in) ? open.clock_in : null;
+  let missedSince: string | null = null;
+  const clockedInNow = !since;
+  if (!since) {
+    const c = await clockIn(person, user.id);
+    if ("error" in c) {
+      // Clocked in on another device at the same moment — that shift is theirs.
+      const again = await openShift(person.id);
+      if (!again) return c;
+      since = again.clock_in;
+    } else {
+      since = c.since;
+      missedSince = c.missedSince;
+    }
   }
-  const { data, error } = await supabaseAdmin.from("staff_shifts")
-    .insert({ person_id: person.id, person_name: person.name, clock_in: now, in_by: user.id }).select("id").single();
-  if (error || !data) return { error: error?.code === "23505" ? `${person.name} is already clocked in` : "Couldn't clock in — try again" };
-  await audit({ actor_id: user.id, action: "CLOCK_IN", target_table: "staff_shifts", target_id: data.id, new_data: { person: person.name } });
-  return { ok: true as const, name: person.name, action: "in" as const, at: now };
+  (await cookies()).set(POS_STAFF_COOKIE, signPosStaff(user.id, person.id), posStaffCookieOptions);
+  await audit({ actor_id: user.id, action: "POS_LOGIN", target_table: "training_people", target_id: person.id, new_data: { person: person.name } });
+  return { ok: true as const, name: person.name, since, clockedInNow, missedSince };
+}
+
+/** Name menu → "Lock screen": back to the PIN pad, still clocked in (a break, or someone else's turn on the till). */
+export async function posStaffLock() {
+  const { user } = await requireRole(["pos_user"]);
+  const staff = await getPosStaff(user.id);
+  (await cookies()).delete(POS_STAFF_COOKIE);
+  if (staff) await audit({ actor_id: user.id, action: "POS_LOCK", target_table: "training_people", target_id: staff.id, new_data: { person: staff.name } });
+  return { ok: true as const };
+}
+
+/** Name menu → "Clock out & log out": ends their shift and locks the till. */
+export async function posStaffLogout() {
+  const { user } = await requireRole(["pos_user"]);
+  const staff = await getPosStaff(user.id);
+  (await cookies()).delete(POS_STAFF_COOKIE);
+  if (!staff) return { ok: true as const, at: null };
+  const open = await openShift(staff.id);
+  const out = open ? await clockOut(open.id, staff, user.id) : null;
+  await audit({ actor_id: user.id, action: "POS_LOGOUT", target_table: "training_people", target_id: staff.id, new_data: { person: staff.name } });
+  return { ok: true as const, at: out && "at" in out ? out.at : null };
 }
 
 // ── Admin → Staff Hours ─────────────────────────────────────────

@@ -7,6 +7,8 @@ import SessionGuard from "@/components/session-guard";
 import { PosThemeRoot } from "@/components/pos/pos-theme";
 import PosFooter from "@/components/pos/pos-footer";
 import PosSession from "@/components/pos/pos-session";
+import PosLockScreen from "@/components/pos/pos-lock-screen";
+import { getPosStaff, posLockOn } from "@/lib/pos-staff";
 
 export const dynamic = "force-dynamic";
 
@@ -39,13 +41,25 @@ export default async function PosLayout({ children }: { children: React.ReactNod
   // Other staff go to their own home, never back through login (a loop).
   if (profile.role !== "pos_user") redirect(ROLE_HOME[profile.role] ?? "/unauthorized");
 
+  // Staff login (migration 037): once anyone may clock in on the POS, the till
+  // stays locked until a counter person types their PIN (which clocks them in).
+  // Until then — nobody set up yet — the POS works as it always did.
+  const lockOn = await posLockOn();
+  const staff = lockOn ? await getPosStaff(profile.id) : null;
+
   // The POS is always dark (owner's call) — easier on the eyes all day at the counter.
   return (
     <PosThemeRoot initialDark>
       <SessionGuard userId={profile.id} />
       <PosSession signedInAt={user?.last_sign_in_at ?? null} />
-      <PosHeader fullName={profile.full_name} />
-      <main className="min-h-0 flex-1">{children}</main>
+      {lockOn && !staff ? (
+        <PosLockScreen />
+      ) : (
+        <>
+          <PosHeader fullName={profile.full_name} staff={staff} />
+          <main className="min-h-0 flex-1">{children}</main>
+        </>
+      )}
       <PosFooter />
     </PosThemeRoot>
   );

@@ -21,7 +21,7 @@ export default async function AdminOrders(props: { searchParams: Promise<{ statu
 
   let query = supabaseAdmin
     .from("orders")
-    .select("id, order_number, daily_number, status, type, subtotal, delivery_fee, total, payment_status, payment_method, created_at, notes, discount_amount, discount_label, points_discount, delivery_address, delivery_lat, delivery_lng, promo_codes:promo_code_id(code), profiles:customer_id(full_name), items:order_items(product_name, quantity, product_price, line_total)")
+    .select("id, order_number, daily_number, status, type, subtotal, delivery_fee, total, payment_status, payment_method, created_at, notes, discount_amount, discount_label, points_discount, delivery_address, delivery_lat, delivery_lng, staff_name, promo_codes:promo_code_id(code), profiles:customer_id(full_name), items:order_items(product_name, quantity, product_price, line_total)")
     .order("created_at", { ascending: false })
     .limit(100);
   if (tab.statuses.length) query = query.in("status", tab.statuses);
@@ -89,6 +89,7 @@ export default async function AdminOrders(props: { searchParams: Promise<{ statu
                 </p>
                 <p className="mt-0.5 truncate text-xs text-stone-500">
                   {customerName}{isGuest && customerName !== "Guest" ? " (guest)" : ""} · {o.type === "delivery" ? "Delivery" : o.type === "dine_in" ? "Dine-in" : "Pickup"} · {format(new Date(o.created_at), "d MMM, h:mm a")}
+                  {o.staff_name && <> · sold by <b className="text-stone-600">{o.staff_name}</b></>}
                 </p>
               </div>
               <p className="shrink-0 font-display text-lg font-bold text-brand-brown">{npr(Number(o.total))}</p>
@@ -174,6 +175,7 @@ export default async function AdminOrders(props: { searchParams: Promise<{ statu
                   <td className="px-4 py-3.5 text-stone-500 text-xs">
                     <div>{format(new Date(o.created_at), "d MMM yyyy")}</div>
                     <div className="text-stone-400">{format(new Date(o.created_at), "h:mm a")}</div>
+                    {o.staff_name && <div className="mt-0.5 text-stone-500">by <b>{o.staff_name}</b></div>}
                   </td>
                   <td className="px-4 py-3.5">
                     <OrderStatusSelect orderId={o.id} status={o.status} type={o.type} />

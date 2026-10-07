@@ -3,13 +3,16 @@ import { supabaseAdmin } from "@/lib/supabase/admin";
 import { fetchLiveOrders } from "@/lib/live-orders";
 import { getPosStock } from "@/lib/stock-alerts";
 import PosWorkspace from "@/components/pos/pos-workspace";
+import { getPosStaff, posLockOn } from "@/lib/pos-staff";
 
 export const dynamic = "force-dynamic";
 
 // pos_user only — see app/admin/(pos)/layout.tsx for why super_admin no
 // longer reaches this screen at all.
 export default async function AdminDashboard() {
-  await requireRole(["pos_user"]);
+  const { user } = await requireRole(["pos_user"]);
+  // Locked till: the layout shows the PIN screen, so don't load the menu and orders.
+  if (await posLockOn() && !(await getPosStaff(user.id))) return null;
 
   const [{ data: products }, { data: categories }, { data: recentOrders }, { data: drivers }, { data: settings }, stock] = await Promise.all([
     supabaseAdmin

@@ -178,10 +178,10 @@ export function buildSalesWorkbook(r: SalesReport, range: { from: Ymd; to: Ymd }
   os.columns = [
     { key: "time", width: 8 }, { key: "no", width: 6 }, { key: "num", width: 17 }, { key: "ch", width: 14 }, { key: "type", width: 10 },
     { key: "status", width: 16 }, { key: "method", width: 9 }, { key: "pay", width: 9 }, { key: "sub", width: 11 }, { key: "disc", width: 10 },
-    { key: "dl", width: 14 }, { key: "del", width: 9 }, { key: "total", width: 11 }, { key: "served", width: 11 },
+    { key: "dl", width: 14 }, { key: "del", width: 9 }, { key: "total", width: 11 }, { key: "served", width: 11 }, { key: "seller", width: 14 },
   ];
-  title(os, 14, "Orders by day", `${period} · each day starts with its total · grey = cancelled · amber = not paid yet`);
-  headerRow(os.addRow(["Time", "#", "Order number", "Channel", "Type", "Status", "Paid by", "Payment", "Subtotal", "Discount", "Discount type", "Delivery", "Total", "Served in (min)"]));
+  title(os, 15, "Orders by day", `${period} · each day starts with its total · grey = cancelled · amber = not paid yet`);
+  headerRow(os.addRow(["Time", "#", "Order number", "Channel", "Type", "Status", "Paid by", "Payment", "Subtotal", "Discount", "Discount type", "Delivery", "Total", "Served in (min)", "Sold by"]));
   const byDay = new Map<Ymd, ReportOrder[]>();
   for (const o of r.orders) { const d = nepalDay(o.created_at); byDay.set(d, [...(byDay.get(d) ?? []), o]); }
   for (const d of days) {
@@ -193,7 +193,7 @@ export function buildSalesWorkbook(r: SalesReport, range: { from: Ymd; to: Ymd }
     bar.getCell(13).value = d.total;
     bar.getCell(13).numFmt = MONEY;
     const isBest = best && d.day === best.day;
-    for (let c = 1; c <= 14; c++) bar.getCell(c).fill = fill(isBest ? COLOR.green : COLOR.band);
+    for (let c = 1; c <= 15; c++) bar.getCell(c).fill = fill(isBest ? COLOR.green : COLOR.band);
     bar.font = { bold: true, size: 12, color: { argb: isBest ? COLOR.greenText : COLOR.brown } };
     bar.height = 22;
     bar.getCell(1).alignment = { vertical: "middle", indent: 1 };
@@ -205,11 +205,12 @@ export function buildSalesWorkbook(r: SalesReport, range: { from: Ymd; to: Ymd }
         pay: unpaid ? "Unpaid" : "Paid", sub: o.subtotal, disc: o.discount_amount || null, dl: o.discount_label ?? "",
         del: o.delivery_fee || null, total: o.total,
         served: o.served_at ? Math.round((new Date(o.served_at).getTime() - new Date(o.created_at).getTime()) / 6000) / 10 : null,
+        seller: o.staff_name ?? "",
       });
       ["sub", "disc", "del", "total"].forEach((c) => { row.getCell(c).numFmt = MONEY; });
       if (cancelled) row.font = { color: { argb: COLOR.grey }, strike: true };
       else if (unpaid) row.getCell("pay").font = { bold: true, color: { argb: COLOR.amber } };
-      borderRow(row, 1, 14);
+      borderRow(row, 1, 15);
     }
   }
   os.pageSetup = { orientation: "landscape", fitToPage: true, fitToWidth: 1, fitToHeight: 0, printTitlesRow: "3:3" };
