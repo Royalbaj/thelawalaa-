@@ -6,8 +6,9 @@ import { POS_STAFF_COOKIE, verifyPosStaff } from "@/lib/pos-staff-cookie";
 import { isStale } from "@/lib/time-clock";
 
 // Who is working the till on this device (migration 037). Logged in = a valid
-// PIN cookie for this POS login AND an open shift — so clocking out, being
-// clocked out from Admin, or a shift left open past 16 h all lock the till.
+// PIN cookie for this POS login for someone who's still allowed on the POS.
+// Logging in and clocking in are separate (owner's call): staff log in and out
+// of the till as often as they swap, but clock in and out once a shift.
 
 /** The PIN lock is on once anyone may clock in on the POS — until then the till works as before. */
 export const posLockOn = cache(async () => {
@@ -16,7 +17,7 @@ export const posLockOn = cache(async () => {
   return (count ?? 0) > 0;
 });
 
-export type PosStaff = { id: string; name: string; since: string };
+export type PosStaff = { id: string; name: string; clockedInSince: string | null };
 
 /** The person logged in on this POS device, or null (locked). */
 export const getPosStaff = cache(async (userId: string): Promise<PosStaff | null> => {
@@ -26,6 +27,6 @@ export const getPosStaff = cache(async (userId: string): Promise<PosStaff | null
     supabaseAdmin.from("training_people").select("id, name, is_active, pos_clock").eq("id", personId).maybeSingle(),
     supabaseAdmin.from("staff_shifts").select("clock_in").eq("person_id", personId).is("clock_out", null).eq("missed_out", false).maybeSingle(),
   ]);
-  if (!p?.is_active || !p.pos_clock || !shift || isStale(shift.clock_in)) return null;
-  return { id: p.id, name: p.name, since: shift.clock_in };
+  if (!p?.is_active || !p.pos_clock) return null;
+  return { id: p.id, name: p.name, clockedInSince: shift && !isStale(shift.clock_in) ? shift.clock_in : null };
 });

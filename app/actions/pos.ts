@@ -29,7 +29,7 @@ export async function createPosOrder(input: unknown) {
   // Who's on the till (their PIN — migration 037). Once staff log in with PINs, the till won't sell without one.
   const seller = profile.role === "pos_user" ? await getPosStaff(user.id) : null;
   if (!seller && profile.role === "pos_user" && await posLockOn()) {
-    return { error: "Your shift has ended on this till — tap Refresh and type your PIN" };
+    return { error: "Nobody is logged in on this till — tap Refresh and type your PIN" };
   }
 
   const ids = d.items.map((i) => i.product_id);

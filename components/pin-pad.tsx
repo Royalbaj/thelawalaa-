@@ -21,6 +21,7 @@ export default function PinPad({ submit, idle = "Enter the 4-digit PIN" }: {
   // The digits so far, read synchronously — quick taps can land before a re-render.
   const pinRef = useRef("");
   const set = (v: string) => { pinRef.current = v; setPin(v); };
+  const box = useRef<HTMLDivElement>(null);
 
   const check = useCallback((value: string) => {
     start(async () => {
@@ -45,6 +46,9 @@ export default function PinPad({ submit, idle = "Enter the 4-digit PIN" }: {
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
+      // A keyboard types into the pad that's in front: not one behind an open dialog.
+      const dialog = document.querySelector('[aria-modal="true"]');
+      if (dialog && !dialog.contains(box.current)) return;
       if (/^\d$/.test(e.key)) press(e.key);
       else if (e.key === "Backspace") press("back");
     };
@@ -54,7 +58,7 @@ export default function PinPad({ submit, idle = "Enter the 4-digit PIN" }: {
 
   const key = "h-16 touch-manipulation rounded-2xl bg-stone-100 font-display text-2xl font-bold text-brand-brown transition active:scale-95 active:bg-orange-100 disabled:opacity-50 dark:bg-stone-800 dark:text-orange-100 dark:active:bg-orange-950";
   return (
-    <>
+    <div ref={box}>
       <div className={cn("my-5 flex justify-center gap-4", shake && "animate-[pin-shake_0.4s]")} aria-live="polite" aria-label={`${pin.length} of ${LENGTH} digits entered`}>
         {Array.from({ length: LENGTH }, (_, i) => (
           <span key={i} className={cn("h-4 w-4 rounded-full border-2 transition", i < pin.length ? "border-brand-orange bg-brand-orange" : "border-stone-300 dark:border-stone-600")} />
@@ -75,6 +79,6 @@ export default function PinPad({ submit, idle = "Enter the 4-digit PIN" }: {
         </button>
       </div>
       <style>{`@keyframes pin-shake { 0%,100% { transform: translateX(0) } 20%,60% { transform: translateX(-8px) } 40%,80% { transform: translateX(8px) } }`}</style>
-    </>
+    </div>
   );
 }

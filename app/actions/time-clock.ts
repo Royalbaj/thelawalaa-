@@ -9,14 +9,15 @@ import { isPin, verifyPin } from "@/lib/accounts-pin";
 import { isYmd } from "@/lib/dates";
 import { clockTime, fromNepal, isStale } from "@/lib/time-clock";
 import { getPosStaff } from "@/lib/pos-staff";
-import { POS_STAFF_COOKIE, posStaffCookieOptions, signPosStaff, verifyPosStaff } from "@/lib/pos-staff-cookie";
+import { POS_STAFF_COOKIE, posStaffCookieOptions, signPosStaff } from "@/lib/pos-staff-cookie";
 
 // POS time clock (migration 036) and staff login (037). The POS login is
 // shared, so each counter person uses their own 4-digit PIN — the same person
-// and PIN as staff training. The PIN lock screen logs them in to the till AND
-// clocks them in; logging out clocks them out. The Clock sheet clocks anyone
-// in or out without changing who's on the till. The POS is told names and
-// times only, never hours worked; hours are for the admin (Admin → Staff Hours).
+// and PIN as staff training — for two separate things (owner's call):
+//  · logging in / out of the till: quick, as often as they swap over;
+//  · clocking in / out (the Clock button): once a shift, for their hours.
+// The POS is told names and times only, never hours worked; hours are for the
+// admin (Admin → Staff Hours).
 
 const uuid = z.string().uuid();
 const DAY = 86_400_000;
@@ -81,11 +82,6 @@ async function clockOut(shiftId: string, person: Person, userId: string): Promis
   return { at: now };
 }
 
-/** Is this the person logged in on the till on this device? */
-async function loggedInHere(userId: string, personId: string) {
-  return verifyPosStaff(userId, (await cookies()).get(POS_STAFF_COOKIE)?.value) === personId;
-}
-
 /** POS → Clock: who is clocked in right now, and since when. No hours. */
 export async function getClockBoard() {
   await requireRole(["pos_user"]);
@@ -122,63 +118,31 @@ export async function punchClock(pin: unknown, action: unknown) {
     if (!open || isStale(open.clock_in)) return { error: `${person.name} isn't clocked in` };
     const out = await clockOut(open.id, person, user.id);
     if ("error" in out) return out;
-    // Clocking out the person on this till logs them out of it too.
-    const loggedOut = await loggedInHere(user.id, person.id);
-    if (loggedOut) (await cookies()).delete(POS_STAFF_COOKIE);
-    return { ok: true as const, name: person.name, action: "out" as const, at: out.at, loggedOut };
+    return { ok: true as const, name: person.name, action: "out" as const, at: out.at };
   }
 
   const c = await clockIn(person, user.id);
   if ("error" in c) return c;
-  return { ok: true as const, name: person.name, action: "in" as const, at: c.since, loggedOut: false };
+  return { ok: true as const, name: person.name, action: "in" as const, at: c.since };
 }
 
-/** POS lock screen: the PIN opens the till for this person and clocks them in if they aren't already. */
+/** POS lock screen: the PIN opens the till for this person. It doesn't clock them in — that's the Clock button. */
 export async function posStaffLogin(pin: unknown) {
   const { user } = await requireRole(["pos_user"]);
   const r = await personForPin(user.id, pin);
   if ("error" in r) return r;
-  const { person } = r;
-  const open = await openShift(person.id);
-  let since = open && !isStale(open.clock_in) ? open.clock_in : null;
-  let missedSince: string | null = null;
-  const clockedInNow = !since;
-  if (!since) {
-    const c = await clockIn(person, user.id);
-    if ("error" in c) {
-      // Clocked in on another device at the same moment — that shift is theirs.
-      const again = await openShift(person.id);
-      if (!again) return c;
-      since = again.clock_in;
-    } else {
-      since = c.since;
-      missedSince = c.missedSince;
-    }
-  }
-  (await cookies()).set(POS_STAFF_COOKIE, signPosStaff(user.id, person.id), posStaffCookieOptions);
-  await audit({ actor_id: user.id, action: "POS_LOGIN", target_table: "training_people", target_id: person.id, new_data: { person: person.name } });
-  return { ok: true as const, name: person.name, since, clockedInNow, missedSince };
+  (await cookies()).set(POS_STAFF_COOKIE, signPosStaff(user.id, r.person.id), posStaffCookieOptions);
+  await audit({ actor_id: user.id, action: "POS_LOGIN", target_table: "training_people", target_id: r.person.id, new_data: { person: r.person.name } });
+  return { ok: true as const, name: r.person.name };
 }
 
-/** Name menu → "Lock screen": back to the PIN pad, still clocked in (a break, or someone else's turn on the till). */
-export async function posStaffLock() {
-  const { user } = await requireRole(["pos_user"]);
-  const staff = await getPosStaff(user.id);
-  (await cookies()).delete(POS_STAFF_COOKIE);
-  if (staff) await audit({ actor_id: user.id, action: "POS_LOCK", target_table: "training_people", target_id: staff.id, new_data: { person: staff.name } });
-  return { ok: true as const };
-}
-
-/** Name menu → "Clock out & log out": ends their shift and locks the till. */
+/** Name menu → "Log out": back to the PIN screen for the next person. Their clock-in isn't touched. */
 export async function posStaffLogout() {
   const { user } = await requireRole(["pos_user"]);
   const staff = await getPosStaff(user.id);
   (await cookies()).delete(POS_STAFF_COOKIE);
-  if (!staff) return { ok: true as const, at: null };
-  const open = await openShift(staff.id);
-  const out = open ? await clockOut(open.id, staff, user.id) : null;
-  await audit({ actor_id: user.id, action: "POS_LOGOUT", target_table: "training_people", target_id: staff.id, new_data: { person: staff.name } });
-  return { ok: true as const, at: out && "at" in out ? out.at : null };
+  if (staff) await audit({ actor_id: user.id, action: "POS_LOGOUT", target_table: "training_people", target_id: staff.id, new_data: { person: staff.name } });
+  return { ok: true as const };
 }
 
 // ── Admin → Staff Hours ─────────────────────────────────────────

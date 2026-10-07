@@ -1,21 +1,21 @@
 "use client";
 import { useEffect, useRef, useState, useTransition } from "react";
-import toast from "react-hot-toast";
-import { ChevronDown, Clock, Lock, LogOut } from "lucide-react";
-import { posStaffLock, posStaffLogout } from "@/app/actions/time-clock";
-import { TimeClockSheet } from "@/components/pos/time-clock";
+import Link from "next/link";
+import { ChevronDown, GraduationCap, LogOut } from "lucide-react";
+import { posStaffLogout } from "@/app/actions/time-clock";
 import { signOutHere } from "@/lib/sign-out";
+import { cn } from "@/lib/utils";
 
 const time = (iso: string) => new Date(iso).toLocaleTimeString("en-GB", { timeZone: "Asia/Kathmandu", hour: "numeric", minute: "2-digit", hour12: true });
 
 /**
- * POS header: who's on the till (logged in with their PIN). Lock = back to the
- * PIN screen, still clocked in; Clock out & log out = shift over. Every change
- * is a full page load, so the next person never sees the last one's screen.
+ * POS header: who's on the till (logged in with their PIN). "Log out" hands
+ * the till over — back to the PIN screen — and never touches their clock-in
+ * (that's the Clock button, once a shift). An amber dot = not clocked in yet.
+ * Logging out is a full page load, so the next person never sees the last one's screen.
  */
-export default function StaffMenu({ name, since }: { name: string; since: string }) {
+export default function StaffMenu({ name, clockedInSince }: { name: string; clockedInSince: string | null }) {
   const [open, setOpen] = useState(false);
-  const [clock, setClock] = useState(false);
   const [pending, start] = useTransition();
   const ref = useRef<HTMLDivElement>(null);
   useEffect(() => {
@@ -27,51 +27,40 @@ export default function StaffMenu({ name, since }: { name: string; since: string
     return () => { document.removeEventListener("pointerdown", away); window.removeEventListener("keydown", esc); };
   }, [open]);
 
-  const lock = () => start(async () => {
-    await posStaffLock().catch(() => null);
+  const logout = () => start(async () => {
+    await posStaffLogout().catch(() => null);
     window.location.replace("/admin");
   });
-  const logout = () => {
-    if (!confirm(`Clock ${name} out and log out of the till?`)) return;
-    start(async () => {
-      const r = await posStaffLogout().catch(() => null);
-      if (!r) { toast.error("No connection — try again"); return; }
-      window.location.replace("/admin");
-    });
-  };
 
-  const item = "flex w-full items-start gap-3 rounded-xl px-3 py-2.5 text-left transition hover:bg-white/10 disabled:opacity-50";
+  const item = "flex w-full items-center gap-3 rounded-xl px-3 py-3 text-left font-bold transition hover:bg-white/10 disabled:opacity-50";
   return (
     <div ref={ref} className="relative">
-      <button onClick={() => setOpen((v) => !v)} aria-expanded={open} aria-haspopup="menu" title={`${name} is on the till`}
-        className="flex h-8 max-w-[8rem] items-center gap-1 rounded-full bg-brand-orange px-3 text-xs font-extrabold text-white transition hover:bg-orange-500">
+      <button onClick={() => setOpen((v) => !v)} aria-expanded={open} aria-haspopup="menu"
+        title={`${name} is on the till${clockedInSince ? "" : " (not clocked in)"}`}
+        className="relative flex h-8 max-w-[8rem] items-center gap-1 rounded-full bg-brand-orange px-3 text-xs font-extrabold text-white transition hover:bg-orange-500">
         <span className="truncate">{name.split(" ")[0]}</span> <ChevronDown size={13} className="shrink-0" />
+        {!clockedInSince && <span className="absolute -right-0.5 -top-0.5 h-2.5 w-2.5 rounded-full bg-amber-400 ring-2 ring-brand-dark" />}
       </button>
       {open && (
-        <div role="menu" className="absolute left-0 top-10 z-[70] w-64 rounded-2xl bg-stone-900 p-1.5 text-sm text-stone-100 shadow-2xl ring-1 ring-stone-700">
+        <div role="menu" className="absolute left-0 top-10 z-[70] w-60 rounded-2xl bg-stone-900 p-1.5 text-sm text-stone-100 shadow-2xl ring-1 ring-stone-700">
           <div className="px-3 pb-2 pt-1.5">
             <p className="font-bold">{name}</p>
-            <p className="text-xs text-stone-400">Clocked in at {time(since)}</p>
+            <p className={cn("text-xs", clockedInSince ? "text-stone-400" : "text-amber-300")}>
+              {clockedInSince ? `Clocked in at ${time(clockedInSince)}` : "Not clocked in — use the Clock button"}
+            </p>
           </div>
-          <button role="menuitem" onClick={lock} disabled={pending} className={item}>
-            <Lock size={16} className="mt-0.5 shrink-0 text-stone-400" />
-            <span><span className="font-bold">Lock screen</span><span className="block text-xs text-stone-400">Stay clocked in — a break, or someone else&apos;s turn</span></span>
+          <button role="menuitem" onClick={logout} disabled={pending} className={cn(item, "bg-white/5")}>
+            <LogOut size={16} className="shrink-0 text-orange-300" /> {pending ? "Logging out…" : "Log out"}
           </button>
-          <button role="menuitem" onClick={logout} disabled={pending} className={item}>
-            <LogOut size={16} className="mt-0.5 shrink-0 text-red-300" />
-            <span><span className="font-bold text-red-300">Clock out &amp; log out</span><span className="block text-xs text-stone-400">Your shift is over</span></span>
-          </button>
+          <Link role="menuitem" href="/staff" className={item}>
+            <GraduationCap size={16} className="shrink-0 text-stone-400" /> Staff training
+          </Link>
           <div className="my-1 border-t border-stone-700" />
-          <button role="menuitem" onClick={() => { setOpen(false); setClock(true); }} className={item}>
-            <Clock size={16} className="mt-0.5 shrink-0 text-stone-400" />
-            <span><span className="font-bold">Clock someone in or out</span><span className="block text-xs text-stone-400">Without changing who&apos;s on the till</span></span>
-          </button>
-          <button role="menuitem" onClick={signOutHere} className={`${item} text-xs text-stone-400`}>
+          <button role="menuitem" onClick={signOutHere} className={cn(item, "text-xs font-normal text-stone-400")}>
             Sign this device out of the POS
           </button>
         </div>
       )}
-      {clock && <TimeClockSheet onClose={() => setClock(false)} />}
     </div>
   );
 }

@@ -5,8 +5,8 @@ import { createHmac, timingSafeEqual } from "node:crypto";
 // screen sets this httpOnly cookie naming the person (training_people.id),
 // bound to the POS login that's signed in and signed with a key only the
 // server has — so it can't be forged, moved to another login or extended.
-// It lasts as long as a shift can (16 h); lib/pos-staff.ts also locks the till
-// as soon as that person's shift ends. Host-only, like every cookie here.
+// It lasts at most a working day (16 h); "Log out" on the till ends it sooner.
+// Host-only, like every cookie here.
 
 export const POS_STAFF_COOKIE = "tw_pos_staff";
 export const POS_STAFF_TTL_SECONDS = 16 * 60 * 60;

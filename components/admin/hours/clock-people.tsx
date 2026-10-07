@@ -15,10 +15,10 @@ function PersonRow({ p }: { p: Person }) {
   const [pin, setPin] = useState("");
   const [pending, start] = useTransition();
   const toggle = () => {
-    if (p.pos_clock && !confirm(`Stop ${p.name} using the POS? If they're clocked in now, they're clocked out and the till locks.`)) return;
+    if (p.pos_clock && !confirm(`Stop ${p.name} using the POS? Their PIN stops working there, and if they're clocked in now, they're clocked out.`)) return;
     start(async () => {
       const r = await updateTrainingPerson(p.id, { pos_clock: !p.pos_clock });
-      r?.error ? toast.error(r.error) : toast.success(p.pos_clock ? `${p.name} can't clock in any more` : `${p.name} can clock in now`);
+      r?.error ? toast.error(r.error) : toast.success(p.pos_clock ? `${p.name} can't use the POS any more` : `${p.name} can use the POS now`);
     });
   };
 
@@ -28,7 +28,7 @@ function PersonRow({ p }: { p: Person }) {
         <p className="min-w-0 flex-1 text-sm font-bold">{p.name}</p>
         <button disabled={pending} onClick={toggle} aria-pressed={p.pos_clock}
           className={p.pos_clock ? "badge bg-green-100 text-green-800" : "badge bg-stone-200 text-stone-600"}>
-          {p.pos_clock ? "Can clock in" : "Can't clock in"}
+          {p.pos_clock ? "Can use the POS" : "Not on the POS"}
         </button>
         <button onClick={() => setPinOpen((v) => !v)} className="flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-bold text-stone-500 ring-1 ring-stone-200 hover:text-brand-orange">
           <KeyRound size={12} /> New PIN
@@ -61,18 +61,19 @@ export default function ClockPeople({ people, videoIds }: { people: Person[]; vi
   return (
     <section className="card space-y-3 p-5">
       <div>
-        <h3 className="font-display font-bold text-brand-brown">Who can clock in · PINs</h3>
+        <h3 className="font-display font-bold text-brand-brown">POS staff · PINs</h3>
         <p className="text-xs text-stone-500">
-          The POS is locked until someone types their own 4-digit PIN. That opens the till for them and clocks them in, and every order they sell
-          carries their name. Their name menu has Lock screen (stay clocked in) and Clock out &amp; log out. It&apos;s the same PIN they use for Staff
-          Training. They see their clock times, never their hours. PINs can&apos;t be shown again, so give a new one if someone forgets theirs.
+          Each person has their own 4-digit PIN (the same one as Staff Training) for two things on the POS. Logging in: the till opens when they type
+          it, every order they sell carries their name, and Log out (under their name) hands the till over. Clocking in and out: once a shift, with
+          the Clock button, for their hours. They see their clock times, never their hours. PINs can&apos;t be shown again, so give a new one if
+          someone forgets theirs.
         </p>
       </div>
       <ul className="divide-y divide-orange-50">
         {people.map((p) => <PersonRow key={p.id} p={p} />)}
         {people.length === 0 && <li className="py-3 text-sm text-stone-500">Nobody yet. Add your counter staff below.</li>}
         {people.length > 0 && !people.some((p) => p.pos_clock) && (
-          <li className="py-3 text-xs text-amber-800">As soon as one person here can clock in, the POS asks for a PIN before anyone can sell.</li>
+          <li className="py-3 text-xs text-amber-800">As soon as one person here can use the POS, it asks for a PIN before anyone can sell.</li>
         )}
       </ul>
       <form className="space-y-2 border-t border-orange-50 pt-3" onSubmit={(e) => {

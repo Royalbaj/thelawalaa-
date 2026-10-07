@@ -54,7 +54,7 @@ function PersonRow({ p, videos }: { p: TraineeStatus; videos: Video[] }) {
         <div className="min-w-0 flex-1">
           <p className="text-sm font-bold">
             {p.name}{!p.is_active && <span className="ml-1.5 text-xs font-normal text-stone-500">(switched off)</span>}
-            {p.is_active && p.pos_clock && <span className="ml-1.5 rounded-full bg-stone-100 px-1.5 py-0.5 text-[10px] font-bold uppercase text-stone-500">POS clock</span>}
+            {p.is_active && p.pos_clock && <span className="ml-1.5 rounded-full bg-stone-100 px-1.5 py-0.5 text-[10px] font-bold uppercase text-stone-500">POS</span>}
           </p>
           {p.total === 0 ? (
             <p className="text-xs text-stone-400">No videos given yet</p>
@@ -134,8 +134,8 @@ export default function TrainingPeople({ team, videos }: { team: TraineeStatus[]
         <h3 className="font-display font-bold text-brand-brown">Team & PINs</h3>
         <p className="text-xs text-stone-500">
           Give each staff member their own 4-digit PIN and pick their videos. On the POS they tap the Training (graduation cap) button, type their PIN,
-          and see only their videos — so you know exactly who has watched what, even on a shared login. The same PIN clocks them in and out
-          on the POS if they&apos;re switched on in Staff Hours.
+          and see only their videos — so you know exactly who has watched what, even on a shared login. The same PIN logs them in to the POS
+          and clocks them in and out, if they&apos;re switched on in Staff Hours.
         </p>
       </div>
       <ul className="divide-y divide-orange-50">
