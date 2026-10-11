@@ -34,27 +34,16 @@ export default function QrSignupPage() {
     <div className="flex min-h-screen flex-col items-center justify-center bg-brand-dark px-4 py-10">
       <div className="w-full max-w-md">
         <div className="rounded-2xl bg-gradient-to-br from-brand-red via-brand-orange to-brand-yellow p-6 text-center shadow-xl">
+          {/* The printed QR posters open this page. The opening-day Rs 11 momo offer that
+              used to be here has ended (owner's call, Oct 2026) — just sign-up and socials now. */}
           <div className="mx-auto mb-1 w-fit rounded-2xl bg-white px-4 py-2.5 shadow-lg"><BrandLogo size="md" /></div>
-          <p className="mt-1 font-display text-sm font-bold uppercase tracking-widest text-white/90">
-            Opening Day Special
-          </p>
-
-          <div className="mx-auto mt-4 flex w-fit items-center gap-4 rounded-2xl bg-white px-6 py-4 shadow-lg">
-            <p className="font-display text-5xl font-black leading-none text-brand-red">
-              Rs&nbsp;11
-            </p>
-            <div className="h-11 w-px bg-stone-200" />
-            <p className="text-left font-display text-lg font-black uppercase leading-tight text-brand-brown">
-              1 Plate<br />Momo
-            </p>
-          </div>
 
           <p className="mx-auto mt-4 max-w-xs font-display text-base font-bold leading-snug text-white drop-shadow-sm">
-            Follow us to unlock this offer — and several more!
+            Follow us for new dishes and offers.
           </p>
 
           <div className="mt-4">
-            <p className="text-xs font-bold uppercase tracking-widest text-white/80">Follow us & get this offer</p>
+            <p className="text-xs font-bold uppercase tracking-widest text-white/80">Follow us</p>
             <ChevronDown size={20} className="mx-auto mt-1 animate-bounce text-white/80" aria-hidden />
             <div className="mt-1">
               <SocialBadges />

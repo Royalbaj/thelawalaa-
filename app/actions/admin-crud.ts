@@ -22,12 +22,16 @@ const productSchema = z.object({
   is_frozen: z.boolean().default(false),
   // What a member pays at the POS (lib/discounts.ts); blank = no member price.
   member_price: z.preprocess((v) => (v === "" || v == null ? null : v), z.coerce.number().positive().max(100000).nullable()).default(null),
+  // The POS can add a half plate (1½, 2½ …) at this price — migration 041; blank = no half option.
+  half_price: z.preprocess((v) => (v === "" || v == null ? null : v), z.coerce.number().positive().max(100000).nullable()).default(null),
 }).refine((p) => p.member_price == null || p.member_price < p.price, {
   message: "Member price must be lower than the normal price", path: ["member_price"],
-// A membership card is only sold at the counter, where the member's details are taken.
-}).transform((p) => (p.is_membership_card ? { ...p, pos_only: true } : p));
+}).refine((p) => p.half_price == null || p.half_price < p.price, {
+  message: "Half plate price must be lower than the full plate price", path: ["half_price"],
+// A membership card is only sold at the counter, where the member's details are taken — and never as a half.
+}).transform((p) => (p.is_membership_card ? { ...p, pos_only: true, half_price: null } : p));
 const productError = (e: z.ZodError) =>
-  e.issues.find((i) => i.path[0] === "member_price")?.message ?? "Check the product fields";
+  e.issues.find((i) => i.path[0] === "member_price" || i.path[0] === "half_price")?.message ?? "Check the product fields";
 
 export async function createProduct(input: unknown) {
   const { user } = await requireRole(["super_admin"]);

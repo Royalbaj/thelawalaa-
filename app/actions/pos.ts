@@ -8,9 +8,10 @@ import { checkStockAfterSale, getPosStock as loadPosStock } from "@/lib/stock-al
 import { requireRole } from "@/lib/supabase/server";
 import { supabaseAdmin, audit, resolveStaffBranchId } from "@/lib/supabase/admin";
 import { applyOpeningPromoPrice } from "@/lib/promo";
-import { studentDiscount, memberUnitPrice, staffFreeItems, managerFreeItems, STUDENT_DISCOUNT_LABEL, MEMBER_PRICE_LABEL, STAFF_LABEL, MANAGER_LABEL } from "@/lib/discounts";
+import { studentDiscount, memberUnitPrice, staffFreeItems, managerFreeItems, halfPlatePrice, halfPlateName, STUDENT_DISCOUNT_LABEL, MEMBER_PRICE_LABEL, STAFF_LABEL, MANAGER_LABEL } from "@/lib/discounts";
 import { getPosStaff, posLockOn, posLoginKey } from "@/lib/pos-staff";
 import { managerForPin } from "@/lib/manager-pin";
+import { memberForCard } from "@/lib/member-card";
 
 /** POS order: branch comes from the operator's OWN profile — never the client. */
 export async function createPosOrder(input: unknown) {
@@ -35,7 +36,7 @@ export async function createPosOrder(input: unknown) {
 
   const ids = d.items.map((i) => i.product_id);
   const [{ data: products }, { data: settings }] = await Promise.all([
-    supabaseAdmin.from("products").select("id, name, price, is_available, student_discount_eligible, member_price, is_membership_card, is_frozen, categories(name)").in("id", ids),
+    supabaseAdmin.from("products").select("id, name, price, half_price, is_available, student_discount_eligible, member_price, is_membership_card, is_frozen, categories(name)").in("id", ids),
     supabaseAdmin.from("app_settings").select("*").eq("id", 1).single(),
   ]);
   if (!products || products.length !== new Set(ids).size) return { error: "Unknown items in cart" };
@@ -57,19 +58,35 @@ export async function createPosOrder(input: unknown) {
     if ("error" in m) return { error: `Manager discount: ${m.error}` };
     approver = m.manager;
   }
+  // Member price: the member's own card (its last 3 digits), checked again here (migration 041).
+  let member: { id: string; name: string; card: string } | null = null;
+  if (d.member) {
+    const m = await memberForCard(d.member_card);
+    if ("error" in m) return { error: `Member price: ${m.error}` };
+    member = m.member;
+  }
 
   let subtotal = 0;
   let discountable = 0;
   let memberSaving = 0;
-  const rows = d.items.map((i) => {
+  // The order lines, in the same order the screen builds them: each item's whole
+  // plates, then its extra half plate (if any) as a line of its own.
+  const rows: { product_id: string; product_name: string; product_price: number; quantity: number; line_total: number; portion: number; card: boolean; frozen: boolean }[] = [];
+  for (const i of d.items) {
     const p = products.find((x) => x.id === i.product_id)!;
     const effectivePrice = applyOpeningPromoPrice(Number(p.price), (p.categories as any)?.name, settings);
+    const half = i.half ? halfPlatePrice(p.half_price, effectivePrice) : null;
+    if (i.half && (half == null || p.is_membership_card)) return { error: `"${p.name}" isn't sold as a half plate` };
     const line = effectivePrice * i.quantity;
-    subtotal += line;
-    if (p.student_discount_eligible) discountable += line;
+    subtotal += line + (half ?? 0);
+    if (p.student_discount_eligible) discountable += line + (half ?? 0);
+    // Member price is for whole plates only — never the extra half.
     memberSaving += (effectivePrice - memberUnitPrice(effectivePrice, p.member_price)) * i.quantity;
-    return { product_id: p.id, product_name: p.name, product_price: effectivePrice, quantity: i.quantity, line_total: line, card: !!p.is_membership_card, frozen: !!p.is_frozen };
-  });
+    rows.push({ product_id: p.id, product_name: p.name, product_price: effectivePrice, quantity: i.quantity, line_total: line, portion: 1, card: !!p.is_membership_card, frozen: !!p.is_frozen });
+    if (half != null) {
+      rows.push({ product_id: p.id, product_name: halfPlateName(p.name), product_price: half, quantity: 1, line_total: half, portion: 0.5, card: false, frozen: !!p.is_frozen });
+    }
+  }
   // Worked out here, never trusted from the screen — the toggles only ask for it.
   // Lines keep the normal price; the member/student/staff/manager saving is the order's discount.
   const staff = d.staff ? staffFreeItems(rows.map((r) => ({ price: r.product_price, qty: r.quantity, eligible: !r.card })), staffLimit) : null;
@@ -90,6 +107,8 @@ export async function createPosOrder(input: unknown) {
       staff_person_id: seller?.id ?? null,
       staff_name: seller?.name ?? null,
       discount_approved_by: manager && discount ? approver!.name : null,
+      membership_id: member?.id ?? null,
+      member_card: member?.card ?? null,
       branch_id: branchId,
       type: d.type,
       status: "confirmed",
@@ -121,14 +140,23 @@ export async function createPosOrder(input: unknown) {
   }
   await audit({
     actor_id: user.id, action: "POS_ORDER", target_table: "orders", target_id: order.id,
-    new_data: { total: order.total, ...(seller ? { sold_by: seller.name } : {}), ...(discount ? { discount, discount_label: discountLabel } : {}), ...(staff?.used ? { staff_free_items: staff.used } : {}), ...(manager?.used ? { manager_free_items: manager.used, approved_by: approver!.name } : {}), ...(members.length ? { memberships: members.length } : {}) },
+    new_data: { total: order.total, ...(seller ? { sold_by: seller.name } : {}), ...(discount ? { discount, discount_label: discountLabel } : {}), ...(staff?.used ? { staff_free_items: staff.used } : {}), ...(manager?.used ? { manager_free_items: manager.used, approved_by: approver!.name } : {}), ...(member ? { member_card: member.card } : {}), ...(members.length ? { memberships: members.length } : {}) },
   });
   // Linked stock (Accounts → Stock) counts down with every sale; warn staff if it's running out.
   after(() => checkStockAfterSale(rows.map((r) => r.product_id)));
   return {
     ok: true, orderNumber: order.order_number, dailyNumber: order.daily_number, total: order.total, discount, discountLabel,
+    member: member ? { name: member.name, card: member.card } : null,
     members: savedMembers.map((m) => ({ name: m.full_name, phone: m.phone, card: m.card_number })),
   };
+}
+
+/** POS "Member" deal: whose card is this (its last 3 digits)? The order checks it again when it's placed. */
+export async function checkMemberCard(digits: unknown) {
+  await requireRole(["pos_user", "super_admin"]);
+  const m = await memberForCard(digits);
+  if ("error" in m) return m;
+  return { ok: true as const, name: m.member.name, card: m.member.card };
 }
 
 /** POS "Manager" deal: is this a manager's PIN? The order checks it again when it's placed. */

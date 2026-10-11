@@ -12,6 +12,26 @@ export function studentDiscount(eligibleSubtotal: number): number {
   return Math.round(eligibleSubtotal * 0.05);
 }
 
+// ── Half plates (migration 041) ──────────────────────────────────
+// A POS line is 1, 1½, 2, 2½ … plates — never a half on its own. The extra
+// half is its own order line (portion 0.5) at products.half_price, and member
+// price never applies to it (owner's call). Other deals treat it as one item.
+
+/** What the extra half costs, or null when the item has no half option. Never more than a whole plate (e.g. during the opening offer). */
+export function halfPlatePrice(halfPrice: number | string | null | undefined, fullPrice: number): number | null {
+  return halfPrice == null ? null : Math.min(Number(halfPrice), fullPrice);
+}
+
+/** The extra half's order line: "Chicken Momo (per plate)" → "Chicken Momo (half plate)". */
+export function halfPlateName(name: string): string {
+  return `${name.replace(/\s*\(per plate\)\s*/i, " ").trim()} (half plate)`;
+}
+
+/** 1 → "1", 1 plus a half → "1½". */
+export function platesLabel(qty: number, half: boolean): string {
+  return `${qty}${half ? "½" : ""}`;
+}
+
 /** A member pays products.member_price where an item has one — never more than its normal price. */
 export function memberUnitPrice(normalPrice: number, memberPrice: number | string | null | undefined): number {
   return memberPrice == null ? normalPrice : Math.min(normalPrice, Number(memberPrice));

@@ -2,23 +2,25 @@
 import { useCallback, useEffect, useMemo, useState, useTransition } from "react";
 import Image from "next/image";
 import toast from "react-hot-toast";
-import { Search, X, Trash2, ShoppingCart, ChevronUp, UtensilsCrossed, CheckCircle2, Minus, Plus, GraduationCap, Crown, ChefHat, IdCard, AlertTriangle, ChevronDown, ShieldCheck, Snowflake } from "lucide-react";
-import { createPosOrder, getPosStock, checkManagerPin } from "@/app/actions/pos";
+import { Search, X, Trash2, ShoppingCart, ChevronUp, UtensilsCrossed, CheckCircle2, Minus, Plus, GraduationCap, Crown, ChefHat, IdCard, AlertTriangle, ChevronDown, ShieldCheck, Snowflake, Delete } from "lucide-react";
+import { createPosOrder, getPosStock, checkManagerPin, checkMemberCard } from "@/app/actions/pos";
 import PinPad from "@/components/pin-pad";
 import { newMemberSchema } from "@/lib/validations/order";
 import { REFRESH_EVENT } from "@/components/refresh-button";
 import type { PosStock } from "@/lib/stock-alerts";
 import { npr, cn } from "@/lib/utils";
 import { applyOpeningPromoPrice, isOpeningPromoActive, type OpeningPromoSettings } from "@/lib/promo";
-import { studentDiscount, memberUnitPrice, staffFreeItems, managerFreeItems, MANAGER_LABEL } from "@/lib/discounts";
+import { studentDiscount, memberUnitPrice, staffFreeItems, managerFreeItems, halfPlatePrice, platesLabel, MANAGER_LABEL, MEMBER_PRICE_LABEL } from "@/lib/discounts";
 
 type Product = {
   id: string; name: string; price: number; is_available: boolean; category_id: string | null;
   image_url?: string | null; student_discount_eligible?: boolean; member_price?: number | string | null;
   is_membership_card?: boolean; is_frozen?: boolean;
+  half_price?: number | string | null; // Admin → Menu "Half plate price"; none = no half option
 };
 type Category = { id: string; name: string };
-type Line = { product: Product; qty: number };
+// qty whole plates, plus an extra half plate when `half` (1½, 2½ …) — never a half on its own.
+type Line = { product: Product; qty: number; half: boolean };
 type Deal = "none" | "student" | "member" | "staff" | "manager";
 type Done = {
   orderNumber: string; dailyNumber: number | null; total: number;
@@ -26,6 +28,8 @@ type Done = {
   method: "cash" | "qr"; received: number | null;
   members: { name: string; phone: string; card: string | null }[];
 };
+// The member whose card was checked for this sale (createPosOrder checks it again).
+type MemberCard = { digits: string; name: string; card: string };
 // A new member, typed in while selling them a membership card.
 type MemberForm = { full_name: string; phone: string; card_number: string };
 const BLANK_MEMBER: MemberForm = { full_name: "", phone: "", card_number: "" };
@@ -65,6 +69,128 @@ function ManagerApproval({ onClose, onApproved }: { onClose: () => void; onAppro
   );
 }
 
+/** Member deal: the counter types the last 3 digits of the member's card before member price applies. */
+function MemberCardCheck({ onClose, onFound }: { onClose: () => void; onFound: (m: MemberCard) => void }) {
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose]);
+  const submit = useCallback(async (digits: string) => {
+    const r = await checkMemberCard(digits);
+    if ("error" in r) return r.error;
+    onFound({ digits, name: r.name, card: r.card });
+    return null;
+  }, [onFound]);
+  return (
+    <div className="fixed inset-0 z-[80] flex items-end justify-center bg-black/60 p-4 sm:items-center" role="dialog" aria-modal="true" aria-label="Member card"
+      style={{ paddingBottom: "calc(env(safe-area-inset-bottom) + 1rem)" }}>
+      <div className="max-h-full w-full max-w-sm overflow-y-auto rounded-3xl bg-white p-5 text-center shadow-2xl ring-1 ring-stone-200 dark:bg-stone-900 dark:ring-stone-800">
+        <div className="flex items-start justify-between gap-2 text-left">
+          <div>
+            <p className="flex items-center gap-1.5 font-display text-lg font-extrabold text-brand-brown dark:text-orange-100"><Crown size={18} /> Member price</p>
+            <p className="text-sm text-stone-500 dark:text-stone-400">Ask for the membership card and type the last 3 digits of its number.</p>
+          </div>
+          <button onClick={onClose} aria-label="Cancel" className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-stone-100 dark:bg-stone-800"><X size={18} /></button>
+        </div>
+        <PinPad submit={submit} idle="Last 3 digits of the card" length={3} />
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Cash sale: Place order first asks "कति रुपैयाँ प्राप्त भयो?" (how much cash was
+ * handed over) and shows what to give back; the order is placed only once it
+ * covers the total. Its own keypad, not the phone/iPad keyboard, which would
+ * cover the button. A keyboard still works (digits, Backspace, Enter, Esc).
+ */
+function CashReceived({ total, pending, onClose, onConfirm }: {
+  total: number; pending: boolean; onClose: () => void; onConfirm: (received: number) => void;
+}) {
+  const [value, setValue] = useState("");
+  const received = Number(value) || 0;
+  const enough = value !== "" && received >= total;
+  const press = useCallback((key: string) => {
+    setValue((v) => (key === "back" ? v.slice(0, -1) : (v + key).replace(/^0+/, "").slice(0, 6)));
+  }, []);
+  const confirm = useCallback(() => { if (enough && !pending) onConfirm(received); }, [enough, pending, onConfirm, received]);
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (/^\d$/.test(e.key)) press(e.key);
+      else if (e.key === "Backspace") press("back");
+      else if (e.key === "Enter") { e.preventDefault(); confirm(); }
+      else if (e.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [press, confirm, onClose]);
+  // The exact amount, then the next few notes bigger than the total.
+  const quick = [total, ...NOTES.filter((n) => n > total).slice(0, 3)];
+  const key = "h-12 touch-manipulation rounded-xl bg-stone-100 font-display text-xl font-bold text-brand-brown transition active:scale-95 active:bg-orange-100 disabled:opacity-50 dark:bg-stone-800 dark:text-orange-100 dark:active:bg-orange-950";
+
+  return (
+    <div className="fixed inset-0 z-[80] flex items-end justify-center bg-black/60 p-3 sm:items-center" role="dialog" aria-modal="true" aria-label="Cash received"
+      style={{ paddingBottom: "calc(env(safe-area-inset-bottom) + 0.75rem)" }}>
+      <div className="flex max-h-full w-full max-w-sm flex-col overflow-y-auto rounded-3xl bg-white p-4 shadow-2xl ring-1 ring-stone-200 dark:bg-stone-900 dark:ring-stone-800">
+        <div className="flex items-start justify-between gap-2">
+          <div>
+            <p className="font-display text-xl font-extrabold leading-tight text-brand-brown dark:text-orange-100" lang="ne">कति रुपैयाँ प्राप्त भयो?</p>
+            <p className="text-sm text-stone-500 dark:text-stone-400">Cash received · total <b className="text-stone-700 dark:text-stone-200">{npr(total)}</b></p>
+          </div>
+          <button onClick={onClose} aria-label="Cancel" className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-stone-100 dark:bg-stone-800"><X size={18} /></button>
+        </div>
+
+        <div className="mt-3 grid grid-cols-2 gap-2">
+          <div className="rounded-2xl bg-orange-50 px-3 py-2 dark:bg-stone-800">
+            <p className="text-[11px] font-bold uppercase tracking-wide text-stone-500 dark:text-stone-400">Received</p>
+            <p className="font-display text-2xl font-extrabold" aria-live="polite">{value ? npr(received) : <span className="text-stone-300 dark:text-stone-600">Rs —</span>}</p>
+          </div>
+          {/* What to hand back — the big number staff look for. */}
+          <div className={cn("rounded-2xl px-3 py-2",
+            !value ? "bg-stone-50 dark:bg-stone-800/60" : enough ? "bg-green-50 dark:bg-green-950/40" : "bg-red-50 dark:bg-red-950/40")}>
+            <p className="text-[11px] font-bold uppercase tracking-wide text-stone-500 dark:text-stone-400">
+              {value && !enough ? <><span lang="ne">कम</span> · Short</> : <><span lang="ne">फिर्ता</span> · Return</>}
+            </p>
+            <p className={cn("font-display text-2xl font-extrabold", !value ? "text-stone-300 dark:text-stone-600" : enough ? "text-brand-green" : "text-brand-red")} aria-live="polite">
+              {!value ? "Rs —" : npr(Math.abs(received - total))}
+            </p>
+          </div>
+        </div>
+
+        <div className="mt-2.5 flex gap-1.5">
+          {quick.map((v, i) => (
+            <button key={v} onClick={() => setValue(String(v))} disabled={pending}
+              className={cn("flex-1 touch-manipulation rounded-lg border py-2 text-xs font-bold transition active:scale-95",
+                received === v && value
+                  ? "border-brand-green bg-green-50 text-brand-green dark:bg-green-950/40"
+                  : "border-orange-100 bg-white text-stone-600 dark:border-stone-700 dark:bg-stone-800 dark:text-stone-300")}>
+              {i === 0 ? "Exact" : npr(v)}
+            </button>
+          ))}
+        </div>
+
+        <div className="mt-2.5 grid grid-cols-3 gap-2">
+          {["1", "2", "3", "4", "5", "6", "7", "8", "9", "00", "0"].map((d) => (
+            <button key={d} onClick={() => press(d)} disabled={pending} className={key}>{d}</button>
+          ))}
+          <button onClick={() => press("back")} aria-label="Delete last digit" disabled={pending}
+            className="flex h-12 touch-manipulation items-center justify-center rounded-xl text-stone-500 transition active:scale-95">
+            <Delete size={22} />
+          </button>
+        </div>
+
+        <button onClick={confirm} disabled={!enough || pending}
+          className="btn-primary mt-3 w-full touch-manipulation !py-4 text-base disabled:opacity-50">
+          {pending ? "Placing…"
+            : enough ? (received > total ? `Place order · return ${npr(received - total)}` : "Place order · exact amount")
+            : value ? `${npr(total - received)} short` : "Type the cash received"}
+        </button>
+      </div>
+    </div>
+  );
+}
+
 /** Two-option switch (Dine-in/Pickup, Cash/QR) — one row instead of two. */
 function Segmented<T extends string>({ value, onChange, options, activeClass }: {
   value: T; onChange: (v: T) => void; options: readonly (readonly [T, string])[]; activeClass: string;
@@ -95,12 +221,16 @@ export default function PosTerminal({
   const [cartOpen, setCartOpen] = useState(false);
   const [type, setType] = useState<"dine_in" | "pickup">("dine_in");
   const [method, setMethod] = useState<"cash" | "qr">("cash");
-  const [cashReceived, setCashReceived] = useState("");
+  // Cash sales: Place order asks how much cash was handed over (CashReceived) before placing.
+  const [askCash, setAskCash] = useState(false);
   // Student 5%, member price, staff and manager never stack — picking one switches the others off.
   const [deal, setDeal] = useState<Deal>("none");
   // Manager discount: approved with a manager's own PIN, kept only for this sale (createPosOrder checks it again).
   const [manager, setManager] = useState<{ pin: string; name: string } | null>(null);
   const [askManager, setAskManager] = useState(false);
+  // Member price: only once a member's card (last 3 digits) has been checked — for this sale only.
+  const [memberCard, setMemberCard] = useState<MemberCard | null>(null);
+  const [askMember, setAskMember] = useState(false);
   const [done, setDone] = useState<Done | null>(null);
   const [members, setMembers] = useState<MemberForm[]>([]);
   const [stock, setStock] = useState<PosStock>(initialStock ?? { all: [], warnings: [], byProduct: {} });
@@ -132,6 +262,8 @@ export default function PosTerminal({
   // What this sale charges for one: the member price when Member is on and the item has one.
   const unitOf = (p: Product) => (memberApplies(p) ? memberUnitPrice(priceOf(p), p.member_price) : priceOf(p));
   const isPromo = (p: Product) => promoActive && priceOf(p) !== Number(p.price);
+  // The extra half plate's price, or null when the item has no half option.
+  const halfOf = (p: Product) => (p.is_membership_card ? null : halfPlatePrice(p.half_price, priceOf(p)));
 
   const visible = useMemo(
     () => products.filter((p) =>
@@ -139,16 +271,24 @@ export default function PosTerminal({
       p.name.toLowerCase().includes(q.toLowerCase())),
     [products, cat, q]
   );
-  // Same sums, in the same order, as createPosOrder — the screen and the charge can't drift apart.
-  let subtotal = 0, eligible = 0, memberSaving = 0, itemCount = 0;
-  for (const l of cart) {
-    const price = priceOf(l.product);
-    subtotal += price * l.qty;
+  // The order lines this cart becomes — the same list, in the same order, as
+  // createPosOrder: each item's whole plates, then its extra half plate as a
+  // line of its own. Every sum below comes from it, so the screen and the charge can't drift apart.
+  const rows = cart.flatMap((l, line) => {
+    const whole = { line, half: false, product: l.product, price: priceOf(l.product), qty: l.qty };
+    const half = l.half ? halfOf(l.product) : null;
+    return half == null ? [whole] : [whole, { line, half: true, product: l.product, price: half, qty: 1 }];
+  });
+  let subtotal = 0, eligible = 0, memberSaving = 0, plates = 0;
+  for (const r of rows) {
+    subtotal += r.price * r.qty;
     // Coca-Cola, and anything else Admin → Menu excludes, doesn't count towards the student discount.
-    if (l.product.student_discount_eligible !== false) eligible += price * l.qty;
-    memberSaving += (price - memberUnitPrice(price, l.product.member_price)) * l.qty;
-    itemCount += l.qty;
+    if (r.product.student_discount_eligible !== false) eligible += r.price * r.qty;
+    // Member price is for whole plates only — never the extra half.
+    if (!r.half) memberSaving += (r.price - memberUnitPrice(r.price, r.product.member_price)) * r.qty;
+    plates += r.half ? 0.5 : r.qty;
   }
+  const itemCount = platesLabel(Math.floor(plates), plates % 1 !== 0);
   // One set of member details per membership card in the cart.
   const cardCount = cart.reduce((n, l) => n + (l.product.is_membership_card ? l.qty : 0), 0);
   const memberAt = (i: number) => members[i] ?? BLANK_MEMBER;
@@ -156,13 +296,14 @@ export default function PosTerminal({
     setMembers((cur) => { const next = [...cur]; next[i] = { ...(cur[i] ?? BLANK_MEMBER), ...patch }; return next; });
   // Staff sale: the dearest items go free, up to the limit — same function createPosOrder uses.
   const staff = deal === "staff"
-    ? staffFreeItems(cart.map((l) => ({ price: priceOf(l.product), qty: l.qty, eligible: !l.product.is_membership_card })), staffLimit)
+    ? staffFreeItems(rows.map((r) => ({ price: r.price, qty: r.qty, eligible: !r.product.is_membership_card })), staffLimit)
     : null;
   const staffFreeLeft = staff ? staffLimit - staff.used : 0;
   // Manager discount: everything free except frozen items and membership cards — same function createPosOrder uses.
   const managerOn = deal === "manager" && !!manager;
+  const memberOn = deal === "member" && !!memberCard;
   const managerFree = managerOn
-    ? managerFreeItems(cart.map((l) => ({ price: priceOf(l.product), qty: l.qty, eligible: !l.product.is_membership_card && !l.product.is_frozen })))
+    ? managerFreeItems(rows.map((r) => ({ price: r.price, qty: r.qty, eligible: !r.product.is_membership_card && !r.product.is_frozen })))
     : null;
   const managerFreeOf = (p: Product) => managerOn && !p.is_membership_card && !p.is_frozen;
   // A tile shows Rs 0 while this staff sale still has free items left, or under the manager discount.
@@ -172,11 +313,6 @@ export default function PosTerminal({
     : deal === "member" ? Math.round(memberSaving * 100) / 100
     : deal === "student" ? studentDiscount(eligible) : 0;
   const total = subtotal - discount;
-  const received = Number(cashReceived) || 0;
-  const change = method === "cash" && received > total ? received - total : 0;
-  const short = method === "cash" && received > 0 && received < total ? total - received : 0;
-  // One tap for the usual cash handed over: the exact amount, or a note bigger than the total.
-  const quickCash = [total, ...NOTES.filter((n) => n > total).slice(0, 3)];
 
   // The confirmation shouldn't block the next customer — it clears itself,
   // a little later when there's change to count out.
@@ -186,15 +322,20 @@ export default function PosTerminal({
     return () => clearTimeout(t);
   }, [done]);
 
-  const qtyOf = (id: string) => cart.find((l) => l.product.id === id)?.qty ?? 0;
-  // Every quantity change goes through here: clamped to 0–MAX_QTY, and 0 removes the line.
+  const lineOf = (id: string) => cart.find((l) => l.product.id === id);
+  const qtyOf = (id: string) => lineOf(id)?.qty ?? 0;
+  // Every quantity change goes through here: clamped to 0–MAX_QTY whole plates, and 0
+  // removes the line (its extra half too — a half is never sold on its own).
   const changeQty = (p: Product, next: (qty: number) => number) =>
     setCart((c) => {
       const cur = c.find((l) => l.product.id === p.id)?.qty ?? 0;
       const qty = Math.max(0, Math.min(next(cur), MAX_QTY));
       if (qty === 0) return c.filter((l) => l.product.id !== p.id);
-      return cur ? c.map((l) => (l.product.id === p.id ? { ...l, qty } : l)) : [...c, { product: p, qty }];
+      return cur ? c.map((l) => (l.product.id === p.id ? { ...l, qty } : l)) : [...c, { product: p, qty, half: false }];
     });
+  // "+½": 1 → 1½, 2 → 2½ … and back. Only on a line that already has a whole plate.
+  const toggleHalf = (p: Product) =>
+    setCart((c) => c.map((l) => (l.product.id === p.id ? { ...l, half: !l.half } : l)));
   const add = (p: Product) => {
     if (!p.is_available) return;
     // Stock says it's gone: sell it if it's really there, but say so once.
@@ -205,13 +346,17 @@ export default function PosTerminal({
   };
   const clearCart = () => { if (cart.length && confirm("Clear the whole cart?")) { setCart([]); setMembers([]); } };
   const toggleDeal = (d: Exclude<Deal, "none">) => {
-    // Manager needs a manager's PIN first; switching it (or to another deal) off forgets the approval.
+    // Manager needs a manager's PIN first, Member the member's card; switching either
+    // (or to another deal) off forgets the approval.
     if (d === "manager" && deal !== "manager") { setAskManager(true); return; }
+    if (d === "member" && deal !== "member") { setAskMember(true); return; }
     setManager(null);
+    setMemberCard(null);
     setDeal((cur) => (cur === d ? "none" : d));
   };
 
-  const placeOrder = () => {
+  // cashIn: the cash handed over, from CashReceived. A cash sale with something to pay asks for it first.
+  const placeOrder = (cashIn?: number) => {
     // Selling membership cards: each needs the new member's name and number first.
     const newMembers: { full_name: string; phone: string; card_number?: string }[] = [];
     for (let i = 0; i < cardCount; i++) {
@@ -225,27 +370,32 @@ export default function PosTerminal({
       }
       newMembers.push(m.data);
     }
+    if (method === "cash" && total > 0 && cashIn == null) { setAskCash(true); return; }
     start(async () => {
       const r = await createPosOrder({
         type, payment_method: method,
         student_discount: deal === "student",
-        member: deal === "member",
+        member: memberOn,
+        member_card: memberOn ? memberCard!.digits : undefined,
         staff: deal === "staff",
         manager: managerOn,
         manager_pin: managerOn ? manager!.pin : undefined,
         members: cardCount ? newMembers : undefined,
-        items: cart.map((l) => ({ product_id: l.product.id, quantity: l.qty })),
+        items: cart.map((l) => ({ product_id: l.product.id, quantity: l.qty, ...(l.half && halfOf(l.product) != null ? { half: true } : {}) })),
       });
       if (r?.error) { toast.error(r.error); return; }
       setDone({
         orderNumber: r.orderNumber!, dailyNumber: r.dailyNumber ?? null, total: Number(r.total),
         discount: Number(r.discount ?? 0),
-        discountLabel: r.discountLabel === MANAGER_LABEL && manager ? `${MANAGER_LABEL} · ${manager.name}` : r.discountLabel ?? null,
-        method, received: method === "cash" && received > 0 && total > 0 ? received : null,
+        discountLabel: r.discountLabel === MANAGER_LABEL && manager ? `${MANAGER_LABEL} · ${manager.name}`
+          : r.discountLabel === MEMBER_PRICE_LABEL && r.member ? `${MEMBER_PRICE_LABEL} · card ${r.member.card} (${r.member.name})`
+          : r.discountLabel ?? null,
+        method, received: method === "cash" && cashIn != null ? cashIn : null,
         members: r.members ?? [],
       });
       // Ready for the next customer: back to cash, no discount.
-      setCart([]); setMembers([]); setCashReceived(""); setDeal("none"); setManager(null); setMethod("cash"); setCartOpen(false);
+      setAskCash(false);
+      setCart([]); setMembers([]); setDeal("none"); setManager(null); setMemberCard(null); setMethod("cash"); setCartOpen(false);
       getPosStock().then(setStock).catch(() => {}); // that sale may have used the last of something
     });
   };
@@ -270,15 +420,21 @@ export default function PosTerminal({
       </button>
     );
   };
-  // What a cart line charges: free staff/manager items cost nothing, member price where it applies.
+  // What a cart line charges (its whole plates + its extra half): free staff/manager
+  // items cost nothing, member price where it applies (never on the half).
   const freeItems = managerFree ?? staff;
-  const lineCharge = (l: Line, i: number) =>
-    freeItems ? (l.qty - freeItems.free[i]) * priceOf(l.product) : unitOf(l.product) * l.qty;
+  const lineRows = (i: number) => rows.map((r, k) => ({ r, k })).filter(({ r }) => r.line === i);
+  const lineCharge = (i: number) => lineRows(i).reduce((s, { r, k }) =>
+    s + (freeItems ? (r.qty - freeItems.free[k]) * r.price : r.half ? r.price : unitOf(r.product) * r.qty), 0);
+  const lineFull = (i: number) => lineRows(i).reduce((s, { r }) => s + r.price * r.qty, 0);
+  // Staff sale: how many of this line's items (a half plate counts as one) are free.
+  const lineFree = (i: number) => lineRows(i).reduce((n, { k }) => n + (freeItems?.free[k] ?? 0), 0);
+  const lineItems = (i: number) => lineRows(i).reduce((n, { r }) => n + r.qty, 0);
 
   const CartContents = (
     <>
       <div className="flex shrink-0 items-center justify-between gap-2 px-4 pb-1 pt-3">
-        <p className="font-display font-bold text-brand-brown dark:text-orange-100">Order{itemCount ? ` · ${itemCount}` : ""}</p>
+        <p className="font-display font-bold text-brand-brown dark:text-orange-100">Order{plates ? ` · ${itemCount}` : ""}</p>
         <div className="flex items-center gap-2">
           {cart.length > 0 && (
             <button onClick={clearCart} className="flex touch-manipulation items-center gap-1 p-1 text-xs font-bold text-brand-red">
@@ -299,28 +455,35 @@ export default function PosTerminal({
           {cart.map((l, lineIndex) => {
             // Member details for this line's cards come after any earlier card lines'.
             const firstCard = cart.slice(0, lineIndex).reduce((n, x) => n + (x.product.is_membership_card ? x.qty : 0), 0);
+            const half = halfOf(l.product);
+            const withHalf = l.half && half != null;
             return (
             // Name on its own line so it wraps instead of being cut off in the narrow cart.
             <div key={l.product.id} className="border-b border-orange-50 py-2.5 last:border-0 dark:border-stone-800">
               <div className="flex items-baseline justify-between gap-2">
                 <p className="text-sm font-bold leading-snug">{l.product.name}</p>
                 <p className="shrink-0 text-sm font-bold">
-                  {lineCharge(l, lineIndex) < priceOf(l.product) * l.qty && (
-                    <s className="mr-1.5 text-xs font-normal text-stone-400">{npr(priceOf(l.product) * l.qty)}</s>
+                  {lineCharge(lineIndex) < lineFull(lineIndex) && (
+                    <s className="mr-1.5 text-xs font-normal text-stone-400">{npr(lineFull(lineIndex))}</s>
                   )}
-                  {npr(lineCharge(l, lineIndex))}
+                  {npr(lineCharge(lineIndex))}
                 </p>
               </div>
+              {withHalf && (
+                <p className="text-xs font-bold text-brand-orange">{platesLabel(l.qty, true)} plates · half plate {npr(half)}</p>
+              )}
               {managerFree ? (
-                managerFree.free[lineIndex] > 0
+                lineFree(lineIndex) > 0
                   ? <p className="text-xs font-bold text-brand-green">Manager · free</p>
                   : l.product.is_frozen ? <p className="text-xs font-bold text-sky-600 dark:text-sky-400">Frozen · full price</p> : null
-              ) : staff && staff.free[lineIndex] > 0 ? (
+              ) : staff && lineFree(lineIndex) > 0 ? (
                 <p className="text-xs font-bold text-brand-green">
-                  Staff · {staff.free[lineIndex] === l.qty ? "free" : `${staff.free[lineIndex]} of ${l.qty} free`}
+                  Staff · {lineFree(lineIndex) === lineItems(lineIndex) ? "free" : `${lineFree(lineIndex)} of ${lineItems(lineIndex)} free`}
                 </p>
               ) : memberApplies(l.product) ? (
-                <p className="text-xs font-bold text-brand-green">Member price {npr(unitOf(l.product))} each</p>
+                <p className="text-xs font-bold text-brand-green">
+                  Member price {npr(unitOf(l.product))} a plate{withHalf ? " · half plate at normal price" : ""}
+                </p>
               ) : isPromo(l.product) && <p className="text-xs font-bold text-brand-green">Opening offer</p>}
               <div className="mt-1.5 flex items-center gap-1.5">
                 <button onClick={() => changeQty(l.product, (n) => n - 1)} aria-label={`One less ${l.product.name}`}
@@ -338,6 +501,16 @@ export default function PosTerminal({
                   className="flex h-10 w-10 shrink-0 touch-manipulation items-center justify-center rounded-full bg-orange-50 transition active:scale-90 dark:bg-stone-800">
                   <Plus size={16} />
                 </button>
+                {half != null && (
+                  <button onClick={() => toggleHalf(l.product)} aria-pressed={l.half}
+                    aria-label={l.half ? `Take the half plate off ${l.product.name}` : `Add a half plate of ${l.product.name}`}
+                    className={cn("h-10 shrink-0 touch-manipulation rounded-full border px-3 text-sm font-bold transition active:scale-95",
+                      l.half
+                        ? "border-brand-orange bg-brand-orange text-white"
+                        : "border-orange-200 bg-white text-brand-orange dark:border-stone-700 dark:bg-stone-800")}>
+                    {l.half ? "½ added" : "+ ½ plate"}
+                  </button>
+                )}
                 <button onClick={() => changeQty(l.product, () => 0)} aria-label={`Remove ${l.product.name}`}
                   className="ml-auto flex h-10 w-10 shrink-0 touch-manipulation items-center justify-center rounded-full text-stone-400 transition hover:bg-red-50 hover:text-brand-red dark:hover:bg-red-950/40">
                   <Trash2 size={15} />
@@ -373,40 +546,10 @@ export default function PosTerminal({
           </div>
           <div className={cn("grid gap-2", threeDeals ? "grid-cols-3" : "grid-cols-2")}>
             {dealButton("student", GraduationCap, "Student 5%")}
-            {dealButton("member", Crown, "Member")}
+            {dealButton("member", Crown, "Member", memberCard ? `${memberCard.name.split(" ")[0]} · ${discount ? `−${npr(discount)}` : "on"}` : undefined)}
             {staffLimit > 0 && dealButton("staff", ChefHat, "Staff", `${staff?.used ?? 0} of ${staffLimit} free`)}
             {managerDeal && dealButton("manager", ShieldCheck, "Manager", manager ? `${manager.name.split(" ")[0]} · ${discount ? `−${npr(discount)}` : "on"}` : undefined)}
           </div>
-          {/* Nothing to collect (a staff sale that's all free) — no cash to count. */}
-          {method === "cash" && (cart.length === 0 || total > 0) && (
-            <>
-              <div className="flex items-center gap-2">
-                <label htmlFor="pos-cash-received" className="text-xs font-bold text-stone-500 dark:text-stone-400">
-                  Cash received <span className="font-normal">(optional)</span>
-                </label>
-                {/* Whole rupees only; 16px so iPhone Safari doesn't zoom in on focus. */}
-                <input
-                  id="pos-cash-received" type="text" inputMode="numeric" pattern="[0-9]*" autoComplete="off"
-                  value={cashReceived}
-                  onChange={(e) => setCashReceived(e.target.value.replace(/\D/g, "").slice(0, 6))}
-                  placeholder="Rs" className="input ml-auto !w-28 !py-1.5 text-right !text-base"
-                />
-              </div>
-              {cart.length > 0 && (
-                <div className="flex gap-1.5">
-                  {quickCash.map((v, i) => (
-                    <button key={v} onClick={() => setCashReceived(String(v))}
-                      className={cn("flex-1 touch-manipulation rounded-lg border py-2 text-xs font-bold transition active:scale-95",
-                        received === v
-                          ? "border-brand-green bg-green-50 text-brand-green dark:bg-green-950/40"
-                          : "border-orange-100 bg-white text-stone-600 dark:border-stone-700 dark:bg-stone-800 dark:text-stone-300")}>
-                      {i === 0 ? "Exact" : npr(v)}
-                    </button>
-                  ))}
-                </div>
-              )}
-            </>
-          )}
         </div>
       </div>
 
@@ -419,10 +562,8 @@ export default function PosTerminal({
               {npr(total)}
               {discount > 0 && <s className="ml-1.5 text-sm font-normal text-stone-400">{npr(subtotal)}</s>}
             </p>
-            {change > 0 && <p className="mt-1 text-sm font-extrabold text-brand-green">Return {npr(change)}</p>}
-            {short > 0 && <p className="mt-1 text-sm font-extrabold text-brand-red">{npr(short)} short</p>}
           </div>
-          <button onClick={placeOrder} disabled={pending || cart.length === 0}
+          <button onClick={() => placeOrder()} disabled={pending || cart.length === 0}
             className="btn-primary min-w-0 flex-1 touch-manipulation !px-4 !py-4 text-base disabled:opacity-50">
             {pending ? "Placing…" : "Place order"}
           </button>
@@ -479,6 +620,8 @@ export default function PosTerminal({
         <div className="grid flex-1 auto-rows-min grid-cols-2 gap-3 overflow-y-auto overscroll-contain bg-brand-cream p-3 pb-24 dark:bg-stone-950 sm:grid-cols-3 sm:p-4 sm:pb-24 md:grid-cols-4 lg:grid-cols-3 lg:pb-4 2xl:grid-cols-4">
           {visible.map((p) => {
             const qty = qtyOf(p.id);
+            const half = halfOf(p);
+            const withHalf = !!lineOf(p.id)?.half && half != null;
             const shown = tileFree(p) ? 0 : unitOf(p);
             return (
               <div key={p.id} className={cn("card relative overflow-hidden", !p.is_available && "opacity-40", qty > 0 && "ring-2 ring-brand-orange")}>
@@ -519,21 +662,30 @@ export default function PosTerminal({
                     ) : (
                       <p className="mt-1 font-display text-brand-orange">{npr(shown)}</p>
                     )}
+                    {half != null && <p className="text-[11px] font-bold text-stone-400">Half plate {npr(half)}</p>}
                     {!p.is_available && <p className="text-xs font-bold text-brand-red">Sold out</p>}
                   </div>
                 </button>
-                {/* Change the quantity right on the tile — no need to open the cart. */}
+                {/* Change the quantity right on the tile — no need to open the cart. ½ adds a half plate (1½, 2½ …). */}
                 {qty > 0 && (
                   <div className="flex items-center border-t border-orange-100 dark:border-stone-800">
                     <button onClick={() => changeQty(p, (n) => n - 1)} aria-label={`One less ${p.name}`}
                       className="flex h-10 flex-1 touch-manipulation items-center justify-center text-brand-orange active:bg-orange-50 dark:active:bg-stone-800">
                       <Minus size={18} />
                     </button>
-                    <span className="min-w-[2rem] text-center font-display text-lg font-bold">{qty}</span>
+                    <span className="min-w-[2rem] text-center font-display text-lg font-bold">{platesLabel(qty, withHalf)}</span>
                     <button onClick={() => add(p)} aria-label={`One more ${p.name}`}
                       className="flex h-10 flex-1 touch-manipulation items-center justify-center text-brand-orange active:bg-orange-50 dark:active:bg-stone-800">
                       <Plus size={18} />
                     </button>
+                    {half != null && (
+                      <button onClick={() => toggleHalf(p)} aria-pressed={withHalf}
+                        aria-label={withHalf ? `Take the half plate off ${p.name}` : `Add a half plate of ${p.name}`}
+                        className={cn("flex h-10 flex-1 touch-manipulation items-center justify-center border-l border-orange-100 font-display text-base font-bold dark:border-stone-800",
+                          withHalf ? "bg-brand-orange text-white" : "text-brand-orange active:bg-orange-50 dark:active:bg-stone-800")}>
+                        ½
+                      </button>
+                    )}
                   </div>
                 )}
               </div>
@@ -551,7 +703,7 @@ export default function PosTerminal({
           onClick={() => setCartOpen(true)}
           className="absolute inset-x-3 bottom-3 z-30 flex touch-manipulation items-center justify-between rounded-2xl bg-brand-orange px-5 py-3.5 text-white shadow-lg shadow-orange-900/30 lg:hidden"
         >
-          <span className="flex items-center gap-2 font-bold"><ShoppingCart size={18} /> {itemCount} item{itemCount > 1 ? "s" : ""}</span>
+          <span className="flex items-center gap-2 font-bold"><ShoppingCart size={18} /> {itemCount} item{plates > 1 ? "s" : ""}</span>
           <span className="flex items-center gap-1.5 font-display font-bold">{npr(total)} <ChevronUp size={18} /></span>
         </button>
       )}
@@ -607,7 +759,16 @@ export default function PosTerminal({
       {askManager && (
         <ManagerApproval
           onClose={() => setAskManager(false)}
-          onApproved={(m) => { setManager(m); setDeal("manager"); setAskManager(false); }}
+          onApproved={(m) => { setManager(m); setMemberCard(null); setDeal("manager"); setAskManager(false); }}
+        />
+      )}
+      {askCash && (
+        <CashReceived total={total} pending={pending} onClose={() => setAskCash(false)} onConfirm={(received) => placeOrder(received)} />
+      )}
+      {askMember && (
+        <MemberCardCheck
+          onClose={() => setAskMember(false)}
+          onFound={(m) => { setMemberCard(m); setManager(null); setDeal("member"); setAskMember(false); toast.success(`Member: ${m.name} · card ${m.card}`); }}
         />
       )}
       <style>{`

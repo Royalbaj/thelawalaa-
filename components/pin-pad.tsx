@@ -3,16 +3,16 @@ import { useCallback, useEffect, useRef, useState, useTransition } from "react";
 import { Delete } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-const LENGTH = 4;
-
 /**
- * A staff member's own 4-digit PIN (Staff Training, the POS time clock): big
- * keys for a touch screen, a keyboard works too. `submit` gets the PIN once
- * all four digits are in and returns an error to show, or null when it worked.
+ * A staff member's own 4-digit PIN (Staff Training, the POS time clock) — or
+ * the last 3 digits of a member's card (`length={3}`): big keys for a touch
+ * screen, a keyboard works too. `submit` gets the digits once they're all in
+ * and returns an error to show, or null when it worked.
  */
-export default function PinPad({ submit, idle = "Enter the 4-digit PIN" }: {
+export default function PinPad({ submit, idle = "Enter the 4-digit PIN", length: LENGTH = 4 }: {
   submit: (pin: string) => Promise<string | null>;
   idle?: string;
+  length?: number;
 }) {
   const [pin, setPin] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -42,7 +42,7 @@ export default function PinPad({ submit, idle = "Enter the 4-digit PIN" }: {
     const value = cur + key;
     set(value);
     if (value.length === LENGTH) check(value);
-  }, [pending, check]);
+  }, [pending, check, LENGTH]);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {

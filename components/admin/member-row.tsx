@@ -4,7 +4,9 @@ import toast from "react-hot-toast";
 import { Pencil, Trash2, X } from "lucide-react";
 import { updateMembership, deleteMembership } from "@/app/actions/memberships";
 
-export type MemberRowData = { id: string; full_name: string; phone: string; card_number: string | null; sold: string; soldBy: string; order: string | null };
+export type MemberRowData = { id: string; full_name: string; phone: string; card_number: string | null; sold: string; soldBy: string; order: string | null;
+  used: number; // sales that got member price with this card (migration 041)
+};
 
 /** One membership: phone = a card, md+ = a table row. Edit fixes typos taken at the counter. */
 export default function MemberRow({ m, asTableRow }: { m: MemberRowData; asTableRow?: boolean }) {
@@ -44,11 +46,12 @@ export default function MemberRow({ m, asTableRow }: { m: MemberRowData; asTable
           <td className="px-4 py-2.5 font-bold">{m.full_name}</td>
           <td className="px-4 py-2.5"><a href={`tel:${m.phone}`} className="hover:text-brand-orange">{m.phone}</a></td>
           <td className="px-4 py-2.5 text-stone-500">{m.card_number ?? "—"}</td>
+          <td className="px-4 py-2.5 text-stone-500">{m.used ? `${m.used}×` : "—"}</td>
           <td className="px-4 py-2.5 text-stone-500">{m.sold}</td>
           <td className="px-4 py-2.5 text-stone-500">{m.soldBy}{m.order ? ` · ${m.order}` : ""}</td>
           <td className="px-2 py-2.5">{actions}</td>
         </tr>
-        {form && <tr><td colSpan={6} className="px-4 pb-3">{form}</td></tr>}
+        {form && <tr><td colSpan={7} className="px-4 pb-3">{form}</td></tr>}
       </>
     );
   }
@@ -58,7 +61,7 @@ export default function MemberRow({ m, asTableRow }: { m: MemberRowData; asTable
         <div className="min-w-0">
           <p className="font-bold">{m.full_name}</p>
           <p className="text-sm"><a href={`tel:${m.phone}`} className="text-brand-orange">{m.phone}</a>{m.card_number ? <span className="text-stone-500"> · card {m.card_number}</span> : null}</p>
-          <p className="text-xs text-stone-400">{m.sold} · {m.soldBy}{m.order ? ` · ${m.order}` : ""}</p>
+          <p className="text-xs text-stone-400">{m.sold} · {m.soldBy}{m.order ? ` · ${m.order}` : ""}{m.used ? ` · used ${m.used}×` : ""}</p>
         </div>
         {actions}
       </div>

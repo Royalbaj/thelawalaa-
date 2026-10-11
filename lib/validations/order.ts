@@ -55,8 +55,10 @@ export const posOrderSchema = z.object({
   staff: z.boolean().optional(), // staff sale — up to app_settings.staff_free_items free
   manager: z.boolean().optional(), // manager discount — everything but frozen items free
   manager_pin: z.string().regex(/^\d{4}$/).optional(), // the approving manager's own PIN, checked again on the server
+  member_card: z.string().regex(/^\d{3}$/).optional(), // member price: the last 3 digits of the member's card, checked again on the server
   members: z.array(newMemberSchema).max(10).optional(), // one per membership card sold
   items: z
-    .array(z.object({ product_id: z.string().uuid(), quantity: z.number().int().min(1).max(50) }))
+    // half: an extra half plate on top of `quantity` whole plates (1½, 2½ …) — migration 041
+    .array(z.object({ product_id: z.string().uuid(), quantity: z.number().int().min(1).max(50), half: z.boolean().optional() }))
     .min(1).max(40),
 });

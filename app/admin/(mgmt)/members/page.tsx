@@ -27,12 +27,21 @@ export default async function MembersPage({ searchParams }: { searchParams: Prom
     supabaseAdmin.from("memberships").select("id", { count: "exact", head: true }).gte("created_at", month),
   ]);
 
+  // How often each card got member price (POS asks for its last 3 digits — migration 041). Cancelled sales don't count.
+  const ids = (data ?? []).map((m) => m.id);
+  const { data: uses } = ids.length
+    ? await supabaseAdmin.from("orders").select("membership_id").in("membership_id", ids).neq("status", "cancelled")
+    : { data: [] as { membership_id: string | null }[] };
+  const usedBy = new Map<string, number>();
+  for (const u of uses ?? []) if (u.membership_id) usedBy.set(u.membership_id, (usedBy.get(u.membership_id) ?? 0) + 1);
+
   const rows: MemberRowData[] = (data ?? []).map((m) => {
     const order = m.order as unknown as { order_number: string; daily_number: number | null } | null;
     return {
       id: m.id, full_name: m.full_name, phone: m.phone, card_number: m.card_number, sold: sold(m.created_at),
       soldBy: (m.seller as unknown as { full_name: string } | null)?.full_name ?? "POS",
       order: order ? (order.daily_number != null ? `#${String(order.daily_number).padStart(2, "0")}` : order.order_number) : null,
+      used: usedBy.get(m.id) ?? 0,
     };
   });
 
@@ -62,7 +71,7 @@ export default async function MembersPage({ searchParams }: { searchParams: Prom
           <div className="card hidden overflow-x-auto md:block">
             <table className="w-full text-left text-sm">
               <thead className="bg-stone-50 text-xs font-bold uppercase tracking-wide text-stone-500">
-                <tr><th className="px-4 py-2.5">Name</th><th className="px-4 py-2.5">Mobile</th><th className="px-4 py-2.5">Card no.</th><th className="px-4 py-2.5">Sold</th><th className="px-4 py-2.5">By · order</th><th /></tr>
+                <tr><th className="px-4 py-2.5">Name</th><th className="px-4 py-2.5">Mobile</th><th className="px-4 py-2.5">Card no.</th><th className="px-4 py-2.5" title="Sales that got member price with this card">Used</th><th className="px-4 py-2.5">Sold</th><th className="px-4 py-2.5">By · order</th><th /></tr>
               </thead>
               <tbody>{rows.map((m) => <MemberRow key={m.id} m={m} asTableRow />)}</tbody>
             </table>
