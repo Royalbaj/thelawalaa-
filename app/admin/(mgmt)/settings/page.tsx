@@ -1,7 +1,7 @@
 import { requireRole } from "@/lib/supabase/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { npr } from "@/lib/utils";
-import { BranchForm, PromoForm, ActiveToggle, FeatureFlagsForm, OpeningPromoForm, SocialLinksManager, DeliveryAreaForm, StaffSaleForm, DeliveryHoursForm } from "@/components/admin/settings-controls";
+import { BranchForm, PromoForm, ActiveToggle, FeatureFlagsForm, OpeningPromoForm, SocialLinksManager, DeliveryAreaForm, StaffSaleForm, DeliveryHoursForm, DeliveryChargeForm } from "@/components/admin/settings-controls";
 import ResetSalesData from "@/components/admin/reset-sales-data";
 import EmailSetupPanel from "@/components/admin/email-setup";
 
@@ -101,6 +101,7 @@ export default async function SettingsPage() {
           days: Number(settings?.delivery_days_ahead ?? 2),
         }} />
         <DeliveryAreaForm radiusKm={Number(settings?.delivery_radius_km ?? 5)} storeLat={settings?.store_lat ?? null} storeLng={settings?.store_lng ?? null} />
+        <DeliveryChargeForm fee={Number(settings?.delivery_fee ?? 20)} freeFrom={Number(settings?.free_delivery_from ?? 99)} />
         <OpeningPromoForm
           enabled={settings?.opening_promo_enabled ?? false}
           momoPrice={Number(settings?.opening_promo_momo_price ?? 11)}

@@ -103,6 +103,7 @@ export function orderConfirmedEmail(o: {
   type: string; paymentMethod: string;
   items: { name: string; qty: number; lineTotal: number }[];
   subtotal: number; promoDiscount: number; pointsDiscount: number; pointsUsed: number; total: number;
+  deliveryFee?: number; // Rs 20 under Rs 99 of food (lib/delivery-fee.ts); 0 = free
   pointsToEarn: number; otp: string | null;
   scheduled?: string | null; // a booked delivery slot, e.g. "Tomorrow 11:00 am – 11:30 am"
 }) {
@@ -132,6 +133,7 @@ export function orderConfirmedEmail(o: {
             ...(o.type === "delivery" ? [{ label: "Delivery", amount: "FREE" }] : []),
             ...(o.promoDiscount ? [{ label: "Promo", amount: `− ${rs(o.promoDiscount)}` }] : []),
             ...(o.pointsDiscount ? [{ label: `${fmtPoints(o.pointsUsed)} points`, amount: `− ${rs(o.pointsDiscount)}` }] : []),
+            ...(o.type === "delivery" ? [{ label: "Delivery", amount: o.deliveryFee ? rs(o.deliveryFee) : "Free" }] : []),
             { label: "Total", amount: rs(o.total) },
           ],
         ),

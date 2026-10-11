@@ -10,6 +10,8 @@ import PosSession from "@/components/pos/pos-session";
 import PosLockScreen from "@/components/pos/pos-lock-screen";
 import OrderSoundKeeper from "@/components/pos/order-sound-keeper";
 import { getPosStaff, posLockOn, posLoginKey } from "@/lib/pos-staff";
+import PosNotices from "@/components/pos/pos-notices";
+import { getPosNotices } from "@/lib/notifications";
 
 export const dynamic = "force-dynamic";
 
@@ -46,7 +48,10 @@ export default async function PosLayout({ children }: { children: React.ReactNod
   // stays locked until a counter person types their PIN (which clocks them in).
   // Until then — nobody set up yet — the POS works as it always did.
   const lockOn = await posLockOn();
-  const staff = lockOn && user ? await getPosStaff(posLoginKey(user)) : null;
+  const [staff, notices] = await Promise.all([
+    lockOn && user ? getPosStaff(posLoginKey(user)) : null,
+    getPosNotices(), // Admin → Notifications → POS: always on screen until removed
+  ]);
 
   // The POS is always dark (owner's call) — easier on the eyes all day at the counter.
   return (
@@ -56,10 +61,14 @@ export default async function PosLayout({ children }: { children: React.ReactNod
       {/* Order sound always on: any tap (PIN screen too) turns it on; a bar shows while it's off. */}
       <OrderSoundKeeper />
       {lockOn && !staff ? (
-        <PosLockScreen />
+        <>
+          <PosNotices initial={notices} />
+          <PosLockScreen />
+        </>
       ) : (
         <>
           <PosHeader fullName={profile.full_name} staff={staff} />
+          <PosNotices initial={notices} />
           <main className="min-h-0 flex-1">{children}</main>
         </>
       )}

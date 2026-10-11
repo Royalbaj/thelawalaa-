@@ -151,6 +151,26 @@ export async function updateDeliveryHours(input: unknown) {
 }
 
 // ── Staff sale: how many items one staff sale gets free (migration 035) ──
+// ── Delivery charge (migration 042) ───────────────────────────────
+// Rs `delivery_fee` when the food comes to less than `free_delivery_from`; 0 = always free.
+const deliveryChargeSchema = z.object({
+  delivery_fee: z.number().int().min(0).max(500, "At most Rs 500"),
+  free_delivery_from: z.number().int().min(0).max(100000),
+});
+
+export async function updateDeliveryCharge(input: unknown) {
+  const { user } = await requireRole(["super_admin"]);
+  const parsed = deliveryChargeSchema.safeParse(input);
+  if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Enter whole rupees" };
+  const { error } = await supabaseAdmin.from("app_settings")
+    .update({ ...parsed.data, updated_at: new Date().toISOString() }).eq("id", 1);
+  if (error) return { error: "Could not save the delivery charge" };
+  await audit({ actor_id: user.id, action: "UPDATE_DELIVERY_CHARGE", target_table: "app_settings", target_id: "1", new_data: parsed.data });
+  revalidatePath("/admin/settings");
+  revalidatePath("/order");
+  return { ok: true };
+}
+
 const staffSaleSchema = z.object({ staff_free_items: z.number().int().min(0).max(20, "At most 20 items") });
 
 export async function updateStaffSale(input: unknown) {

@@ -15,7 +15,7 @@ import { slotLabel } from "@/lib/delivery-hours";
 
 type TrackOrder = {
   id: string; order_number: string; daily_number: number | null; status: string; type: string;
-  total: number | null; payment_status: string; payment_method: string | null; created_at: string; delivery_address: string | null;
+  total: number | null; delivery_fee?: number | null; payment_status: string; payment_method: string | null; created_at: string; delivery_address: string | null;
   scheduled_for?: string | null; scheduled_until?: string | null; // a booked delivery slot
 };
 type TrackItem = { product_name: string; quantity: number; line_total: number | null };
@@ -191,6 +191,9 @@ function TrackContent() {
             </ul>
             {order.total != null && (
               <>
+                {order.type === "delivery" && order.delivery_fee != null && (
+                  <p className="mt-1 flex justify-between text-sm text-stone-500"><span>Delivery</span><span>{order.delivery_fee > 0 ? npr(order.delivery_fee) : "Free"}</span></p>
+                )}
                 <p className="mt-3 flex justify-between border-t pt-2 font-bold"><span>{order.payment_status === "paid" ? "Total" : "To pay"}</span><span>{npr(Number(order.total))}</span></p>
                 <p className="mt-1 text-xs text-stone-500">
                   {order.payment_method?.toUpperCase()} · {order.payment_status === "paid" ? "Paid ✓" : order.payment_method === "qr" ? "Scan QR on arrival" : order.payment_method === "esewa" ? "Payment pending" : order.type === "delivery" ? "Pay cash on arrival" : "Pay cash at the counter"}

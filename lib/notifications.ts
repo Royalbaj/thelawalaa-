@@ -26,3 +26,13 @@ export async function getInbox(profileId: string, audience: "customers" | "drive
 export async function unreadCount(profileId: string, audience: "customers" | "drivers") {
   return (await getInbox(profileId, audience)).unread;
 }
+
+// Notices for the counter (migration 042): Admin → Notifications → POS. They stay
+// on the POS screen (till and PIN screen) until the admin removes them.
+export type PosNotice = { id: string; title: string; body: string; created_at: string };
+
+export async function getPosNotices(): Promise<PosNotice[]> {
+  const { data } = await supabaseAdmin.from("notifications").select("id, title, body, created_at")
+    .eq("audience", "pos").order("created_at", { ascending: false }).limit(5);
+  return (data ?? []) as PosNotice[];
+}

@@ -22,7 +22,7 @@ export async function GET(_req: Request, props: { params: Promise<{ orderId: str
 
   const { data: order } = await supabaseAdmin
     .from("orders")
-    .select("id, order_number, daily_number, status, type, total, payment_status, payment_method, created_at, customer_id, delivery_address, scheduled_for, scheduled_until")
+    .select("id, order_number, daily_number, status, type, total, delivery_fee, payment_status, payment_method, created_at, customer_id, delivery_address, scheduled_for, scheduled_until")
     .eq("id", params.orderId)
     .maybeSingle();
   if (!order) return NextResponse.json({ error: "Not found" }, { status: 404 });
@@ -44,9 +44,9 @@ export async function GET(_req: Request, props: { params: Promise<{ orderId: str
     if (user?.id === order.customer_id) deliveryCode = deliveryOtp(order.id);
   }
 
-  const { customer_id: _owner, total, ...rest } = order;
+  const { customer_id: _owner, total, delivery_fee, ...rest } = order;
   return NextResponse.json({
-    order: { ...rest, total: done ? null : total },
+    order: { ...rest, total: done ? null : total, delivery_fee: done ? null : Number(delivery_fee ?? 0) },
     items: (items ?? []).map((i) => ({ product_name: i.product_name, quantity: i.quantity, line_total: done ? null : i.line_total })),
     deliveryCode,
   }, { headers: { "Cache-Control": "no-store" } });

@@ -4,7 +4,7 @@ import toast from "react-hot-toast";
 import { Facebook, Instagram, Link2, Trash2 } from "lucide-react";
 import TikTokIcon from "@/components/icons/tiktok";
 import { createBranch, setBranchActive, createPromoCode, setPromoActive } from "@/app/actions/admin-crud";
-import { updateAppSettings, updateOpeningPromo, addSocialLink, setSocialLinkActive, deleteSocialLink, updateDeliveryArea, updateStaffSale, updateDeliveryHours } from "@/app/actions/settings";
+import { updateAppSettings, updateOpeningPromo, addSocialLink, setSocialLinkActive, deleteSocialLink, updateDeliveryArea, updateStaffSale, updateDeliveryHours, updateDeliveryCharge } from "@/app/actions/settings";
 import { deliveryHours, deliverySlots, minutesLabel, slotLabel } from "@/lib/delivery-hours";
 
 function platformIcon(platform: string) {
@@ -139,6 +139,58 @@ export function FeatureFlagsForm({ esewaEnabled, deliveryEnabled, posCanCancel }
 }
 
 /** Staff sale at the POS: how many items one sale gets free. 0 hides the Staff button. */
+/** Delivery charge: Rs X when the food comes to less than Rs Y (checkout + createOrder, lib/delivery-fee.ts). */
+export function DeliveryChargeForm({ fee, freeFrom }: { fee: number; freeFrom: number }) {
+  const [feeText, setFee] = useState(String(fee));
+  const [fromText, setFrom] = useState(String(freeFrom));
+  const [saved, setSaved] = useState({ fee, freeFrom });
+  const [pending, start] = useTransition();
+  const f = feeText.trim() === "" ? NaN : Number(feeText);
+  const m = fromText.trim() === "" ? NaN : Number(fromText);
+  const valid = Number.isInteger(f) && f >= 0 && f <= 500 && Number.isInteger(m) && m >= 0;
+  const changed = f !== saved.fee || m !== saved.freeFrom;
+
+  return (
+    <form
+      className="card space-y-3 p-5"
+      onSubmit={(e) => {
+        e.preventDefault();
+        if (!valid) { toast.error("Enter whole rupees"); return; }
+        start(async () => {
+          const r = await updateDeliveryCharge({ delivery_fee: f, free_delivery_from: m });
+          if (r?.error) { toast.error(r.error); return; }
+          setSaved({ fee: f, freeFrom: m });
+          toast.success(f ? `Delivery: Rs ${f} under Rs ${m}, free from Rs ${m}` : "Delivery is free for every order");
+        });
+      }}
+    >
+      <div className="flex items-center justify-between gap-3">
+        <h3 className="font-display font-bold text-brand-brown">Delivery charge</h3>
+        <span className={saved.fee ? "badge bg-orange-100 text-brand-orange" : "badge bg-green-100 text-green-800"}>
+          {saved.fee ? `Rs ${saved.fee} under Rs ${saved.freeFrom}` : "Always free"}
+        </span>
+      </div>
+      <p className="text-xs text-stone-500">
+        Online delivery orders pay this when the food comes to less than the amount below (before vouchers or points),
+        and nothing from that amount up. 0 = delivery is always free. Website wording that mentions delivery is in Website text.
+      </p>
+      <div className="grid grid-cols-2 gap-3">
+        <div>
+          <label className="label" htmlFor="delivery_fee">Charge (Rs)</label>
+          <input id="delivery_fee" type="number" inputMode="numeric" min={0} max={500} step={1} value={feeText}
+            onChange={(e) => setFee(e.target.value.replace(/\D/g, "").slice(0, 3))} className="input" />
+        </div>
+        <div>
+          <label className="label" htmlFor="free_delivery_from">Free from (Rs)</label>
+          <input id="free_delivery_from" type="number" inputMode="numeric" min={0} step={1} value={fromText}
+            onChange={(e) => setFrom(e.target.value.replace(/\D/g, "").slice(0, 6))} className="input" />
+        </div>
+      </div>
+      <button disabled={pending || !valid || !changed} className="btn-primary w-full">{pending ? "Saving…" : "Save"}</button>
+    </form>
+  );
+}
+
 export function StaffSaleForm({ freeItems }: { freeItems: number }) {
   const [value, setValue] = useState(String(freeItems));
   const [saved, setSaved] = useState(freeItems);

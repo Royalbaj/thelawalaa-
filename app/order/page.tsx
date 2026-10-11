@@ -18,6 +18,7 @@ import AddToCartButton from "@/components/add-to-cart-button";
 import BrandLogo from "@/components/brand-logo";
 import { applyOpeningPromoPrice, isOpeningPromoActive, type OpeningPromoSettings } from "@/lib/promo";
 import { deliveryArea, outsideArea, distanceKm, fmtKm } from "@/lib/geo";
+import { deliveryFeeFor, deliveryFeeRules, toFreeDelivery } from "@/lib/delivery-fee";
 import { phoneDisplay, telHref } from "@/lib/utils";
 import { guestCodeKey } from "@/lib/guest-order";
 import { deliveryHours, deliveryOpenNow, deliverySlots, dayWord, minutesLabel, nextStartLabel, slotLabel } from "@/lib/delivery-hours";
@@ -82,6 +83,8 @@ export default function OrderPage() {
     // Delivery hours (Admin → Settings): ASAP only inside them; otherwise a booked slot.
     delivery_hours_enabled?: boolean; delivery_start?: string; delivery_end?: string;
     delivery_slot_minutes?: number; delivery_lead_minutes?: number; delivery_days_ahead?: number;
+    // Delivery charge (Admin → Settings → Delivery area): Rs 20 under Rs 99 of food.
+    delivery_fee?: number | string | null; free_delivery_from?: number | string | null;
   }>({ esewa_enabled: false, delivery_enabled: false });
   // When to deliver: as soon as possible, or a booked slot (always a slot while delivery is closed).
   const [when, setWhen] = useState<"asap" | "later">("asap");
@@ -114,7 +117,7 @@ export default function OrderPage() {
       supabase.from("categories").select("id, name").order("sort_order"),
       supabase.from("branches").select("id, name, address"),
       supabase.from("addresses").select("id, label, full_address, lat, lng"),
-      supabase.from("app_settings").select("esewa_enabled, delivery_enabled, opening_promo_enabled, opening_promo_momo_price, opening_promo_starts_at, opening_promo_ends_at, delivery_radius_km, store_lat, store_lng, delivery_hours_enabled, delivery_start, delivery_end, delivery_slot_minutes, delivery_lead_minutes, delivery_days_ahead").eq("id", 1).single(),
+      supabase.from("app_settings").select("esewa_enabled, delivery_enabled, opening_promo_enabled, opening_promo_momo_price, opening_promo_starts_at, opening_promo_ends_at, delivery_radius_km, store_lat, store_lng, delivery_hours_enabled, delivery_start, delivery_end, delivery_slot_minutes, delivery_lead_minutes, delivery_days_ahead, delivery_fee, free_delivery_from").eq("id", 1).single(),
       supabase.from("site_content").select("value").eq("key", "contact.whatsapp").maybeSingle(),
     ]).then(([p, c, b, a, s, phone]) => {
       if (phone.data?.value) setShopPhone(phone.data.value as string);
@@ -163,7 +166,11 @@ export default function OrderPage() {
   const subtotal = useMemo(() => items.reduce((t, i) => t + i.price * i.quantity, 0), [items]);
   // Same plan createOrder makes on the server (lib/rewards.ts) — this is only the preview.
   const pointsPlan = usePoints && rewards ? redeemPlan(rewards.points, subtotal - promoDiscount, rewards.settings) : { points: 0, rupees: 0 };
-  const finalTotal = Math.max(0, subtotal - promoDiscount - pointsPlan.rupees);
+  // Delivery: Rs 20 under Rs 99 of food, free from Rs 99 — the same rule createOrder charges (lib/delivery-fee.ts).
+  const deliveryFee = type === "delivery" ? deliveryFeeFor(subtotal, settings) : 0;
+  const moreForFree = type === "delivery" ? toFreeDelivery(subtotal, settings) : 0;
+  const feeRules = deliveryFeeRules(settings);
+  const finalTotal = Math.max(0, subtotal - promoDiscount - pointsPlan.rupees) + deliveryFee;
 
   const visible = activeCat ? products.filter((p) => p.category_id === activeCat) : products;
 
@@ -597,7 +604,13 @@ export default function OrderPage() {
                         </p>
                       </div>
                     )}
-                    <p className="text-xs font-bold text-brand-green">Free home delivery within {area.radiusKm} km of Godam Chowk</p>
+                    <p className={`text-xs font-bold ${deliveryFee ? "text-stone-600" : "text-brand-green"}`}>
+                      {feeRules.fee === 0
+                        ? `Free home delivery within ${area.radiusKm} km of Godam Chowk`
+                        : deliveryFee
+                        ? `Delivery ${npr(deliveryFee)} — add ${npr(moreForFree)} more for free delivery (free from ${npr(feeRules.freeFrom)})`
+                        : `Free delivery — your order is over ${npr(feeRules.freeFrom)}`}
+                    </p>
                   </div>
                 )}
               </div>
@@ -667,6 +680,16 @@ export default function OrderPage() {
               </div>
             </div>
 
+            {type === "delivery" && (
+              <dl className="card space-y-1 p-4 text-sm">
+                <div className="flex justify-between"><dt className="text-stone-500">Food</dt><dd>{npr(subtotal)}</dd></div>
+                {promoDiscount + pointsPlan.rupees > 0 && (
+                  <div className="flex justify-between text-brand-green"><dt>Discounts</dt><dd>−{npr(promoDiscount + pointsPlan.rupees)}</dd></div>
+                )}
+                <div className="flex justify-between"><dt className="text-stone-500">Delivery</dt><dd className={deliveryFee ? "" : "font-bold text-brand-green"}>{deliveryFee ? npr(deliveryFee) : "Free"}</dd></div>
+                <div className="flex justify-between border-t border-stone-100 pt-1.5 font-bold"><dt>Total</dt><dd>{npr(finalTotal)}</dd></div>
+              </dl>
+            )}
             <p className="text-center text-xs text-stone-500">
               By placing this order you agree to our <Link href="/terms" target="_blank" className="font-bold text-brand-orange">Terms &amp; Conditions</Link>. Offers and prices can change without notice.
             </p>

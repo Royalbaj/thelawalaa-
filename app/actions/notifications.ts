@@ -7,17 +7,19 @@ import { supabaseAdmin, audit } from "@/lib/supabase/admin";
 import { resendClient, EMAIL_SITE } from "@/lib/email";
 import { offerNoticeEmail } from "@/lib/account-emails";
 import { unsubscribeToken } from "@/lib/signed-links";
-import { pushToDrivers } from "@/lib/push";
+import { pushToDrivers, pushToStaff } from "@/lib/push";
+import { getPosNotices as loadPosNotices } from "@/lib/notifications";
 
 // Admin → Notifications. Customers only ever get these if they joined offers
-// (profiles.marketing_opt_in); drivers get theirs in the driver portal.
+// (profiles.marketing_opt_in); drivers get theirs in the driver portal; POS
+// notices stay on the counter screen until removed (migration 042).
 
 const linkSchema = z.string().trim().max(300)
   .refine((v) => v === "" || /^\/[A-Za-z0-9/_\-?=&#.%]*$/.test(v) || /^https:\/\/[^\s]+$/.test(v), "Links must start with / (a page on this site) or https://")
   .optional();
 
 const noticeSchema = z.object({
-  audience: z.enum(["customers", "drivers"]),
+  audience: z.enum(["customers", "drivers", "pos"]),
   title: z.string().trim().min(2, "Add a title").max(80, "Keep the title under 80 characters"),
   body: z.string().trim().min(2, "Write the message").max(500, "Keep the message under 500 characters"),
   link_url: linkSchema,
@@ -86,10 +88,16 @@ export async function sendNotification(input: unknown) {
     const r = await pushToDrivers({ title: d.title, body: d.body, tag: `notice-${notice.id}`, url: "/delivery/updates" });
     pushed = r.sent;
   }
+  // The counter: an alert to the POS devices that turned alerts on (the bell in the POS header).
+  if (d.audience === "pos" && d.push) {
+    const r = await pushToStaff({ title: d.title, body: d.body, tag: `notice-${notice.id}`, url: "/admin" });
+    pushed = r.sent;
+  }
 
   await supabaseAdmin.from("notifications").update({ emailed, pushed }).eq("id", notice.id);
   await audit({ actor_id: user.id, action: "SEND_NOTIFICATION", target_table: "notifications", target_id: notice.id, new_data: { audience: d.audience, title: d.title, emailed, pushed } });
   revalidatePath("/admin/notifications");
+  if (d.audience === "pos") revalidatePath("/admin");
   return { ok: true, emailed, pushed, emailProblem };
 }
 
@@ -99,6 +107,7 @@ export async function deleteNotification(id: string) {
   await supabaseAdmin.from("notifications").delete().eq("id", id);
   await audit({ actor_id: user.id, action: "DELETE_NOTIFICATION", target_table: "notifications", target_id: id });
   revalidatePath("/admin/notifications");
+  revalidatePath("/admin");
   return { ok: true };
 }
 
@@ -109,4 +118,10 @@ export async function markNotificationsSeen() {
   revalidatePath("/account", "layout");
   revalidatePath("/delivery");
   return { ok: true };
+}
+
+/** The POS checks for new notices every minute and on Refresh (they also come with each page load). */
+export async function getPosNotices() {
+  await requireRole(["pos_user", "super_admin"]);
+  return loadPosNotices();
 }

@@ -23,7 +23,7 @@ export const SITE = {
   url: process.env.NEXT_PUBLIC_SITE_URL && !process.env.NEXT_PUBLIC_SITE_URL.includes("vercel.app")
     ? process.env.NEXT_PUBLIC_SITE_URL : "https://www.thelawalaa.com",
   description:
-    "Thelawalaa serves Banepa's most flavourful chatpate and momo — hygienic, freshly made, and delivered hot to your door free within 5km of Godam Chowk. Classic, Gilo, Mint & Spicy Ramen chatpate, plus Veg, Chicken & Buff momo.",
+    "Thelawalaa serves Banepa's most flavourful chatpate and momo — hygienic, freshly made, and delivered hot to your door within 5km of Godam Chowk — free from Rs 99. Classic, Gilo, Mint & Spicy Ramen chatpate, plus Veg, Chicken & Buff momo.",
   tagline: "Banepa's Most Flavourful Chatpate & Momo",
   locale: "en_NP",
   currency: "NPR",
@@ -32,7 +32,7 @@ export const SITE = {
   email: "hello@thelawalaa.com",
   // USP — surfaced in copy and metadata.
   usp: {
-    delivery: "Free home delivery within 5km of our Godam Chowk store",
+    delivery: "Home delivery within 5km of our Godam Chowk store — free on orders from Rs 99, Rs 20 below",
     pillars: ["Hygiene", "Flavour", "Variety", "Pickup & home delivery"],
     deliveryRadiusKm: 5,
   },

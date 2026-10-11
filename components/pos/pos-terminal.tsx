@@ -146,13 +146,13 @@ function CashReceived({ total, pending, onClose, onConfirm }: {
             <p className="text-[11px] font-bold uppercase tracking-wide text-stone-500 dark:text-stone-400">Received</p>
             <p className="font-display text-2xl font-extrabold" aria-live="polite">{value ? npr(received) : <span className="text-stone-300 dark:text-stone-600">Rs —</span>}</p>
           </div>
-          {/* What to hand back — the big number staff look for. */}
+          {/* What to hand back — the big number staff look for, in red (owner's call). */}
           <div className={cn("rounded-2xl px-3 py-2",
-            !value ? "bg-stone-50 dark:bg-stone-800/60" : enough ? "bg-green-50 dark:bg-green-950/40" : "bg-red-50 dark:bg-red-950/40")}>
+            !value ? "bg-stone-50 dark:bg-stone-800/60" : enough ? "bg-red-50 dark:bg-red-950/40" : "bg-amber-50 dark:bg-amber-950/40")}>
             <p className="text-[11px] font-bold uppercase tracking-wide text-stone-500 dark:text-stone-400">
               {value && !enough ? <><span lang="ne">कम</span> · Short</> : <><span lang="ne">फिर्ता</span> · Return</>}
             </p>
-            <p className={cn("font-display text-2xl font-extrabold", !value ? "text-stone-300 dark:text-stone-600" : enough ? "text-brand-green" : "text-brand-red")} aria-live="polite">
+            <p className={cn("font-display text-2xl font-extrabold", !value ? "text-stone-300 dark:text-stone-600" : enough ? "text-brand-red" : "text-amber-600 dark:text-amber-400")} aria-live="polite">
               {!value ? "Rs —" : npr(Math.abs(received - total))}
             </p>
           </div>
@@ -738,10 +738,10 @@ export default function PosTerminal({
             ))}
             {/* Cash with an amount entered: what to hand back, big enough to read at arm's length. */}
             {done.received != null && (
-              <div className={cn("mt-3 rounded-2xl p-3", done.received >= done.total ? "bg-green-50 dark:bg-green-950/40" : "bg-red-50 dark:bg-red-950/40")}>
+              <div className={cn("mt-3 rounded-2xl p-3", done.received > done.total ? "bg-red-50 dark:bg-red-950/40" : done.received === done.total ? "bg-green-50 dark:bg-green-950/40" : "bg-amber-50 dark:bg-amber-950/40")}>
                 <p className="text-sm font-bold text-stone-600 dark:text-stone-300">Received {npr(done.received)}</p>
                 {done.received > done.total ? (
-                  <p className="font-display text-3xl font-extrabold text-brand-green">Return {npr(done.received - done.total)}</p>
+                  <p className="font-display text-3xl font-extrabold text-brand-red">Return {npr(done.received - done.total)}</p>
                 ) : done.received === done.total ? (
                   <p className="font-bold text-brand-green">Exact amount — nothing to return</p>
                 ) : (

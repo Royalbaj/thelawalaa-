@@ -16,6 +16,7 @@ import { deliveryOtp, hashOtp } from "@/lib/delivery-otp";
 import { deliveryArea, outsideArea, distanceKm, fmtKm } from "@/lib/geo";
 import { getSiteText } from "@/lib/site-content";
 import { bookableSlot, deliveryHours, deliveryOpenNow, nextStartLabel, slotLabel, type Slot } from "@/lib/delivery-hours";
+import { deliveryFeeFor } from "@/lib/delivery-fee";
 import { throttled, clientIp } from "@/lib/throttle";
 
 // Promo codes match exactly, in any letter case. ilike treats % and _ as
@@ -210,7 +211,10 @@ export async function createOrder(input: unknown) {
     }
   }
 
-  const total = Math.max(0, subtotal - discount_amount - points_discount);
+  // Delivery: Rs 20 under Rs 99 of food, free from Rs 99 (Admin → Settings; lib/delivery-fee.ts).
+  // On top of the food — vouchers and points never pay for delivery.
+  const delivery_fee = data.type === "delivery" ? deliveryFeeFor(subtotal, settings) : 0;
+  const total = Math.max(0, subtotal - discount_amount - points_discount) + delivery_fee;
   
   let finalNotes = data.notes ? data.notes.trim() : "";
   const addressLine = data.type === "delivery"
@@ -240,7 +244,7 @@ export async function createOrder(input: unknown) {
       branch_id: isStaff ? await resolveStaffBranchId(profile.branch_id) : (data.branch_id ?? null),
       type: data.type,
       subtotal,
-      delivery_fee: 0, // delivery is free within the delivery area (owner's call, Oct 2026)
+      delivery_fee,
       discount_amount,
       total,
       delivery_address_id: isSelfCheckout ? (data.delivery_address_id ?? null) : null,
@@ -310,7 +314,7 @@ export async function createOrder(input: unknown) {
           name: profile.full_name, orderId: order.id, orderNumber: order.order_number, dailyNumber: order.daily_number,
           type: data.type, paymentMethod: data.payment_method,
           items: itemRows.map((r) => ({ name: r.product_name, qty: r.quantity, lineTotal: r.line_total })),
-          subtotal, promoDiscount: discount_amount, pointsDiscount: points_discount, pointsUsed: points_redeemed,
+          subtotal, promoDiscount: discount_amount, pointsDiscount: points_discount, pointsUsed: points_redeemed, deliveryFee: delivery_fee,
           total, pointsToEarn: rewards.enabled ? pointsForTotal(total, rewards) : 0, otp: otpForEmail,
           scheduled: slot ? slotLabel(slot) : null,
         }),
