@@ -112,7 +112,8 @@ export default function StructuredData({
     <script
       type="application/ld+json"
       // eslint-disable-next-line react/no-danger
-      dangerouslySetInnerHTML={{ __html: JSON.stringify(json) }}
+      // "<" escaped so editable text (FAQs, website text) containing "</script>" can't end the tag early.
+      dangerouslySetInnerHTML={{ __html: JSON.stringify(json).replace(/</g, "\\u003c") }}
     />
   );
 }

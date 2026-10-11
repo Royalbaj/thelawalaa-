@@ -1,9 +1,8 @@
 "use server";
 
 import { z } from "zod";
-import { createHmac } from "node:crypto";
-import { headers } from "next/headers";
 import { createClient as createPlainClient } from "@supabase/supabase-js";
+import { throttled, clientIp } from "@/lib/throttle";
 import { getVerifiedUser } from "@/lib/supabase/server";
 import { supabaseAdmin, audit, getRewardSettings } from "@/lib/supabase/admin";
 import { signupSchema } from "@/lib/validations/auth";
@@ -26,24 +25,6 @@ import { verifyEmail, welcomeEmail, resetEmail, alreadyRegisteredEmail } from "@
 
 type Result = { ok: true; fallback?: boolean } | { error: string };
 const emailSchema = z.string().trim().toLowerCase().email().max(254);
-
-function keyHash(value: string) {
-  const secret = process.env.OTP_HMAC_SECRET || process.env.SUPABASE_SERVICE_ROLE_KEY || "local-dev";
-  return createHmac("sha256", `auth-email|${secret}`).update(value).digest("hex").slice(0, 32);
-}
-
-/** At most `max` of this kind of email per key per hour (the IP and the address are each a key). */
-async function throttled(kind: string, keys: string[], max: number) {
-  const since = new Date(Date.now() - 60 * 60_000).toISOString();
-  for (const key of keys) {
-    const { count } = await supabaseAdmin.from("email_throttle").select("id", { count: "exact", head: true })
-      .eq("kind", kind).eq("key_hash", keyHash(key)).gte("created_at", since);
-    if ((count ?? 0) >= max) return true;
-  }
-  await supabaseAdmin.from("email_throttle").insert(keys.map((k) => ({ kind, key_hash: keyHash(k) })));
-  return false;
-}
-const clientIp = async () => (await headers()).get("x-forwarded-for")?.split(",")[0]?.trim() || "unknown";
 
 async function accountStatus(email: string) {
   const { data } = await supabaseAdmin.rpc("auth_user_status", { p_email: email });

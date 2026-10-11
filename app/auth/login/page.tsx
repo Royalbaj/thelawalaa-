@@ -55,8 +55,10 @@ function LoginForm() {
     if (profile.role === "customer") await completeSignup().catch(() => null);
 
     const redirect = params.get("redirect");
-    // Only allow same-site relative redirects — blocks open-redirect phishing
-    const safe = redirect && redirect.startsWith("/") && !redirect.startsWith("//");
+    // Only allow same-site relative redirects — blocks open-redirect phishing.
+    // Browsers read "/\evil.com" (and tabs/newlines inside it) as "//evil.com",
+    // so a backslash or any whitespace/control character anywhere is refused too.
+    const safe = redirect && /^\/(?![/\\])[^\\\s\x00-\x1f]*$/.test(redirect);
     // First sign-in straight after confirming: the account home with its welcome note.
     const home = profile.role === "customer" && params.get("verified") === "1" ? "/account?welcome=1" : ROLE_HOME[profile.role] ?? "/account";
     // A full page load, replacing this login page in history: it drops Next's

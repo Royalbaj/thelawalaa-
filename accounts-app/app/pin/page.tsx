@@ -10,7 +10,8 @@ export default async function PinPage({ searchParams }: { searchParams: Promise<
   if (!profile) redirect("/login");
   const { next } = await searchParams;
   // Only ever back into this app.
-  const safeNext = next && next.startsWith("/") && !next.startsWith("//") && !next.startsWith("/pin") ? next : "/";
+  // Same-site paths only: browsers read "/\evil.com" (and tabs/newlines in it) as "//evil.com".
+  const safeNext = next && /^\/(?![/\\])[^\\\s\x00-\x1f]*$/.test(next) && !next.startsWith("/pin") ? next : "/";
 
   return (
     <div className="flex min-h-dvh items-center justify-center bg-brand-dark px-4 py-8">

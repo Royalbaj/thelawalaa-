@@ -1,6 +1,7 @@
 "use server";
 
 import { after } from "next/server";
+import { z } from "zod";
 import { checkStockAfterSale } from "@/lib/stock-alerts";
 import { orderSchema } from "@/lib/validations/order";
 import { getVerifiedUser } from "@/lib/supabase/server";
@@ -15,7 +16,14 @@ import { deliveryOtp, hashOtp } from "@/lib/delivery-otp";
 import { deliveryArea, outsideArea, distanceKm, fmtKm } from "@/lib/geo";
 import { getSiteText } from "@/lib/site-content";
 import { bookableSlot, deliveryHours, deliveryOpenNow, nextStartLabel, slotLabel, type Slot } from "@/lib/delivery-hours";
+import { throttled, clientIp } from "@/lib/throttle";
 
+// Promo codes match exactly, in any letter case. ilike treats % and _ as
+// wildcards, so they're escaped — otherwise "%" would match any live code and
+// "A%" would let someone guess codes letter by letter.
+const exactCode = (code: string) => code.replace(/[\\%_]/g, (c) => `\\${c}`);
+// Each try (Apply, or an order with a code) counts: 30 per IP per 15 minutes.
+const promoThrottled = async () => throttled("promo", [await clientIp()], 30, 15);
 
 /**
  * Creates an order. Security properties:
@@ -141,10 +149,11 @@ export async function createOrder(input: unknown) {
   let discount_amount = 0;
   let promo_code_id: string | null = null;
   if (data.promo_code) {
+    if (await promoThrottled()) return { error: "Too many promo code tries — please wait a few minutes" };
     const { data: promo } = await supabaseAdmin
       .from("promo_codes")
       .select("*")
-      .ilike("code", data.promo_code)
+      .ilike("code", exactCode(data.promo_code))
       .eq("is_active", true)
       .single();
 
@@ -328,12 +337,17 @@ export async function createOrder(input: unknown) {
 }
 
 export async function validatePromoCode(code: string, subtotal: number) {
-  if (!code) return { error: "Please enter a code" };
-  
+  const parsed = z.object({ code: z.string().trim().min(1).max(30), subtotal: z.number().min(0).max(1_000_000) })
+    .safeParse({ code, subtotal });
+  if (!parsed.success) return { error: "Please enter a code" };
+  if (await promoThrottled()) return { error: "Too many tries — please wait a few minutes" };
+  code = parsed.data.code;
+  subtotal = parsed.data.subtotal;
+
   const { data: promo } = await supabaseAdmin
     .from("promo_codes")
     .select("*")
-    .ilike("code", code)
+    .ilike("code", exactCode(code))
     .eq("is_active", true)
     .single();
 

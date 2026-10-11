@@ -9,7 +9,8 @@ import { phoneNP } from "@/lib/validations/auth";
 
 export async function toggleFavorite(productId: string) {
   const { user } = await requireRole(["customer", "super_admin"]);
-  
+  if (!zod.string().uuid().safeParse(productId).success) return { ok: false as const, error: "Unknown item" };
+
   const { data: existing } = await supabaseAdmin
     .from("customer_favorites")
     .select("id")
@@ -28,24 +29,40 @@ export async function toggleFavorite(productId: string) {
   
   revalidatePath("/account");
   revalidatePath("/order");
-  return { ok: true, isFavorite: !existing };
+  return { ok: true as const, isFavorite: !existing };
 }
+
+const ratingSchema = zod.object({
+  orderId: zod.string().uuid(),
+  food: zod.number().int().min(1).max(5),
+  delivery: zod.number().int().min(1).max(5).nullable(),
+  comment: zod.string().trim().max(500).nullable(),
+});
 
 export async function submitOrderRating(orderId: string, foodRating: number, deliveryRating: number | null, comment: string | null) {
   const { user } = await requireRole(["customer"]);
-  
+  const parsed = ratingSchema.safeParse({ orderId, food: foodRating, delivery: deliveryRating, comment });
+  if (!parsed.success) return { error: "Could not submit rating" };
+  const d = parsed.data;
+
+  // Only your own order. A rating is once per order (order_ratings.order_id is
+  // unique), so rating someone else's would also stop them rating it.
+  const { data: own } = await supabaseAdmin.from("orders").select("id")
+    .eq("id", d.orderId).eq("customer_id", user.id).maybeSingle();
+  if (!own) return { error: "Could not submit rating" };
+
   const { error } = await supabaseAdmin.from("order_ratings").insert({
-    order_id: orderId,
+    order_id: d.orderId,
     customer_id: user.id,
-    food_rating: foodRating,
-    delivery_rating: deliveryRating,
-    comment: comment || null
+    food_rating: d.food,
+    delivery_rating: d.delivery,
+    comment: d.comment || null
   });
-  
+
   if (error) return { error: "Could not submit rating" };
-  
+
   revalidatePath("/account/orders");
-  revalidatePath(`/track/${orderId}`);
+  revalidatePath(`/track/${d.orderId}`);
   return { ok: true };
 }
 
