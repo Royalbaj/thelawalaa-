@@ -44,11 +44,20 @@ export const orderSchema = z.object({
 export const newMemberSchema = z.object({
   full_name: z.string().trim().min(2, "Type the member's full name").max(100, "That name is too long"),
   phone: z.string().transform((v) => v.replace(/[\s-]/g, "")).pipe(z.string().regex(/^(\+977)?9[6-8]\d{8}$/, "Enter the member's mobile number (98XXXXXXXX)")),
-  card_number: z.string().trim().max(30, "Card number is too long").optional().transform((v) => v || undefined),
+  // The number written on the card (101, 102 … — migration 044). Empty = the next automatic one, while 101–200 last.
+  card_number: z.string().trim().max(6, "Card numbers are up to 6 digits").regex(/^\d*$/, "Card numbers are digits only").optional().transform((v) => v || undefined),
+});
+
+// A delivery taken at the counter (phone orders, migration 045): who and where.
+export const posDeliverySchema = z.object({
+  name: z.string().trim().min(2, "Type the customer's name").max(100, "That name is too long"),
+  phone: z.string().transform((v) => v.replace(/[\s-]/g, "")).pipe(z.string().regex(/^(\+977)?9[6-8]\d{8}$/, "Enter the customer's mobile number (98XXXXXXXX)")),
+  address: z.string().trim().min(10, "Add the full address — tole/street, house and a landmark").max(300, "Keep the address under 300 characters"),
 });
 
 export const posOrderSchema = z.object({
-  type: z.enum(["pickup", "dine_in"]),
+  type: z.enum(["pickup", "dine_in", "delivery"]),
+  delivery: posDeliverySchema.optional(), // required when type is delivery
   payment_method: z.enum(["cash", "qr"]),
   student_discount: z.boolean().optional(),
   member: z.boolean().optional(),
@@ -56,6 +65,7 @@ export const posOrderSchema = z.object({
   manager: z.boolean().optional(), // manager discount — everything but frozen items free
   manager_pin: z.string().regex(/^\d{4}$/).optional(), // the approving manager's own PIN, checked again on the server
   member_card: z.string().regex(/^\d{3}$/).optional(), // member price: the last 3 digits of the member's card, checked again on the server
+  promo_code: z.string().trim().min(1).max(30).optional(), // "Code" deal: a discount code from Admin → Settings, checked again on the server
   members: z.array(newMemberSchema).max(10).optional(), // one per membership card sold
   items: z
     // half: an extra half plate on top of `quantity` whole plates (1½, 2½ …) — migration 041

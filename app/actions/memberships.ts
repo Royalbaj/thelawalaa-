@@ -15,6 +15,7 @@ export async function updateMembership(id: string, input: unknown) {
   if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Check the details" };
   const { full_name, phone, card_number } = parsed.data;
   const { error } = await supabaseAdmin.from("memberships").update({ full_name, phone, card_number: card_number ?? null }).eq("id", id);
+  if (error?.code === "23505") return { error: `Card ${card_number} is already another member's` };
   if (error) return { error: "Couldn't save" };
   await audit({ actor_id: user.id, action: "MEMBERSHIP_EDIT", target_table: "memberships", target_id: id, new_data: parsed.data });
   revalidatePath("/admin/members");

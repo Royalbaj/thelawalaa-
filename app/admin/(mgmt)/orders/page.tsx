@@ -1,4 +1,3 @@
-import { format } from "date-fns";
 import { requireRole } from "@/lib/supabase/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { npr, cn } from "@/lib/utils";
@@ -8,6 +7,7 @@ import MarkPaidButton from "@/components/admin/mark-paid-button";
 import { ItemsSummary, OrderDetails } from "@/components/admin/order-details";
 import { ClipboardList, Bike, Store } from "lucide-react";
 import { slotLabel } from "@/lib/delivery-hours";
+import { npDate, npDayMonthTime, npTime } from "@/lib/nepal-time";
 
 export const dynamic = "force-dynamic";
 
@@ -89,7 +89,7 @@ export default async function AdminOrders(props: { searchParams: Promise<{ statu
                   <span className="font-mono text-sm font-bold text-brand-brown">{o.order_number}</span>
                 </p>
                 <p className="mt-0.5 truncate text-xs text-stone-500">
-                  {customerName}{isGuest && customerName !== "Guest" ? " (guest)" : ""} · {o.type === "delivery" ? "Delivery" : o.type === "dine_in" ? "Dine-in" : "Pickup"} · {format(new Date(o.created_at), "d MMM, h:mm a")}
+                  {customerName}{isGuest && customerName !== "Guest" ? " (guest)" : ""} · {o.type === "delivery" ? "Delivery" : o.type === "dine_in" ? "Dine-in" : "Pickup"} · {npDayMonthTime(o.created_at)}
                   {o.staff_name && <> · sold by <b className="text-stone-600">{o.staff_name}</b></>}
                 </p>
                 {o.scheduled_for && o.scheduled_until && (
@@ -180,8 +180,8 @@ export default async function AdminOrders(props: { searchParams: Promise<{ statu
                     </div>
                   </td>
                   <td className="px-4 py-3.5 text-stone-500 text-xs">
-                    <div>{format(new Date(o.created_at), "d MMM yyyy")}</div>
-                    <div className="text-stone-400">{format(new Date(o.created_at), "h:mm a")}</div>
+                    <div>{npDate(o.created_at)}</div>
+                    <div className="text-stone-400">{npTime(o.created_at)}</div>
                     {o.staff_name && <div className="mt-0.5 text-stone-500">by <b>{o.staff_name}</b></div>}
                   </td>
                   <td className="px-4 py-3.5">

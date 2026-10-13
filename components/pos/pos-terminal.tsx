@@ -2,15 +2,16 @@
 import { useCallback, useEffect, useMemo, useState, useTransition } from "react";
 import Image from "next/image";
 import toast from "react-hot-toast";
-import { Search, X, Trash2, ShoppingCart, ChevronUp, UtensilsCrossed, CheckCircle2, Minus, Plus, GraduationCap, Crown, ChefHat, IdCard, AlertTriangle, ChevronDown, ShieldCheck, Snowflake, Delete } from "lucide-react";
-import { createPosOrder, getPosStock, checkManagerPin, checkMemberCard } from "@/app/actions/pos";
+import { Search, X, Trash2, ShoppingCart, ChevronUp, UtensilsCrossed, CheckCircle2, Minus, Plus, GraduationCap, Crown, ChefHat, IdCard, AlertTriangle, ChevronDown, ShieldCheck, Snowflake, Delete, Ticket, Bike } from "lucide-react";
+import { createPosOrder, getPosStock, checkManagerPin, checkMemberCard, checkPosCode } from "@/app/actions/pos";
 import PinPad from "@/components/pin-pad";
-import { newMemberSchema } from "@/lib/validations/order";
+import { newMemberSchema, posDeliverySchema } from "@/lib/validations/order";
+import { deliveryFeeFor, toFreeDelivery, type DeliveryFeeSettings } from "@/lib/delivery-fee";
 import { REFRESH_EVENT } from "@/components/refresh-button";
 import type { PosStock } from "@/lib/stock-alerts";
 import { npr, cn } from "@/lib/utils";
 import { applyOpeningPromoPrice, isOpeningPromoActive, type OpeningPromoSettings } from "@/lib/promo";
-import { studentDiscount, memberUnitPrice, staffFreeItems, managerFreeItems, halfPlatePrice, platesLabel, MANAGER_LABEL, MEMBER_PRICE_LABEL } from "@/lib/discounts";
+import { studentDiscount, memberUnitPrice, staffFreeItems, managerFreeItems, halfPlatePrice, platesLabel, codeDiscount, MANAGER_LABEL, MEMBER_PRICE_LABEL } from "@/lib/discounts";
 
 type Product = {
   id: string; name: string; price: number; is_available: boolean; category_id: string | null;
@@ -21,15 +22,22 @@ type Product = {
 type Category = { id: string; name: string };
 // qty whole plates, plus an extra half plate when `half` (1½, 2½ …) — never a half on its own.
 type Line = { product: Product; qty: number; half: boolean };
-type Deal = "none" | "student" | "member" | "staff" | "manager";
+type Deal = "none" | "student" | "member" | "code" | "staff" | "manager";
 type Done = {
   orderNumber: string; dailyNumber: number | null; total: number;
   discount: number; discountLabel: string | null;
   method: "cash" | "qr"; received: number | null;
   members: { name: string; phone: string; card: string | null }[];
+  // A delivery from the counter: the code the rider will ask for, and that the rider collects the money.
+  delivery: { code: string | null; fee: number } | null;
 };
+// Who and where, for a delivery taken at the counter (phone orders).
+type DeliveryForm = { name: string; phone: string; address: string };
+const BLANK_DELIVERY: DeliveryForm = { name: "", phone: "", address: "" };
 // The member whose card was checked for this sale (createPosOrder checks it again).
 type MemberCard = { digits: string; name: string; card: string };
+// A discount code from Admin → Settings → Discount codes (createPosOrder checks it again and counts the use).
+type PosCode = { code: string; type: "percent" | "flat"; value: number; min: number };
 // A new member, typed in while selling them a membership card.
 type MemberForm = { full_name: string; phone: string; card_number: string };
 const BLANK_MEMBER: MemberForm = { full_name: "", phone: "", card_number: "" };
@@ -191,6 +199,44 @@ function CashReceived({ total, pending, onClose, onConfirm }: {
   );
 }
 
+/** "Code" deal: type a discount code made in Admin → Settings → Discount codes. */
+function CodeCheck({ onClose, onFound }: { onClose: () => void; onFound: (c: PosCode) => void }) {
+  const [code, setCode] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [pending, start] = useTransition();
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose]);
+  const check = () => start(async () => {
+    setError(null);
+    const r = await checkPosCode(code).catch(() => ({ error: "No connection — try again" }));
+    if ("error" in r) { setError(r.error ?? "That code isn't valid"); return; }
+    onFound({ code: r.code, type: r.type, value: r.value, min: r.min });
+  });
+  return (
+    <div className="fixed inset-0 z-[80] flex items-end justify-center bg-black/60 p-4 sm:items-center" role="dialog" aria-modal="true" aria-label="Discount code"
+      style={{ paddingBottom: "calc(env(safe-area-inset-bottom) + 1rem)" }}>
+      <form onSubmit={(e) => { e.preventDefault(); if (code.trim()) check(); }}
+        className="w-full max-w-sm rounded-3xl bg-white p-5 shadow-2xl ring-1 ring-stone-200 dark:bg-stone-900 dark:ring-stone-800">
+        <div className="flex items-start justify-between gap-2">
+          <div>
+            <p className="flex items-center gap-1.5 font-display text-lg font-extrabold text-brand-brown dark:text-orange-100"><Ticket size={18} /> Discount code</p>
+            <p className="text-sm text-stone-500 dark:text-stone-400">Type the code the customer has.</p>
+          </div>
+          <button type="button" onClick={onClose} aria-label="Cancel" className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-stone-100 dark:bg-stone-800"><X size={18} /></button>
+        </div>
+        <input autoFocus value={code} onChange={(e) => setCode(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 20))}
+          placeholder="e.g. MOMO30" aria-label="Discount code" autoComplete="off" autoCapitalize="characters" spellCheck={false}
+          className="input mt-4 text-center font-mono !text-xl font-bold tracking-widest dark:!border-stone-700 dark:!bg-stone-800 dark:!text-stone-100" />
+        <p className={cn("mt-2 min-h-5 text-center text-sm font-bold", error ? "text-brand-red" : "text-stone-400")}>{error ?? (pending ? "Checking…" : "")}</p>
+        <button disabled={pending || !code.trim()} className="btn-primary mt-2 w-full touch-manipulation !py-3.5 disabled:opacity-50">Use code</button>
+      </form>
+    </div>
+  );
+}
+
 /** Two-option switch (Dine-in/Pickup, Cash/QR) — one row instead of two. */
 function Segmented<T extends string>({ value, onChange, options, activeClass }: {
   value: T; onChange: (v: T) => void; options: readonly (readonly [T, string])[]; activeClass: string;
@@ -209,17 +255,23 @@ function Segmented<T extends string>({ value, onChange, options, activeClass }: 
 }
 
 export default function PosTerminal({
-  products, categories, openingPromo, initialStock, staffFreeItems: staffLimit = 0, managerDeal = false,
+  products, categories, openingPromo, initialStock, staffFreeItems: staffLimit = 0, managerDeal = false, nextCard = null, posDelivery = false, deliveryFee,
 }: {
   products: Product[]; categories: Category[]; openingPromo?: OpeningPromoSettings | null; initialStock?: PosStock;
   staffFreeItems?: number; // Admin → Settings → Staff sale; 0 = no Staff button
   managerDeal?: boolean; // someone is a manager (Admin → Staff Hours) → the Manager button
+  nextCard?: number | null; // next automatic membership card number (101–200 — migration 044); null = type it
+  posDelivery?: boolean; // Admin → Settings → Feature flags: the POS can take delivery orders
+  deliveryFee?: DeliveryFeeSettings; // Rs 20 under Rs 99 of food (lib/delivery-fee.ts)
 }) {
   const [cat, setCat] = useState<string>("all");
   const [q, setQ] = useState("");
   const [cart, setCart] = useState<Line[]>([]);
   const [cartOpen, setCartOpen] = useState(false);
-  const [type, setType] = useState<"dine_in" | "pickup">("dine_in");
+  const [type, setType] = useState<"dine_in" | "pickup" | "delivery">("dine_in");
+  const [delivery, setDelivery] = useState<DeliveryForm>(BLANK_DELIVERY);
+  // The manager switched POS delivery off while this screen was open.
+  useEffect(() => { if (!posDelivery) setType((t) => (t === "delivery" ? "dine_in" : t)); }, [posDelivery]);
   const [method, setMethod] = useState<"cash" | "qr">("cash");
   // Cash sales: Place order asks how much cash was handed over (CashReceived) before placing.
   const [askCash, setAskCash] = useState(false);
@@ -231,8 +283,15 @@ export default function PosTerminal({
   // Member price: only once a member's card (last 3 digits) has been checked — for this sale only.
   const [memberCard, setMemberCard] = useState<MemberCard | null>(null);
   const [askMember, setAskMember] = useState(false);
+  // "Code" deal: a discount code, for this sale only.
+  const [posCode, setPosCode] = useState<PosCode | null>(null);
+  const [askCode, setAskCode] = useState(false);
   const [done, setDone] = useState<Done | null>(null);
   const [members, setMembers] = useState<MemberForm[]>([]);
+  // The next automatic membership card (101–200). Cards are written 101, 102 … and handed out in
+  // order, so the POS says which one to give; after 200 the number on the card is typed.
+  const [nextCardNo, setNextCardNo] = useState<number | null>(nextCard);
+  useEffect(() => { setNextCardNo(nextCard); }, [nextCard]);
   const [stock, setStock] = useState<PosStock>(initialStock ?? { all: [], warnings: [], byProduct: {} });
   const [stockOpen, setStockOpen] = useState(false);
   const [pending, start] = useTransition();
@@ -292,6 +351,12 @@ export default function PosTerminal({
   // One set of member details per membership card in the cart.
   const cardCount = cart.reduce((n, l) => n + (l.product.is_membership_card ? l.qty : 0), 0);
   const memberAt = (i: number) => members[i] ?? BLANK_MEMBER;
+  // The automatic number card i will get: the next one, plus earlier cards that didn't type their own.
+  const autoCardFor = (i: number) => {
+    if (nextCardNo == null) return null;
+    const n = nextCardNo + Array.from({ length: i }, (_, k) => memberAt(k)).filter((m) => !m.card_number.trim()).length;
+    return n <= 200 ? n : null;
+  };
   const setMember = (i: number, patch: Partial<MemberForm>) =>
     setMembers((cur) => { const next = [...cur]; next[i] = { ...(cur[i] ?? BLANK_MEMBER), ...patch }; return next; });
   // Staff sale: the dearest items go free, up to the limit — same function createPosOrder uses.
@@ -302,6 +367,9 @@ export default function PosTerminal({
   // Manager discount: everything free except frozen items and membership cards — same function createPosOrder uses.
   const managerOn = deal === "manager" && !!manager;
   const memberOn = deal === "member" && !!memberCard;
+  const codeOn = deal === "code" && !!posCode;
+  // The code has a minimum order and the cart is below it (shown on the button; the order is refused).
+  const codeShort = codeOn && subtotal < posCode!.min;
   const managerFree = managerOn
     ? managerFreeItems(rows.map((r) => ({ price: r.price, qty: r.qty, eligible: !r.product.is_membership_card && !r.product.is_frozen })))
     : null;
@@ -311,8 +379,12 @@ export default function PosTerminal({
   const discount = managerFree ? managerFree.saving
     : staff ? staff.saving
     : deal === "member" ? Math.round(memberSaving * 100) / 100
+    : codeOn ? (codeShort ? 0 : codeDiscount(posCode!.type, posCode!.value, subtotal))
     : deal === "student" ? studentDiscount(eligible) : 0;
-  const total = subtotal - discount;
+  // Delivery: the same charge as online — Rs 20 under Rs 99 of food (lib/delivery-fee.ts), paid to the rider.
+  const isDelivery = type === "delivery";
+  const fee = isDelivery ? deliveryFeeFor(subtotal, deliveryFee) : 0;
+  const total = subtotal - discount + fee;
 
   // The confirmation shouldn't block the next customer — it clears itself,
   // a little later when there's change to count out.
@@ -350,8 +422,10 @@ export default function PosTerminal({
     // (or to another deal) off forgets the approval.
     if (d === "manager" && deal !== "manager") { setAskManager(true); return; }
     if (d === "member" && deal !== "member") { setAskMember(true); return; }
+    if (d === "code" && deal !== "code") { setAskCode(true); return; }
     setManager(null);
     setMemberCard(null);
+    setPosCode(null);
     setDeal((cur) => (cur === d ? "none" : d));
   };
 
@@ -360,6 +434,12 @@ export default function PosTerminal({
     // Selling membership cards: each needs the new member's name and number first.
     const newMembers: { full_name: string; phone: string; card_number?: string }[] = [];
     for (let i = 0; i < cardCount; i++) {
+      if (!memberAt(i).card_number.trim() && autoCardFor(i) == null) {
+        toast.error(`${cardCount > 1 ? `Card ${i + 1}: ` : ""}Type the number written on the card`);
+        setCartOpen(true);
+        setTimeout(() => document.getElementById(`member-${i}-card_number`)?.focus(), 350);
+        return;
+      }
       const m = newMemberSchema.safeParse(memberAt(i));
       if (!m.success) {
         const field = String(m.error.issues[0].path[0] ?? "full_name");
@@ -370,12 +450,27 @@ export default function PosTerminal({
       }
       newMembers.push(m.data);
     }
-    if (method === "cash" && total > 0 && cashIn == null) { setAskCash(true); return; }
+    if (codeShort) { toast.error(`Code ${posCode!.code} needs an order of at least ${npr(posCode!.min)}`); return; }
+    let deliveryTo: { name: string; phone: string; address: string } | undefined;
+    if (isDelivery) {
+      const dv = posDeliverySchema.safeParse(delivery);
+      if (!dv.success) {
+        toast.error(dv.error.issues[0].message);
+        setCartOpen(true);
+        setTimeout(() => document.getElementById(`delivery-${String(dv.error.issues[0].path[0] ?? "name")}`)?.focus(), 350);
+        return;
+      }
+      deliveryTo = dv.data;
+    }
+    // A delivery is paid to the rider on arrival — no cash to count at the counter.
+    if (!isDelivery && method === "cash" && total > 0 && cashIn == null) { setAskCash(true); return; }
     start(async () => {
       const r = await createPosOrder({
         type, payment_method: method,
+        delivery: deliveryTo,
         student_discount: deal === "student",
         member: memberOn,
+        promo_code: codeOn ? posCode!.code : undefined,
         member_card: memberOn ? memberCard!.digits : undefined,
         staff: deal === "staff",
         manager: managerOn,
@@ -390,19 +485,22 @@ export default function PosTerminal({
         discountLabel: r.discountLabel === MANAGER_LABEL && manager ? `${MANAGER_LABEL} · ${manager.name}`
           : r.discountLabel === MEMBER_PRICE_LABEL && r.member ? `${MEMBER_PRICE_LABEL} · card ${r.member.card} (${r.member.name})`
           : r.discountLabel ?? null,
-        method, received: method === "cash" && cashIn != null ? cashIn : null,
+        method, received: !isDelivery && method === "cash" && cashIn != null ? cashIn : null,
         members: r.members ?? [],
+        delivery: isDelivery ? { code: r.deliveryCode ?? null, fee: Number(r.deliveryFee ?? 0) } : null,
       });
       // Ready for the next customer: back to cash, no discount.
       setAskCash(false);
-      setCart([]); setMembers([]); setDeal("none"); setManager(null); setMemberCard(null); setMethod("cash"); setCartOpen(false);
+      if (r.nextCard !== undefined) setNextCardNo(r.nextCard);
+      setDelivery(BLANK_DELIVERY); setType("dine_in");
+      setCart([]); setMembers([]); setDeal("none"); setManager(null); setMemberCard(null); setPosCode(null); setMethod("cash"); setCartOpen(false);
       getPosStock().then(setStock).catch(() => {}); // that sale may have used the last of something
     });
   };
 
-  // Two or four deals: two across. Three: three across, compact (narrow beside the cart on an iPad).
-  const dealCount = 2 + (staffLimit > 0 ? 1 : 0) + (managerDeal ? 1 : 0);
-  const threeDeals = dealCount === 3;
+  // Four deals: two across. Three or five: three across, compact (narrow beside the cart on an iPad).
+  const dealCount = 3 + (staffLimit > 0 ? 1 : 0) + (managerDeal ? 1 : 0);
+  const threeDeals = dealCount !== 4;
   const dealButton = (d: Exclude<Deal, "none">, Icon: typeof Crown, label: string, onText?: string) => {
     const on = deal === d;
     return (
@@ -528,7 +626,19 @@ export default function PosTerminal({
                       placeholder="Full name" aria-label="Member's full name" autoComplete="off" maxLength={100} className={field} />
                     <input id={`member-${i}-phone`} value={m.phone} onChange={(e) => setMember(i, { phone: e.target.value.replace(/[^\d+ -]/g, "").slice(0, 16) })}
                       placeholder="Mobile 98XXXXXXXX" aria-label="Member's mobile number" inputMode="tel" autoComplete="off" className={field} />
-                    <p className="text-[11px] text-amber-700 dark:text-amber-400">The card number is given automatically when the order is placed.</p>
+                    {(() => {
+                      const auto = autoCardFor(i);
+                      return (
+                        <>
+                          {auto != null && !m.card_number.trim() && (
+                            <p className="text-sm font-bold text-amber-900 dark:text-amber-200">Give the customer card no. <span className="font-display text-lg">{auto}</span></p>
+                          )}
+                          <input id={`member-${i}-card_number`} value={m.card_number} onChange={(e) => setMember(i, { card_number: e.target.value.replace(/\D/g, "").slice(0, 6) })}
+                            placeholder={auto != null ? "Different number on the card? Type it" : "Card number written on the card"}
+                            aria-label="Card number" inputMode="numeric" autoComplete="off" className={field} />
+                        </>
+                      );
+                    })()}
                   </div>
                 );
               })}
@@ -538,15 +648,33 @@ export default function PosTerminal({
         </div>
 
         <div className="space-y-2.5 border-t border-orange-100 p-4 dark:border-stone-800 lg:shrink-0">
-          <div className="grid grid-cols-2 gap-2">
+          <div className={cn("grid gap-2", posDelivery ? "grid-cols-1" : "grid-cols-2")}>
             <Segmented value={type} onChange={setType} activeClass="bg-brand-orange text-white shadow-sm"
-              options={[["dine_in", "Dine-in"], ["pickup", "Pickup"]] as const} />
+              options={posDelivery ? ([["dine_in", "Dine-in"], ["pickup", "Pickup"], ["delivery", "Delivery"]] as const) : ([["dine_in", "Dine-in"], ["pickup", "Pickup"]] as const)} />
             <Segmented value={method} onChange={setMethod} activeClass="bg-brand-green text-white shadow-sm"
-              options={[["cash", "Cash"], ["qr", "QR"]] as const} />
+              options={[["cash", isDelivery ? "Cash to rider" : "Cash"], ["qr", "QR"]] as const} />
           </div>
+          {isDelivery && (() => {
+            const field = "input !py-2 text-base sm:!text-sm dark:!border-stone-700 dark:!bg-stone-800 dark:!text-stone-100";
+            return (
+              <div className="space-y-1.5 rounded-xl bg-sky-50 p-2.5 ring-1 ring-sky-200 dark:bg-sky-950/30 dark:ring-sky-900">
+                <p className="flex items-center gap-1.5 text-xs font-bold text-sky-800 dark:text-sky-300"><Bike size={14} /> Deliver to</p>
+                <input id="delivery-name" value={delivery.name} onChange={(e) => setDelivery((v) => ({ ...v, name: e.target.value }))}
+                  placeholder="Customer's name" aria-label="Customer's name" autoComplete="off" maxLength={100} className={field} />
+                <input id="delivery-phone" value={delivery.phone} onChange={(e) => setDelivery((v) => ({ ...v, phone: e.target.value.replace(/[^\d+ -]/g, "").slice(0, 16) }))}
+                  placeholder="Mobile 98XXXXXXXX" aria-label="Customer's mobile number" inputMode="tel" autoComplete="off" className={field} />
+                <textarea id="delivery-address" value={delivery.address} onChange={(e) => setDelivery((v) => ({ ...v, address: e.target.value }))}
+                  placeholder="Tole / street, house, nearest landmark" aria-label="Delivery address" rows={2} maxLength={300} autoComplete="off" className={field} />
+                <p className="text-[11px] font-bold text-sky-800 dark:text-sky-300">
+                  {fee ? `Delivery ${npr(fee)} — free from ${npr(subtotal + toFreeDelivery(subtotal, deliveryFee))} of food` : "Free delivery"} · the rider collects the money
+                </p>
+              </div>
+            );
+          })()}
           <div className={cn("grid gap-2", threeDeals ? "grid-cols-3" : "grid-cols-2")}>
             {dealButton("student", GraduationCap, "Student 5%")}
             {dealButton("member", Crown, "Member", memberCard ? `${memberCard.name.split(" ")[0]} · ${discount ? `−${npr(discount)}` : "on"}` : undefined)}
+            {dealButton("code", Ticket, "Code", posCode ? (codeShort ? `Min ${npr(posCode.min)}` : `${posCode.code} · −${npr(discount)}`) : undefined)}
             {staffLimit > 0 && dealButton("staff", ChefHat, "Staff", `${staff?.used ?? 0} of ${staffLimit} free`)}
             {managerDeal && dealButton("manager", ShieldCheck, "Manager", manager ? `${manager.name.split(" ")[0]} · ${discount ? `−${npr(discount)}` : "on"}` : undefined)}
           </div>
@@ -562,6 +690,7 @@ export default function PosTerminal({
               {npr(total)}
               {discount > 0 && <s className="ml-1.5 text-sm font-normal text-stone-400">{npr(subtotal)}</s>}
             </p>
+            {isDelivery && <p className="mt-1 text-xs font-bold text-sky-700 dark:text-sky-300">{fee ? `incl. delivery ${npr(fee)}` : "free delivery"}</p>}
           </div>
           <button onClick={() => placeOrder()} disabled={pending || cart.length === 0}
             className="btn-primary min-w-0 flex-1 touch-manipulation !px-4 !py-4 text-base disabled:opacity-50">
@@ -730,7 +859,20 @@ export default function PosTerminal({
             )}
             <p className="mt-1 font-mono text-sm text-stone-500 dark:text-stone-400">{done.orderNumber}</p>
             {done.discount > 0 && <p className="mt-1 text-sm font-bold text-brand-green">{done.discountLabel ?? "Discount"} −{npr(done.discount)}</p>}
-            <p className="mt-1 font-bold">{done.total > 0 ? <>{npr(done.total)} · paid by {done.method === "cash" ? "cash" : "QR"}</> : "Nothing to pay"}</p>
+            {done.delivery ? (
+              <div className="mt-3 rounded-2xl bg-sky-50 p-3 dark:bg-sky-950/40">
+                <p className="text-sm font-bold text-sky-900 dark:text-sky-200">Delivery · the rider collects {npr(done.total)} {done.method === "cash" ? "in cash" : "by QR"}{done.delivery.fee ? ` (incl. ${npr(done.delivery.fee)} delivery)` : ""}</p>
+                {done.delivery.code && (
+                  <>
+                    <p className="mt-2 text-xs font-bold uppercase tracking-wide text-sky-800 dark:text-sky-300">Tell the customer their delivery code</p>
+                    <p className="font-mono text-4xl font-extrabold tracking-widest text-sky-900 dark:text-sky-100">{done.delivery.code}</p>
+                    <p className="text-[11px] text-sky-800 dark:text-sky-300">The rider asks for it when handing over. Assign a rider from Orders.</p>
+                  </>
+                )}
+              </div>
+            ) : (
+              <p className="mt-1 font-bold">{done.total > 0 ? <>{npr(done.total)} · paid by {done.method === "cash" ? "cash" : "QR"}</> : "Nothing to pay"}</p>
+            )}
             {done.members.map((m, i) => (
               <p key={i} className="mt-1.5 flex items-center justify-center gap-1.5 text-sm text-amber-800 dark:text-amber-300">
                 <IdCard size={15} className="shrink-0" /> New member: <b>{m.name}</b> · {m.phone}{m.card ? <> · card no. <b className="text-base">{m.card}</b></> : ""}
@@ -759,7 +901,7 @@ export default function PosTerminal({
       {askManager && (
         <ManagerApproval
           onClose={() => setAskManager(false)}
-          onApproved={(m) => { setManager(m); setMemberCard(null); setDeal("manager"); setAskManager(false); }}
+          onApproved={(m) => { setManager(m); setMemberCard(null); setPosCode(null); setDeal("manager"); setAskManager(false); }}
         />
       )}
       {askCash && (
@@ -768,7 +910,13 @@ export default function PosTerminal({
       {askMember && (
         <MemberCardCheck
           onClose={() => setAskMember(false)}
-          onFound={(m) => { setMemberCard(m); setManager(null); setDeal("member"); setAskMember(false); toast.success(`Member: ${m.name} · card ${m.card}`); }}
+          onFound={(m) => { setMemberCard(m); setManager(null); setPosCode(null); setDeal("member"); setAskMember(false); toast.success(`Member: ${m.name} · card ${m.card}`); }}
+        />
+      )}
+      {askCode && (
+        <CodeCheck
+          onClose={() => setAskCode(false)}
+          onFound={(c) => { setPosCode(c); setManager(null); setMemberCard(null); setDeal("code"); setAskCode(false); }}
         />
       )}
       <style>{`

@@ -67,3 +67,13 @@ export function managerFreeItems(lines: { price: number; qty: number; eligible: 
   const free = lines.map((l) => (l.eligible ? l.qty : 0));
   return { free, saving: lines.reduce((s, l, i) => s + free[i] * l.price, 0), used: free.reduce((s, n) => s + n, 0) };
 }
+
+/**
+ * A discount code (Admin → Settings → Discount codes, promo_codes): Rs off —
+ * never more than the food — or % off in whole rupees. Used online (createOrder)
+ * and at the POS (the "Code" deal, createPosOrder), always worked out on the server.
+ */
+export function codeDiscount(type: string, value: number | string, subtotal: number): number {
+  const v = Number(value);
+  return type === "percent" ? Math.round((subtotal * v) / 100) : Math.min(v, subtotal);
+}

@@ -3,11 +3,11 @@
 // authenticated server — never trusted as data on their own.
 import { useEffect, useState } from "react";
 import toast from "react-hot-toast";
-import { format } from "date-fns";
 import { createClient } from "@/lib/supabase/client";
 import { npr, STATUS_COLORS, cn } from "@/lib/utils";
 import OrderStatusSelect from "./order-status-select";
 import MarkPaidButton from "./mark-paid-button";
+import { npTime } from "@/lib/nepal-time";
 
 type Row = {
   id: string; order_number: string; daily_number: number | null; status: string; type: string;
@@ -46,7 +46,7 @@ export default function RealtimeFeed({ initial }: { initial: Row[] }) {
                 <span className="rounded-full bg-brand-orange/10 px-2 py-0.5 text-xs font-extrabold text-brand-orange">#{String(o.daily_number).padStart(2, "0")}</span>
               )}
               <span className="font-mono text-sm font-bold">{o.order_number}</span>
-              <span className="text-xs capitalize text-stone-500">· {o.type.replace("_", " ")} · {format(new Date(o.created_at), "h:mm a")}</span>
+              <span className="text-xs capitalize text-stone-500">· {o.type.replace("_", " ")} · {npTime(o.created_at)}</span>
             </p>
             <p className="shrink-0 font-bold">{npr(Number(o.total))}</p>
           </div>
@@ -81,7 +81,7 @@ export default function RealtimeFeed({ initial }: { initial: Row[] }) {
               <td className="px-4 py-3">
                 <MarkPaidButton orderId={o.id} total={Number(o.total)} paid={o.payment_status === "paid"} method={o.payment_method} />
               </td>
-              <td className="px-4 py-3 text-stone-500">{format(new Date(o.created_at), "h:mm a")}</td>
+              <td className="px-4 py-3 text-stone-500">{npTime(o.created_at)}</td>
               <td className="px-4 py-3"><OrderStatusSelect orderId={o.id} status={o.status} type={o.type} /></td>
             </tr>
           ))}

@@ -6,6 +6,7 @@ import TikTokIcon from "@/components/icons/tiktok";
 import { createBranch, setBranchActive, createPromoCode, setPromoActive } from "@/app/actions/admin-crud";
 import { updateAppSettings, updateOpeningPromo, addSocialLink, setSocialLinkActive, deleteSocialLink, updateDeliveryArea, updateStaffSale, updateDeliveryHours, updateDeliveryCharge } from "@/app/actions/settings";
 import { deliveryHours, deliverySlots, minutesLabel, slotLabel } from "@/lib/delivery-hours";
+import { toNepalInput } from "@/lib/nepal-time";
 
 function platformIcon(platform: string) {
   const p = platform.toLowerCase();
@@ -54,40 +55,43 @@ export function PromoForm() {
             discount_value: fd.discount_value, min_order_amount: fd.min_order_amount || 0,
             max_uses: fd.max_uses || undefined, expires_at: fd.expires_at,
           });
-          if (r?.error) toast.error(r.error); else { toast.success("Promo created"); form.reset(); }
+          if (r?.error) toast.error(r.error); else { toast.success("Discount code created — it works online and at the POS"); form.reset(); }
         });
       }}
     >
-      <h3 className="font-display font-bold text-brand-brown">New promo code</h3>
-      <input name="code" required placeholder="CHAAT10" className="input uppercase" maxLength={20} />
+      <h3 className="font-display font-bold text-brand-brown">New discount code</h3>
+      <p className="text-xs text-stone-500">Customers type it at online checkout, or tell the counter — the POS &quot;Code&quot; button. One deal per order.</p>
+      <input name="code" required placeholder="MOMO30" className="input uppercase" maxLength={20} />
       <div className="grid grid-cols-2 gap-3">
-        <select name="discount_type" className="input"><option value="percent">% off</option><option value="flat">Rs flat</option></select>
-        <input name="discount_value" required type="number" min="1" placeholder="Value" className="input" />
+        <select name="discount_type" className="input" aria-label="Kind of discount"><option value="flat">Rs off</option><option value="percent">% off</option></select>
+        <input name="discount_value" required type="number" min="1" placeholder="Amount (e.g. 30)" className="input" aria-label="Amount" />
       </div>
       <div className="grid grid-cols-2 gap-3">
-        <input name="min_order_amount" type="number" min="0" placeholder="Min order Rs" className="input" />
-        <input name="max_uses" type="number" min="1" placeholder="Max uses" className="input" />
+        <input name="min_order_amount" type="number" min="0" placeholder="Min order Rs" className="input" aria-label="Minimum order" />
+        <input name="max_uses" type="number" min="1" placeholder="Max uses" className="input" aria-label="Maximum uses" />
       </div>
-      <label className="label">Expires (optional)<input name="expires_at" type="datetime-local" className="input mt-1" /></label>
-      <button disabled={pending} className="btn-primary">Create promo</button>
+      <label className="label">Expires — Nepal time (optional)<input name="expires_at" type="datetime-local" className="input mt-1" /></label>
+      <button disabled={pending} className="btn-primary">Create code</button>
     </form>
   );
 }
 
-export function FeatureFlagsForm({ esewaEnabled, deliveryEnabled, posCanCancel }: { esewaEnabled: boolean; deliveryEnabled: boolean; posCanCancel: boolean }) {
+export function FeatureFlagsForm({ esewaEnabled, deliveryEnabled, posCanCancel, posDelivery }: { esewaEnabled: boolean; deliveryEnabled: boolean; posCanCancel: boolean; posDelivery: boolean }) {
   const [esewa, setEsewa] = useState(esewaEnabled);
   const [delivery, setDelivery] = useState(deliveryEnabled);
   const [posCancel, setPosCancel] = useState(posCanCancel);
+  const [posDel, setPosDel] = useState(posDelivery);
   const [pending, start] = useTransition();
 
-  function toggle(change: Partial<{ esewa_enabled: boolean; delivery_enabled: boolean; pos_can_cancel: boolean }>) {
-    const next = { esewa_enabled: esewa, delivery_enabled: delivery, pos_can_cancel: posCancel, ...change };
+  function toggle(change: Partial<{ esewa_enabled: boolean; delivery_enabled: boolean; pos_can_cancel: boolean; pos_delivery_enabled: boolean }>) {
+    const next = { esewa_enabled: esewa, delivery_enabled: delivery, pos_can_cancel: posCancel, pos_delivery_enabled: posDel, ...change };
     start(async () => {
       const r = await updateAppSettings(next);
       if (r?.error) { toast.error(r.error); return; }
       setEsewa(next.esewa_enabled);
       setDelivery(next.delivery_enabled);
       setPosCancel(next.pos_can_cancel);
+      setPosDel(next.pos_delivery_enabled);
       toast.success("Updated");
     });
   }
@@ -98,7 +102,7 @@ export function FeatureFlagsForm({ esewaEnabled, deliveryEnabled, posCanCancel }
       <div className="flex items-center justify-between gap-3">
         <div>
           <p className="font-bold text-sm">Delivery</p>
-          <p className="text-xs text-stone-500">Show delivery as an order type at checkout</p>
+          <p className="text-xs text-stone-500">Show delivery as an order type at website checkout</p>
         </div>
         <button
           disabled={pending}
@@ -106,6 +110,19 @@ export function FeatureFlagsForm({ esewaEnabled, deliveryEnabled, posCanCancel }
           className={delivery ? "badge bg-green-100 text-green-800" : "badge bg-stone-200 text-stone-600"}
         >
           {delivery ? "Enabled" : "Disabled"}
+        </button>
+      </div>
+      <div className="flex items-center justify-between gap-3">
+        <div>
+          <p className="font-bold text-sm">Delivery from the counter (POS)</p>
+          <p className="text-xs text-stone-500">The POS can take delivery orders (phone orders): customer&apos;s name, number and address, paid to the rider</p>
+        </div>
+        <button
+          disabled={pending}
+          onClick={() => toggle({ pos_delivery_enabled: !posDel })}
+          className={posDel ? "badge bg-green-100 text-green-800" : "badge bg-stone-200 text-stone-600"}
+        >
+          {posDel ? "Enabled" : "Disabled"}
         </button>
       </div>
       <div className="flex items-center justify-between gap-3">
@@ -232,12 +249,6 @@ export function StaffSaleForm({ freeItems }: { freeItems: number }) {
   );
 }
 
-function toLocalInputValue(iso: string | null) {
-  if (!iso) return "";
-  const d = new Date(iso);
-  const pad = (n: number) => String(n).padStart(2, "0");
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
-}
 
 export function OpeningPromoForm({
   enabled, momoPrice, startsAt, endsAt,
@@ -273,11 +284,11 @@ export function OpeningPromoForm({
       <div className="grid grid-cols-2 gap-2">
         <div>
           <label className="label" htmlFor="opening_promo_starts_at">Starts</label>
-          <input id="opening_promo_starts_at" name="opening_promo_starts_at" type="datetime-local" defaultValue={toLocalInputValue(startsAt)} className="input" />
+          <input id="opening_promo_starts_at" name="opening_promo_starts_at" type="datetime-local" defaultValue={toNepalInput(startsAt)} className="input" />
         </div>
         <div>
           <label className="label" htmlFor="opening_promo_ends_at">Ends</label>
-          <input id="opening_promo_ends_at" name="opening_promo_ends_at" type="datetime-local" defaultValue={toLocalInputValue(endsAt)} className="input" />
+          <input id="opening_promo_ends_at" name="opening_promo_ends_at" type="datetime-local" defaultValue={toNepalInput(endsAt)} className="input" />
         </div>
       </div>
       <button disabled={pending} className="btn-primary w-full">{pending ? "Saving…" : "Save promo"}</button>

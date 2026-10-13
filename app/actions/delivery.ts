@@ -1,11 +1,14 @@
 "use server";
 
 import crypto from "crypto";
+import { z } from "zod";
+import { after } from "next/server";
 import { revalidatePath } from "next/cache";
 import { requireRole } from "@/lib/supabase/server";
 import { supabaseAdmin, audit } from "@/lib/supabase/admin";
 import { hashOtp } from "@/lib/delivery-otp";
 import { noteField } from "@/lib/order-notes";
+import { measureDelivery } from "@/lib/rider-trips";
 
 export async function setDriverOnline(online: boolean) {
   const { user } = await requireRole(["delivery_driver"]);
@@ -53,9 +56,15 @@ export async function driverAdvanceStatus(orderId: string) {
 
 const MAX_OTP_ATTEMPTS = 3;
 
-export async function verifyDeliveryOtp(orderId: string, otp: string) {
+// Where the rider's phone was when they tapped Delivered — for the fuel report (migration 045).
+const dropSchema = z.object({
+  lat: z.number().min(26.3).max(30.5), lng: z.number().min(80).max(88.3), accuracy: z.number().min(0).max(100000).optional(),
+}).optional();
+
+export async function verifyDeliveryOtp(orderId: string, otp: string, drop?: unknown) {
   const { user } = await requireRole(["delivery_driver"]);
   if (!/^\d{2}$/.test(otp)) return { error: "The code is 2 digits" };
+  const spot = dropSchema.safeParse(drop).data; // no GPS (or outside Nepal) = not recorded
 
   const { data: delivery } = await supabaseAdmin
     .from("deliveries")
@@ -87,9 +96,14 @@ export async function verifyDeliveryOtp(orderId: string, otp: string) {
   const now = new Date().toISOString();
   await supabaseAdmin
     .from("deliveries")
-    .update({ otp_verified: true, delivered_at: now })
+    .update({
+      otp_verified: true, delivered_at: now,
+      ...(spot ? { drop_lat: spot.lat, drop_lng: spot.lng, drop_accuracy_m: spot.accuracy != null ? Math.round(spot.accuracy) : null } : {}),
+    })
     .eq("id", delivery.id);
   await supabaseAdmin.from("orders").update({ status: "delivered" }).eq("id", orderId);
+  // Road distance from the shop (Google Maps) — after the answer, so the rider never waits on it.
+  after(() => measureDelivery(orderId));
 
   await audit({ actor_id: user.id, action: "DELIVERY_CONFIRMED", target_table: "deliveries", target_id: delivery.id });
   revalidatePath("/delivery");
@@ -122,4 +136,24 @@ export async function getCustomerTelLink(orderId: string) {
   if (!phone) return { error: "No phone number on this order — call the shop" };
   await audit({ actor_id: user.id, action: "DRIVER_FETCH_PHONE", target_table: "orders", target_id: orderId });
   return { tel: `tel:${phone.replace(/[^\d+]/g, "")}` };
+}
+
+/**
+ * Admin → Deliveries: work the distance out again for trips that only have a
+ * straight line (Google couldn't be asked at the time) or none yet — e.g. once
+ * a Google Maps key with the Routes API is set. At most 60 per tap.
+ */
+export async function recalcTripDistances(input: unknown) {
+  await requireRole(["super_admin"]);
+  const r = z.object({ from: z.string().datetime({ offset: true }), to: z.string().datetime({ offset: true }) }).safeParse(input);
+  if (!r.success) return { error: "Bad period" };
+  const { data } = await supabaseAdmin.from("deliveries").select("order_id, distance_source")
+    .not("delivered_at", "is", null).gte("delivered_at", r.data.from).lt("delivered_at", r.data.to)
+    .or("distance_source.is.null,distance_source.eq.straight").limit(60);
+  if (!data?.length) return { ok: true, checked: 0, road: 0 };
+  for (const d of data) await measureDelivery(d.order_id);
+  const { count: road } = await supabaseAdmin.from("deliveries").select("id", { count: "exact", head: true })
+    .in("order_id", data.map((d) => d.order_id)).eq("distance_source", "road");
+  revalidatePath("/admin/delivery");
+  return { ok: true, checked: data.length, road: road ?? 0 };
 }

@@ -4,8 +4,9 @@ import { z } from "zod";
 import { revalidatePath } from "next/cache";
 import { requireRole } from "@/lib/supabase/server";
 import { supabaseAdmin, audit } from "@/lib/supabase/admin";
+import { fromNepalInput } from "@/lib/nepal-time";
 
-const schema = z.object({ esewa_enabled: z.boolean(), delivery_enabled: z.boolean(), pos_can_cancel: z.boolean() });
+const schema = z.object({ esewa_enabled: z.boolean(), delivery_enabled: z.boolean(), pos_can_cancel: z.boolean(), pos_delivery_enabled: z.boolean() });
 
 /** Site-wide feature flags — admin only, see app_settings migration. */
 export async function updateAppSettings(input: unknown) {
@@ -50,8 +51,8 @@ export async function updateOpeningPromo(input: unknown) {
     .update({
       opening_promo_enabled: parsed.data.opening_promo_enabled,
       opening_promo_momo_price: parsed.data.opening_promo_momo_price,
-      opening_promo_starts_at: parsed.data.opening_promo_starts_at ? new Date(parsed.data.opening_promo_starts_at).toISOString() : null,
-      opening_promo_ends_at: parsed.data.opening_promo_ends_at ? new Date(parsed.data.opening_promo_ends_at).toISOString() : null,
+      opening_promo_starts_at: fromNepalInput(parsed.data.opening_promo_starts_at)?.toISOString() ?? null, // typed in Nepal time
+      opening_promo_ends_at: fromNepalInput(parsed.data.opening_promo_ends_at)?.toISOString() ?? null,
       updated_at: new Date().toISOString(),
     })
     .eq("id", 1);
@@ -183,5 +184,19 @@ export async function updateStaffSale(input: unknown) {
   await audit({ actor_id: user.id, action: "UPDATE_STAFF_SALE", target_table: "app_settings", target_id: "1", new_data: parsed.data });
   revalidatePath("/admin/settings");
   revalidatePath("/admin");
+  return { ok: true };
+}
+
+// ── Riders' fuel money (migration 045) ────────────────────────────
+// Rs per km, there and back; blank = the Deliveries page shows km only.
+export async function updateFuelRate(input: unknown) {
+  const { user } = await requireRole(["super_admin"]);
+  const parsed = z.object({ fuel_rate_per_km: z.number().min(0).max(1000).nullable() }).safeParse(input);
+  if (!parsed.success) return { error: "Enter rupees per km (0–1000), or leave it empty" };
+  const { error } = await supabaseAdmin.from("app_settings")
+    .update({ ...parsed.data, updated_at: new Date().toISOString() }).eq("id", 1);
+  if (error) return { error: "Could not save the fuel rate" };
+  await audit({ actor_id: user.id, action: "UPDATE_FUEL_RATE", target_table: "app_settings", target_id: "1", new_data: parsed.data });
+  revalidatePath("/admin/delivery");
   return { ok: true };
 }

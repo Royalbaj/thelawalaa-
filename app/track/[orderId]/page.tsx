@@ -3,7 +3,6 @@
 import { Suspense, useEffect, useState } from "react";
 import Link from "next/link";
 import { useParams, useSearchParams } from "next/navigation";
-import { format } from "date-fns";
 import { Clock, KeyRound, MapPin, Star } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { npr, STATUS_COLORS, cn } from "@/lib/utils";
@@ -12,6 +11,7 @@ import BrandLogo from "@/components/brand-logo";
 import { BrandLoader } from "@/components/brand-loader";
 import { guestCodeKey } from "@/lib/guest-order";
 import { slotLabel } from "@/lib/delivery-hours";
+import { npDateTime } from "@/lib/nepal-time";
 
 type TrackOrder = {
   id: string; order_number: string; daily_number: number | null; status: string; type: string;
@@ -134,7 +134,7 @@ function TrackContent() {
           <div className="flex items-center justify-between gap-3">
             <div>
               <p className="font-mono text-sm text-stone-500">{order.order_number}</p>
-              <p className="text-sm text-stone-500">{format(new Date(order.created_at), "d MMM yyyy, h:mm a")}</p>
+              <p className="text-sm text-stone-500">{npDateTime(order.created_at)}</p>
             </div>
             <span className={cn("badge", STATUS_COLORS[order.status])}>{orderStatusLabel(order.status, order.type)}</span>
           </div>

@@ -21,7 +21,7 @@ export function AnnouncementForm() {
       <h3 className="font-display font-bold text-brand-brown">New announcement</h3>
       <input name="message" required placeholder="Free home delivery within 5km" className="input" maxLength={200} />
       <input name="link_url" type="url" placeholder="Link (optional)" className="input" />
-      <label className="label">Ends at (optional)
+      <label className="label">Ends at — Nepal time (optional)
         <input name="ends_at" type="datetime-local" className="input mt-1" />
       </label>
       <button disabled={pending} className="btn-primary">{pending ? "Publishing…" : "Publish"}</button>

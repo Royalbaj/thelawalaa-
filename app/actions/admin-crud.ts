@@ -4,6 +4,7 @@ import { z } from "zod";
 import { revalidatePath } from "next/cache";
 import { requireRole } from "@/lib/supabase/server";
 import { supabaseAdmin, audit } from "@/lib/supabase/admin";
+import { fromNepalInput } from "@/lib/nepal-time";
 
 // ── Menu ─────────────────────────────────────────────────────────
 const productSchema = z.object({
@@ -141,7 +142,7 @@ export async function createAnnouncement(input: unknown) {
   const { data, error } = await supabaseAdmin.from("announcements").insert({
     message: parsed.data.message,
     link_url: parsed.data.link_url || null,
-    ends_at: parsed.data.ends_at ? new Date(parsed.data.ends_at).toISOString() : null,
+    ends_at: fromNepalInput(parsed.data.ends_at)?.toISOString() ?? null, // typed in Nepal time
     created_by: user.id,
   }).select("id").single();
   if (error) return { error: "Couldn't create announcement" };
@@ -182,7 +183,7 @@ export async function createPromoCode(input: unknown) {
     discount_value: parsed.data.discount_value,
     min_order_amount: parsed.data.min_order_amount,
     max_uses: parsed.data.max_uses ?? null,
-    expires_at: parsed.data.expires_at ? new Date(parsed.data.expires_at).toISOString() : null,
+    expires_at: fromNepalInput(parsed.data.expires_at)?.toISOString() ?? null, // typed in Nepal time
   }).select("id").single();
   if (error) return { error: "Code already exists?" };
   await audit({ actor_id: user.id, action: "CREATE_PROMO", target_table: "promo_codes", target_id: data.id, new_data: { code: parsed.data.code } });

@@ -4,13 +4,10 @@ import { npr } from "@/lib/utils";
 import { BranchForm, PromoForm, ActiveToggle, FeatureFlagsForm, OpeningPromoForm, SocialLinksManager, DeliveryAreaForm, StaffSaleForm, DeliveryHoursForm, DeliveryChargeForm } from "@/components/admin/settings-controls";
 import ResetSalesData from "@/components/admin/reset-sales-data";
 import EmailSetupPanel from "@/components/admin/email-setup";
+import { npDateTime } from "@/lib/nepal-time";
 
 export const dynamic = "force-dynamic";
 
-// The server runs in UTC — show archive times as the shop sees them.
-const ARCHIVE_DATE = new Intl.DateTimeFormat("en-US", {
-  timeZone: "Asia/Kathmandu", day: "numeric", month: "short", year: "numeric", hour: "numeric", minute: "2-digit",
-});
 
 export default async function SettingsPage() {
   await requireRole(["super_admin"]);
@@ -41,7 +38,7 @@ export default async function SettingsPage() {
           </div>
         </section>
         <section>
-          <h2 className="mb-2 font-display font-bold text-brand-brown">Promo codes</h2>
+          <h2 className="mb-2 font-display font-bold text-brand-brown">Discount codes</h2>
           <div className="card divide-y divide-orange-50">
             {(promos ?? []).map((p) => (
               <div key={p.id} className="flex flex-wrap items-center justify-between gap-3 px-4 py-3">
@@ -50,13 +47,14 @@ export default async function SettingsPage() {
                   <p className="text-xs text-stone-500">
                     {p.discount_type === "percent" ? `${p.discount_value}% off` : `${npr(Number(p.discount_value))} off`}
                     {Number(p.min_order_amount) > 0 && ` · min ${npr(Number(p.min_order_amount))}`}
-                    {p.max_uses && ` · ${p.uses_count}/${p.max_uses} used`}
+                    {p.max_uses ? ` · ${p.uses_count}/${p.max_uses} used` : ` · used ${p.uses_count}×`}
+                    {p.expires_at && ` · ${new Date(p.expires_at) < new Date() ? "ended" : "ends"} ${npDateTime(p.expires_at)}`}
                   </p>
                 </div>
                 <ActiveToggle id={p.id} active={p.is_active} kind="promo" />
               </div>
             ))}
-            {(promos ?? []).length === 0 && <p className="px-4 py-6 text-center text-sm text-stone-500">No promo codes yet.</p>}
+            {(promos ?? []).length === 0 && <p className="px-4 py-6 text-center text-sm text-stone-500">No discount codes yet — make one with "New discount code".</p>}
           </div>
         </section>
         <section>
@@ -72,7 +70,7 @@ export default async function SettingsPage() {
               return (
               <div key={a.id} className="flex flex-wrap items-center justify-between gap-3 px-4 py-3">
                 <div>
-                  <p className="font-bold">{ARCHIVE_DATE.format(new Date(a.created_at))}</p>
+                  <p className="font-bold">{npDateTime(a.created_at)}</p>
                   <p className="text-xs text-stone-500">
                     {a.order_count} orders · {npr(Number(a.total_revenue))} paid{resetBy ? ` · reset by ${resetBy}` : ""}
                   </p>
@@ -90,7 +88,7 @@ export default async function SettingsPage() {
         </section>
       </div>
       <div className="space-y-4">
-        <FeatureFlagsForm esewaEnabled={settings?.esewa_enabled ?? false} deliveryEnabled={settings?.delivery_enabled ?? false} posCanCancel={settings?.pos_can_cancel ?? true} />
+        <FeatureFlagsForm esewaEnabled={settings?.esewa_enabled ?? false} deliveryEnabled={settings?.delivery_enabled ?? false} posCanCancel={settings?.pos_can_cancel ?? true} posDelivery={settings?.pos_delivery_enabled ?? true} />
         <StaffSaleForm freeItems={Number(settings?.staff_free_items ?? 2)} />
         <DeliveryHoursForm initial={{
           enabled: settings?.delivery_hours_enabled ?? false,

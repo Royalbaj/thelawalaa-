@@ -1,4 +1,3 @@
-import { format } from "date-fns";
 import { MapPin, Navigation, Bike, Clock } from "lucide-react";
 import { requireRole } from "@/lib/supabase/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
@@ -6,9 +5,13 @@ import { npr, cn } from "@/lib/utils";
 import { orderStatusLabel } from "@/lib/order-status";
 import { noteField } from "@/lib/order-notes";
 import { directionsUrl, searchUrl, distanceKm, fmtKm, deliveryArea, type LatLng } from "@/lib/geo";
-import { nepalToday } from "@/lib/dates";
+import { nepalToday, resolveRange, addDays, type RangeKey } from "@/lib/dates";
 import AssignDriver from "@/components/admin/assign-driver";
 import { slotLabel } from "@/lib/delivery-hours";
+import { npTime, npDayMonthTime } from "@/lib/nepal-time";
+import { getRiderTrips } from "@/lib/rider-trips";
+import RangePicker from "@/components/admin/range-picker";
+import { FuelRateForm, RecalcDistances } from "@/components/admin/rider-fuel";
 
 export const dynamic = "force-dynamic";
 
@@ -38,8 +41,16 @@ function Where({ o, shop }: { o: Row; shop: LatLng }) {
   );
 }
 
-export default async function DeliveryPage() {
+const TRIP_RANGES: RangeKey[] = ["today", "week", "month", "last-month", "custom"];
+const kmLabel = (km: number) => `${km.toFixed(1)} km`;
+const minutesLabel = (m: number) => (m < 60 ? `${m} min` : `${Math.floor(m / 60)} h ${m % 60} min`);
+
+export default async function DeliveryPage({ searchParams }: { searchParams: Promise<{ range?: string; from?: string; to?: string }> }) {
   await requireRole(["super_admin"]);
+  // Riders' trips for the fuel money (migration 045): Nepal days, delivered in the period.
+  const range = resolveRange(await searchParams, "month");
+  const tripFrom = `${range.from}T00:00:00+05:45`;
+  const tripTo = `${addDays(range.to, 1)}T00:00:00+05:45`;
 
   const [{ data: drivers }, { data: unassigned }, { data: active }, { data: doneToday }, { data: settings }] = await Promise.all([
     supabaseAdmin.from("profiles")
@@ -52,8 +63,11 @@ export default async function DeliveryPage() {
       .eq("type", "delivery").in("status", ["assigned", "picked_up", "on_the_way"]).order("created_at"),
     supabaseAdmin.from("orders").select("id, deliveries!inner(driver_id)")
       .eq("type", "delivery").eq("status", "delivered").gte("served_at", `${nepalToday()}T00:00:00+05:45`),
-    supabaseAdmin.from("app_settings").select("delivery_radius_km, store_lat, store_lng").eq("id", 1).maybeSingle(),
+    supabaseAdmin.from("app_settings").select("delivery_radius_km, store_lat, store_lng, fuel_rate_per_km").eq("id", 1).maybeSingle(),
   ]);
+  const riders = await getRiderTrips(tripFrom, tripTo);
+  const fuelRate = settings?.fuel_rate_per_km != null ? Number(settings.fuel_rate_per_km) : null;
+  const notByRoad = riders.reduce((n, r) => n + r.list.filter((t) => t.source !== "road").length, 0);
   const { shop } = deliveryArea(settings);
   const perDriver = new Map<string, number>();
   for (const o of (doneToday ?? []) as unknown as { deliveries: { driver_id: string | null } }[]) {
@@ -74,7 +88,7 @@ export default async function DeliveryPage() {
                   <p className="flex flex-wrap items-center gap-2">
                     <span className="font-display text-lg font-extrabold text-brand-brown">{no(o)}</span>
                     <span className="rounded-full bg-stone-100 px-2 py-0.5 text-[11px] font-bold text-stone-600">{orderStatusLabel(o.status, "delivery")}</span>
-                    <span className="text-xs text-stone-400">{format(new Date(o.created_at), "h:mm a")} · {npr(Number(o.total))}{o.payment_status === "paid" ? " · paid" : ""}</span>
+                    <span className="text-xs text-stone-400">{npTime(o.created_at)} · {npr(Number(o.total))}{o.payment_status === "paid" ? " · paid" : ""}</span>
                   </p>
                   <p className="mt-1 text-xs text-stone-600">{o.items.map((i) => `${i.quantity}× ${i.product_name}`).join(", ")}</p>
                   <Where o={o} shop={shop} />
@@ -125,6 +139,64 @@ export default async function DeliveryPage() {
           {(drivers ?? []).length === 0 && <p className="px-4 py-6 text-center text-sm text-stone-500">No riders yet — invite them from Staff &amp; Users (role: delivery driver).</p>}
         </div>
         <p className="mt-3 text-xs text-stone-500">Riders use <b>/delivery</b> on their phone: map and directions to each customer, a Call button, and alerts for new deliveries. Send them a message from <a href="/admin/notifications" className="font-bold text-brand-orange">Notifications</a>.</p>
+      </section>
+
+      {/* Riders' trips: how far and how long, for paying fuel money. */}
+      <section className="space-y-3 lg:col-span-3">
+        <div className="flex flex-wrap items-end justify-between gap-3">
+          <div>
+            <h2 className="font-display font-bold text-brand-brown">Rider trips &amp; fuel money</h2>
+            <p className="text-xs text-stone-500">
+              Distance is by road from the shop to where the rider tapped Delivered (their phone&apos;s location), counted there and back.
+              Time is from &quot;On the way&quot; to Delivered. {range.label}.
+            </p>
+          </div>
+          <FuelRateForm rate={fuelRate} />
+        </div>
+        <RangePicker current={range.key} from={range.from} to={range.to} keys={TRIP_RANGES} />
+        {riders.length === 0 ? (
+          <div className="card px-4 py-8 text-center text-sm text-stone-500">No deliveries finished in this period.</div>
+        ) : (
+          <div className="grid gap-3 md:grid-cols-2">
+            {riders.map((r) => {
+              const back = r.kmOneWay * 2;
+              return (
+                <div key={r.driverId} className="card p-4">
+                  <div className="flex items-start justify-between gap-3">
+                    <p className="font-display text-lg font-bold text-brand-brown">{r.name}</p>
+                    {fuelRate != null && <p className="text-right"><span className="block text-[11px] font-bold uppercase text-stone-400">Fuel money</span><span className="font-display text-xl font-extrabold text-brand-orange">{npr(Math.round(back * fuelRate))}</span></p>}
+                  </div>
+                  <dl className="mt-2 grid grid-cols-3 gap-2 text-center">
+                    <div className="rounded-xl bg-orange-50 py-2"><dt className="text-[11px] font-bold uppercase text-stone-500">Trips</dt><dd className="font-display text-lg font-bold">{r.trips}</dd></div>
+                    <div className="rounded-xl bg-orange-50 py-2"><dt className="text-[11px] font-bold uppercase text-stone-500">There &amp; back</dt><dd className="font-display text-lg font-bold">{kmLabel(back)}</dd></div>
+                    <div className="rounded-xl bg-orange-50 py-2"><dt className="text-[11px] font-bold uppercase text-stone-500">Avg time</dt><dd className="font-display text-lg font-bold">{r.timed ? minutesLabel(Math.round(r.minutes / r.timed)) : "—"}</dd></div>
+                  </dl>
+                  {r.unmeasured > 0 && <p className="mt-2 text-xs text-amber-700">{r.unmeasured} trip{r.unmeasured > 1 ? "s" : ""} without a location — not in the km.</p>}
+                  <details className="mt-2">
+                    <summary className="cursor-pointer text-xs font-bold text-brand-orange">Every trip</summary>
+                    <ul className="mt-2 divide-y divide-orange-50 text-sm">
+                      {r.list.map((t) => (
+                        <li key={t.orderId} className="flex items-center justify-between gap-2 py-1.5">
+                          <span className="text-stone-600">{npDayMonthTime(t.deliveredAt)} · <b>{t.dailyNumber != null ? `#${String(t.dailyNumber).padStart(2, "0")}` : t.orderNumber}</b></span>
+                          <span className="shrink-0 text-right text-xs text-stone-500">
+                            {t.km != null ? <>{kmLabel(t.km)}{t.source === "straight" && <span className="text-amber-700"> approx</span>}</> : "no location"}
+                            {t.minutes != null && ` · ${minutesLabel(t.minutes)}`}
+                          </span>
+                        </li>
+                      ))}
+                    </ul>
+                  </details>
+                </div>
+              );
+            })}
+          </div>
+        )}
+        {notByRoad > 0 && (
+          <p className="text-xs text-stone-500">
+            {notByRoad} trip{notByRoad > 1 ? "s are" : " is"} not by road yet (&quot;approx&quot; = straight line, which reads a little short).{" "}
+            <RecalcDistances from={tripFrom} to={tripTo} count={notByRoad} />
+          </p>
+        )}
       </section>
     </div>
   );

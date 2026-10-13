@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useMemo, useRef } from "react";
-import { format, formatDistanceToNowStrict } from "date-fns";
+import { formatDistanceToNowStrict } from "date-fns";
 import toast from "react-hot-toast";
 import { createClient } from "@/lib/supabase/client";
 import { npr, cn, STATUS_COLORS } from "@/lib/utils";
@@ -14,6 +14,7 @@ import { REFRESH_EVENT } from "@/components/refresh-button";
 import { MANAGER_LABEL, MEMBER_PRICE_LABEL, STAFF_LABEL } from "@/lib/discounts";
 import { CheckCircle2, ClipboardList, MessageSquareText, Crown, ChefHat, GraduationCap, Phone, MapPin, Navigation, ShieldCheck, Clock } from "lucide-react";
 import { slotLabel } from "@/lib/delivery-hours";
+import { npDayMonthTime } from "@/lib/nepal-time";
 
 interface Line { product_name: string; quantity: number }
 
@@ -311,7 +312,7 @@ export default function LiveOrdersPanel({
               {expanded && (
                 <div className="mt-3 space-y-2 border-t border-stone-100 pt-2 dark:border-stone-800">
                   <p className="text-[10px] text-stone-400" suppressHydrationWarning>
-                    {o.order_number} · {format(new Date(o.created_at), "d MMM, h:mm a")}
+                    {o.order_number} · {npDayMonthTime(o.created_at)}
                     {o.payment_method ? ` · ${o.payment_method.toUpperCase()}` : ""}
                   </p>
                   {phone && (

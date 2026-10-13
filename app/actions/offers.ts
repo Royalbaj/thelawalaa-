@@ -4,6 +4,7 @@ import { z } from "zod";
 import { revalidatePath } from "next/cache";
 import { requireRole } from "@/lib/supabase/server";
 import { supabaseAdmin, audit } from "@/lib/supabase/admin";
+import { fromNepalInput } from "@/lib/nepal-time";
 
 const offerSchema = z.object({
   title: z.string().min(3).max(100),
@@ -25,7 +26,7 @@ export async function createOffer(input: unknown) {
     offer_type: parsed.data.offer_type,
     discount_label: parsed.data.discount_label || null,
     target_audience: parsed.data.target_audience,
-    ends_at: parsed.data.ends_at ? new Date(parsed.data.ends_at).toISOString() : null,
+    ends_at: fromNepalInput(parsed.data.ends_at)?.toISOString() ?? null, // typed in Nepal time
     created_by: user.id,
   }).select("id").single();
 

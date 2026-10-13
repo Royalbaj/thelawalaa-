@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import toast from "react-hot-toast";
 import { Gift } from "lucide-react";
 import { createOffer, setOfferActive, deleteOffer } from "@/app/actions/offers";
+import { npDate } from "@/lib/nepal-time";
 
 interface Offer {
   id: string;
@@ -76,7 +77,7 @@ export default function OfferControls({ offers }: { offers: Offer[] }) {
               </select>
             </div>
             <div>
-              <label className="label">Expires At</label>
+              <label className="label">Expires — Nepal time</label>
               <input name="ends_at" type="datetime-local" className="input" />
             </div>
           </div>
@@ -99,7 +100,7 @@ export default function OfferControls({ offers }: { offers: Offer[] }) {
                 )}
               </div>
               {o.description && <p className="text-xs text-stone-500 mt-0.5">{o.description}</p>}
-              <p className="text-[10px] text-stone-400 mt-1">Audience: {o.target_audience} · Created: {new Date(o.created_at).toLocaleDateString()}</p>
+              <p className="text-[10px] text-stone-400 mt-1">Audience: {o.target_audience} · Created: {npDate(o.created_at)}</p>
             </div>
             <div className="flex items-center gap-2 shrink-0">
               <button

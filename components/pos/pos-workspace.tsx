@@ -7,6 +7,7 @@ import PosTerminal from "@/components/pos/pos-terminal";
 import LiveOrdersPanel, { type Order } from "@/components/admin/live-orders-panel";
 import type { OpeningPromoSettings } from "@/lib/promo";
 import type { PosStock } from "@/lib/stock-alerts";
+import type { DeliveryFeeSettings } from "@/lib/delivery-fee";
 
 type Props = {
   products: Parameters<typeof PosTerminal>[0]["products"];
@@ -19,12 +20,15 @@ type Props = {
   canCancel: boolean;
   staffFreeItems: number; // 0 = no Staff button
   managerDeal: boolean; // a manager exists → the Manager button
+  nextCard: number | null; // next automatic membership card number (101–200), null once used up
+  posDelivery: boolean; // Admin → Settings → Feature flags: the POS can take delivery orders
+  deliveryFee: DeliveryFeeSettings; // Rs 20 under Rs 99 (lib/delivery-fee.ts)
 };
 
 // Phones, iPads (portrait and the 1024px-wide landscape) and small laptops
 // get Sell / Orders tabs; from 1280px both sit side by side. Both panels stay
 // mounted when hidden, so Realtime, the chime and the cart all carry on.
-export default function PosWorkspace({ products, categories, openingPromo, initialOrders, drivers, stock, canCancel, staffFreeItems, managerDeal }: Props) {
+export default function PosWorkspace({ products, categories, openingPromo, initialOrders, drivers, stock, canCancel, staffFreeItems, managerDeal, nextCard, posDelivery, deliveryFee }: Props) {
   const [tab, setTab] = useState<"sell" | "orders">("sell");
   const [newCount, setNewCount] = useState(0);
 
@@ -55,7 +59,7 @@ export default function PosWorkspace({ products, categories, openingPromo, initi
 
       <div className="flex min-h-0 flex-1 gap-3 p-2 xl:gap-4 xl:p-4">
         <div className={cn("min-h-0 flex-1 overflow-hidden rounded-2xl border border-orange-100 dark:border-stone-800", tab !== "sell" && "hidden xl:block")}>
-          <PosTerminal products={products} categories={categories} openingPromo={openingPromo} initialStock={stock} staffFreeItems={staffFreeItems} managerDeal={managerDeal} />
+          <PosTerminal products={products} categories={categories} openingPromo={openingPromo} initialStock={stock} staffFreeItems={staffFreeItems} managerDeal={managerDeal} nextCard={nextCard} posDelivery={posDelivery} deliveryFee={deliveryFee} />
         </div>
         <div className={cn("min-h-0 flex-1 overflow-hidden xl:w-[400px] xl:flex-none", tab !== "orders" && "hidden xl:block")}>
           <LiveOrdersPanel initialOrders={initialOrders} drivers={drivers} onNewOrder={onNewOrder} onNewCount={setNewCount} canCancel={canCancel} />

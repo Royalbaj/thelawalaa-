@@ -1,7 +1,7 @@
-import { format } from "date-fns";
 import { requireRole } from "@/lib/supabase/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { AnnouncementForm, AnnouncementToggle } from "@/components/admin/announcement-controls";
+import { npDate, npDayMonthTime } from "@/lib/nepal-time";
 
 export const dynamic = "force-dynamic";
 
@@ -21,8 +21,8 @@ export default async function AnnouncementsPage() {
             <div>
               <p className="font-bold">{a.message}</p>
               <p className="text-xs text-stone-500">
-                {format(new Date(a.created_at), "d MMM yyyy")}
-                {a.ends_at && ` · ends ${format(new Date(a.ends_at), "d MMM, h:mm a")}`}
+                {npDate(a.created_at)}
+                {a.ends_at && ` · ends ${npDayMonthTime(a.ends_at)}`}
               </p>
             </div>
             <AnnouncementToggle id={a.id} active={a.is_active} />

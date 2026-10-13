@@ -18,11 +18,10 @@ import { getSiteText } from "@/lib/site-content";
 import { bookableSlot, deliveryHours, deliveryOpenNow, nextStartLabel, slotLabel, type Slot } from "@/lib/delivery-hours";
 import { deliveryFeeFor } from "@/lib/delivery-fee";
 import { throttled, clientIp } from "@/lib/throttle";
+import { findCode, codeProblem, codeAmount, useCode } from "@/lib/promo-codes";
 
-// Promo codes match exactly, in any letter case. ilike treats % and _ as
-// wildcards, so they're escaped — otherwise "%" would match any live code and
-// "A%" would let someone guess codes letter by letter.
-const exactCode = (code: string) => code.replace(/[\\%_]/g, (c) => `\\${c}`);
+// Discount codes (exact match, rules and the use count) live in lib/promo-codes.ts,
+// shared with the POS "Code" deal.
 // Each try (Apply, or an order with a code) counts: 30 per IP per 15 minutes.
 const promoThrottled = async () => throttled("promo", [await clientIp()], 30, 15);
 
@@ -151,35 +150,13 @@ export async function createOrder(input: unknown) {
   let promo_code_id: string | null = null;
   if (data.promo_code) {
     if (await promoThrottled()) return { error: "Too many promo code tries — please wait a few minutes" };
-    const { data: promo } = await supabaseAdmin
-      .from("promo_codes")
-      .select("*")
-      .ilike("code", exactCode(data.promo_code))
-      .eq("is_active", true)
-      .single();
-
-    const valid =
-      promo &&
-      (!promo.expires_at || new Date(promo.expires_at) > new Date()) &&
-      (promo.max_uses == null || promo.uses_count < promo.max_uses) &&
-      subtotal >= Number(promo.min_order_amount);
-
-    if (!valid) return { error: "Promo code is invalid or expired" };
-
-    discount_amount =
-      promo.discount_type === "percent"
-        ? Math.round((subtotal * Number(promo.discount_value)) / 100)
-        : Math.min(Number(promo.discount_value), subtotal);
+    const promo = await findCode(data.promo_code);
+    const problem = codeProblem(promo, subtotal);
+    if (problem || !promo) return { error: problem ?? "That code isn't valid" };
+    discount_amount = codeAmount(promo, subtotal);
     promo_code_id = promo.id;
-
-    // Conditional increment — fails the guard if another request used the last slot
-    const { data: bumped } = await supabaseAdmin
-      .from("promo_codes")
-      .update({ uses_count: promo.uses_count + 1 })
-      .eq("id", promo.id)
-      .eq("uses_count", promo.uses_count)
-      .select("id");
-    if (!bumped?.length) return { error: "Promo code just ran out — try again" };
+    // Conditional increment — fails if another order used the last one
+    if (!(await useCode(promo))) return { error: "That code just ran out — try again" };
   }
 
   // ── Rewards (signed-in customers): points as a discount, and the free item ──
@@ -348,30 +325,8 @@ export async function validatePromoCode(code: string, subtotal: number) {
   code = parsed.data.code;
   subtotal = parsed.data.subtotal;
 
-  const { data: promo } = await supabaseAdmin
-    .from("promo_codes")
-    .select("*")
-    .ilike("code", exactCode(code))
-    .eq("is_active", true)
-    .single();
-
-  if (!promo) return { error: "Invalid promo code" };
-
-  if (promo.expires_at && new Date(promo.expires_at) < new Date()) {
-    return { error: "This promo code has expired" };
-  }
-
-  if (promo.max_uses != null && promo.uses_count >= promo.max_uses) {
-    return { error: "This promo code has reached its usage limit" };
-  }
-
-  if (subtotal < Number(promo.min_order_amount)) {
-    return { error: `Minimum order of Nrs ${promo.min_order_amount} required` };
-  }
-
-  const discount = promo.discount_type === "percent"
-    ? Math.round((subtotal * Number(promo.discount_value)) / 100)
-    : Math.min(Number(promo.discount_value), subtotal);
-
-  return { success: true, discount, type: promo.discount_type, value: promo.discount_value };
+  const promo = await findCode(code);
+  const problem = codeProblem(promo, subtotal);
+  if (problem || !promo) return { error: problem ?? "That code isn't valid" };
+  return { success: true, discount: codeAmount(promo, subtotal), type: promo.discount_type, value: promo.discount_value };
 }

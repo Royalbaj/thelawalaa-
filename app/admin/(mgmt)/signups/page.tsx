@@ -1,7 +1,7 @@
-import { format } from "date-fns";
 import { requireRole } from "@/lib/supabase/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { CustomerRowActions } from "@/components/admin/staff-controls";
+import { npDate } from "@/lib/nepal-time";
 
 export const dynamic = "force-dynamic";
 
@@ -66,7 +66,7 @@ export default async function SignupsPage(props: { searchParams: Promise<{ q?: s
             <div className="flex items-start justify-between gap-2">
               <div className="min-w-0">
                 <p className="font-bold text-brand-brown">{c.full_name}</p>
-                <p className="text-xs text-stone-500">{c.phone ?? "No phone"} · joined {format(new Date(c.created_at), "d MMM yyyy")}</p>
+                <p className="text-xs text-stone-500">{c.phone ?? "No phone"} · joined {npDate(c.created_at)}</p>
               </div>
               <span className={`badge shrink-0 ${c.signup_source === "qr_poster" ? "bg-orange-100 text-brand-orange" : "bg-stone-100 text-stone-600"}`}>
                 {SOURCE_LABEL[c.signup_source] ?? c.signup_source}
@@ -103,7 +103,7 @@ export default async function SignupsPage(props: { searchParams: Promise<{ q?: s
                     {SOURCE_LABEL[c.signup_source] ?? c.signup_source}
                   </span>
                 </td>
-                <td className="px-4 py-3.5 text-stone-500 text-xs">{format(new Date(c.created_at), "d MMM yyyy")}</td>
+                <td className="px-4 py-3.5 text-stone-500 text-xs">{npDate(c.created_at)}</td>
                 <td className="px-4 py-3.5">
                   {c.is_active ? <span className="badge bg-green-100 text-green-800">Active</span> : <span className="badge bg-red-100 text-red-800">Suspended</span>}
                 </td>

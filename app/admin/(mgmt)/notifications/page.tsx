@@ -1,8 +1,8 @@
-import { format } from "date-fns";
 import { Mail, BellRing, Users, Bike, Store } from "lucide-react";
 import { requireRole } from "@/lib/supabase/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { NotificationComposer, DeleteNotification } from "@/components/admin/notification-composer";
+import { npDateTime } from "@/lib/nepal-time";
 
 export const dynamic = "force-dynamic";
 
@@ -36,7 +36,7 @@ export default async function NotificationsAdminPage() {
                   <p className="font-bold text-brand-brown">{n.title}</p>
                   <p className="line-clamp-2 whitespace-pre-line text-sm text-stone-600">{n.body}</p>
                   <p className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-stone-400">
-                    <span>{format(new Date(n.created_at), "d MMM yyyy, h:mm a")}</span>
+                    <span>{npDateTime(n.created_at)}</span>
                     <span>{n.audience === "customers" ? "Customers (joined offers)" : n.audience === "pos" ? <b className="text-amber-700">POS screen · showing until removed</b> : "Riders"}</span>
                     {n.emailed > 0 && <span className="flex items-center gap-1"><Mail size={12} /> {n.emailed} emailed</span>}
                     {n.pushed > 0 && <span className="flex items-center gap-1"><BellRing size={12} /> {n.pushed} alerted</span>}

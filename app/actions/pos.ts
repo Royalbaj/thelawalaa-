@@ -12,17 +12,20 @@ import { studentDiscount, memberUnitPrice, staffFreeItems, managerFreeItems, hal
 import { getPosStaff, posLockOn, posLoginKey } from "@/lib/pos-staff";
 import { managerForPin } from "@/lib/manager-pin";
 import { memberForCard } from "@/lib/member-card";
+import { findCode, codeProblem, codeAmount, useCode } from "@/lib/promo-codes";
+import { deliveryFeeFor } from "@/lib/delivery-fee";
+import { deliveryOtp, hashOtp } from "@/lib/delivery-otp";
 
 /** POS order: branch comes from the operator's OWN profile — never the client. */
 export async function createPosOrder(input: unknown) {
   const { user, profile } = await requireRole(["pos_user", "super_admin"]);
   const parsed = posOrderSchema.safeParse(input);
   if (!parsed.success) {
-    const memberIssue = parsed.error.issues.find((i) => i.path[0] === "members");
-    return { error: memberIssue?.message ?? "Invalid order" };
+    const issue = parsed.error.issues.find((i) => i.path[0] === "members" || i.path[0] === "delivery");
+    return { error: issue?.message ?? "Invalid order" };
   }
   const d = parsed.data;
-  if ([d.member, d.student_discount, d.staff, d.manager].filter(Boolean).length > 1) return { error: "Pick one deal — student, member, staff or manager" };
+  if ([d.member, d.student_discount, d.staff, d.manager, d.promo_code].filter(Boolean).length > 1) return { error: "Pick one deal — student, member, code, staff or manager" };
 
   const branchId = await resolveStaffBranchId(profile.branch_id);
   if (!branchId && profile.role === "pos_user") {
@@ -48,6 +51,25 @@ export async function createPosOrder(input: unknown) {
   if (cards > 10) return { error: "Sell up to 10 membership cards at a time" };
   if (members.length !== cards) {
     return { error: cards ? `Add the member's name and mobile number${cards > 1 ? ` for all ${cards} cards` : ""}` : "Member details without a membership card" };
+  }
+  // Card numbers (migration 044): the next automatic one (101–200) unless one was typed;
+  // after 200 the number written on the card must be typed. Checked before the sale is saved.
+  if (members.length) {
+    const typed = members.map((m) => m.card_number).filter((c): c is string => !!c);
+    if (new Set(typed).size !== typed.length) return { error: "Two new members have the same card number" };
+    if (typed.length) {
+      const { data: taken } = await supabaseAdmin.from("memberships").select("card_number, full_name").in("card_number", typed);
+      if (taken?.length) return { error: `Card ${taken[0].card_number} is already ${taken[0].full_name}'s — check the number on the card` };
+    }
+    if (typed.length < members.length) {
+      const { data: next } = await supabaseAdmin.rpc("peek_membership_card");
+      if (next == null) return { error: "Automatic card numbers (101–200) are all used — type the number written on each card" };
+    }
+  }
+  // Delivery from the counter (phone orders, migration 045): the manager's switch, and who/where.
+  if (d.type === "delivery") {
+    if (settings?.pos_delivery_enabled === false) return { error: "Delivery from the POS is switched off — ask the manager" };
+    if (!d.delivery) return { error: "Add the customer's name, mobile number and address" };
   }
   const staffLimit = Number(settings?.staff_free_items ?? 0);
   if (d.staff && staffLimit <= 0) return { error: "Staff sale is switched off — ask the manager" };
@@ -89,15 +111,30 @@ export async function createPosOrder(input: unknown) {
   }
   // Worked out here, never trusted from the screen — the toggles only ask for it.
   // Lines keep the normal price; the member/student/staff/manager saving is the order's discount.
+  // "Code" deal: a discount code from Admin → Settings → Discount codes, checked again here.
+  const promo = d.promo_code ? await findCode(d.promo_code) : null;
+  if (d.promo_code) {
+    const problem = codeProblem(promo, subtotal);
+    if (problem) return { error: `Code: ${problem}` };
+  }
   const staff = d.staff ? staffFreeItems(rows.map((r) => ({ price: r.product_price, qty: r.quantity, eligible: !r.card })), staffLimit) : null;
   const manager = approver ? managerFreeItems(rows.map((r) => ({ price: r.product_price, qty: r.quantity, eligible: !r.card && !r.frozen }))) : null;
   const discount = manager ? manager.saving
     : staff ? staff.saving
     : d.member ? Math.round(memberSaving * 100) / 100
+    : promo ? codeAmount(promo, subtotal)
     : d.student_discount ? studentDiscount(discountable) : 0;
-  const discountLabel = !discount ? null : manager ? MANAGER_LABEL : staff ? STAFF_LABEL : d.member ? MEMBER_PRICE_LABEL : STUDENT_DISCOUNT_LABEL;
+  const discountLabel = !discount ? null : manager ? MANAGER_LABEL : staff ? STAFF_LABEL : d.member ? MEMBER_PRICE_LABEL
+    : promo ? `Code ${promo.code}` : STUDENT_DISCOUNT_LABEL;
+  // Count the code's use before the sale is saved — conditional, so the last use can't go twice.
+  if (promo && !(await useCode(promo))) return { error: "Code: that code just ran out — try again" };
 
-  // Counter sales are anonymous walk-ins — the POS no longer asks for a name or phone.
+  // Counter sales are anonymous walk-ins — the POS asks for a name and phone only for a delivery.
+  // A delivery pays on arrival (the rider collects), with the same charge as online:
+  // Rs 20 under Rs 99 of food (lib/delivery-fee.ts). The notes header is the one createOrder
+  // writes, which the rider screens read the name / phone / address from (lib/order-notes.ts).
+  const isDelivery = d.type === "delivery" && !!d.delivery;
+  const delivery_fee = isDelivery ? deliveryFeeFor(subtotal, settings) : 0;
   const { data: order, error } = await supabaseAdmin
     .from("orders")
     .insert({
@@ -108,31 +145,42 @@ export async function createPosOrder(input: unknown) {
       staff_name: seller?.name ?? null,
       discount_approved_by: manager && discount ? approver!.name : null,
       membership_id: member?.id ?? null,
+      promo_code_id: promo?.id ?? null,
       member_card: member?.card ?? null,
       branch_id: branchId,
       type: d.type,
       status: "confirmed",
       subtotal,
-      delivery_fee: 0,
+      delivery_fee,
       discount_amount: discount,
       discount_label: discountLabel,
-      total: subtotal - discount,
+      total: subtotal - discount + delivery_fee,
       payment_method: d.payment_method,
-      payment_status: "paid", // POS = paid at counter
-      notes: null,
+      payment_status: isDelivery ? "pending" : "paid", // POS = paid at the counter; a delivery is paid to the rider
+      delivery_address: isDelivery ? d.delivery!.address : null,
+      notes: isDelivery
+        ? `[POS Order]\nName: ${d.delivery!.name}\nPhone: ${d.delivery!.phone}\nAddress: ${d.delivery!.address.replace(/\s*\n\s*/g, ", ")}`
+        : null,
     })
     .select("id, order_number, daily_number, total")
     .single();
   if (error || !order) return { error: "Order failed" };
 
   await supabaseAdmin.from("order_items").insert(rows.map(({ card: _card, frozen: _frozen, ...r }) => ({ ...r, order_id: order.id })));
-  // Card numbers come from the database (003, 004, … — migration 030). A clash
-  // with a number the admin typed by hand just takes the next one.
+  // The delivery code the rider asks for — only its hash is stored. The POS shows it so the
+  // counter can tell the customer (on the phone, for a phone order).
+  let deliveryCode: string | null = null;
+  if (isDelivery) {
+    deliveryCode = deliveryOtp(order.id);
+    await supabaseAdmin.from("deliveries").insert({ order_id: order.id, delivery_otp_hash: hashOtp(deliveryCode, order.id) });
+  }
+  // Automatic card numbers come from the database (101–200 — migration 044); a typed
+  // one is used as it is. A clash with a number the admin typed by hand takes the next one.
   let savedMembers: { full_name: string; phone: string; card_number: string | null }[] = [];
   if (members.length) {
     for (let attempt = 1; attempt <= 3; attempt++) {
       const { data, error: memberErr } = await supabaseAdmin.from("memberships")
-        .insert(members.map((m) => ({ full_name: m.full_name, phone: m.phone, order_id: order.id, sold_by: user.id })))
+        .insert(members.map((m) => ({ full_name: m.full_name, phone: m.phone, order_id: order.id, sold_by: user.id, ...(m.card_number ? { card_number: m.card_number } : {}) })))
         .select("full_name, phone, card_number");
       if (!memberErr) { savedMembers = data ?? []; break; }
       if (memberErr.code !== "23505" || attempt === 3) { console.error("Couldn't save membership details:", memberErr.message); break; }
@@ -146,9 +194,23 @@ export async function createPosOrder(input: unknown) {
   after(() => checkStockAfterSale(rows.map((r) => r.product_id)));
   return {
     ok: true, orderNumber: order.order_number, dailyNumber: order.daily_number, total: order.total, discount, discountLabel,
+    deliveryCode, deliveryFee: delivery_fee,
     member: member ? { name: member.name, card: member.card } : null,
+    // The next automatic card number, for the POS's "give card no. …" (null once 101–200 are used).
+    nextCard: members.length ? ((await supabaseAdmin.rpc("peek_membership_card")).data as number | null) : undefined,
     members: savedMembers.map((m) => ({ name: m.full_name, phone: m.phone, card: m.card_number })),
   };
+}
+
+/** POS "Code" deal: is this discount code live? The minimum order is shown on the screen; the order checks everything again. */
+export async function checkPosCode(code: unknown) {
+  await requireRole(["pos_user", "super_admin"]);
+  const c = z.string().trim().min(1).max(30).safeParse(code);
+  if (!c.success) return { error: "Type the code" };
+  const promo = await findCode(c.data);
+  const problem = codeProblem(promo, Number.MAX_SAFE_INTEGER);
+  if (problem || !promo) return { error: problem ?? "That code isn't valid" };
+  return { ok: true as const, code: promo.code, type: promo.discount_type, value: Number(promo.discount_value), min: Number(promo.min_order_amount) };
 }
 
 /** POS "Member" deal: whose card is this (its last 3 digits)? The order checks it again when it's placed. */

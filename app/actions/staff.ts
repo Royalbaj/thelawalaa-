@@ -5,6 +5,7 @@ import { after } from "next/server";
 import { pushToDrivers } from "@/lib/push";
 import { inviteStaffSchema } from "@/lib/validations/staff";
 import { requireRole } from "@/lib/supabase/server";
+import { measureDelivery } from "@/lib/rider-trips";
 import { supabaseAdmin, audit, loyaltyAward, loyaltyUnaward, loyaltyOnCancel } from "@/lib/supabase/admin";
 import { fetchLiveOrders } from "@/lib/live-orders";
 import { sendEmail, EMAIL_SITE } from "@/lib/email";
@@ -176,6 +177,13 @@ export async function adminUpdateOrderStatus(orderId: string, status: string) {
   if (error) return { error: "Couldn't update the order — try again" };
   // Cancelled: the customer gets back any points / free item it used, and loses what it earned.
   if (status === "cancelled") await loyaltyOnCancel(orderId);
+  // The shop confirmed a delivery itself (e.g. the rider's code tries ran out): stamp it, so the
+  // rider's trip still counts in Admin → Deliveries, measured from the customer's pin if there is one.
+  if (status === "delivered") {
+    const { data: stamped } = await supabaseAdmin.from("deliveries").update({ delivered_at: new Date().toISOString() })
+      .eq("order_id", orderId).is("delivered_at", null).select("id");
+    if (stamped?.length) after(() => measureDelivery(orderId));
+  }
   await audit({ actor_id: user.id, action: "UPDATE_ORDER_STATUS", target_table: "orders", target_id: orderId, new_data: { status } });
   revalidatePath("/admin/orders");
   return { ok: true };

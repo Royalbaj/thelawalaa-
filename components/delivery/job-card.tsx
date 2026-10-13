@@ -35,7 +35,9 @@ export default function JobCard({ job, shop = STORE }: { job: DriverJob; shop?: 
   });
 
   const confirm = () => start(async () => {
-    const r = await verifyDeliveryOtp(job.orderId, code);
+    // Where the rider is now — the road distance for the fuel report is worked out from it.
+    const spot = await hereNow();
+    const r = await verifyDeliveryOtp(job.orderId, code, spot);
     if ("error" in r && r.error) { toast.error(r.error); setCode(""); return; }
     toast.success("Delivered — great job");
     setCodeOpen(false);
@@ -158,7 +160,7 @@ export default function JobCard({ job, shop = STORE }: { job: DriverJob; shop?: 
         {job.status === "on_the_way" && codeOpen && (
           <div className="space-y-3 rounded-2xl bg-white/5 p-4 ring-1 ring-white/10">
             <p className="text-center text-sm font-bold text-white">Ask the customer for their 2-digit delivery code</p>
-            <p className="text-center text-xs text-white/45">It&apos;s on their order screen and in their email.{job.otpAttemptsLeft < 3 ? ` ${job.otpAttemptsLeft} ${job.otpAttemptsLeft === 1 ? "try" : "tries"} left.` : ""}</p>
+            <p className="text-center text-xs text-white/45">It&apos;s on their order screen and in their email — for phone orders the shop told them.{job.otpAttemptsLeft < 3 ? ` ${job.otpAttemptsLeft} ${job.otpAttemptsLeft === 1 ? "try" : "tries"} left.` : ""}</p>
             <input value={code} inputMode="numeric" autoComplete="one-time-code" maxLength={2} autoFocus aria-label="Delivery code"
               onChange={(e) => setCode(e.target.value.replace(/\D/g, "").slice(0, 2))}
               onKeyDown={(e) => { if (e.key === "Enter" && code.length === 2) confirm(); }}
@@ -174,4 +176,17 @@ export default function JobCard({ job, shop = STORE }: { job: DriverJob; shop?: 
       </div>
     </article>
   );
+}
+
+/** The phone's location right now, for the fuel report — gives up after a few seconds so Delivered never waits long. */
+function hereNow() {
+  return new Promise<{ lat: number; lng: number; accuracy: number } | undefined>((resolve) => {
+    if (typeof navigator === "undefined" || !("geolocation" in navigator)) return resolve(undefined);
+    const giveUp = setTimeout(() => resolve(undefined), 6000);
+    navigator.geolocation.getCurrentPosition(
+      (p) => { clearTimeout(giveUp); resolve({ lat: p.coords.latitude, lng: p.coords.longitude, accuracy: p.coords.accuracy }); },
+      () => { clearTimeout(giveUp); resolve(undefined); },
+      { enableHighAccuracy: true, timeout: 5000, maximumAge: 60_000 },
+    );
+  });
 }

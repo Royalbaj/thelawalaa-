@@ -41,7 +41,8 @@ export default function PosSignOutButton({ variant }: { variant: "icon" | "menu"
 
 function SignOutSheet({ onClose }: { onClose: () => void }) {
   const [board, setBoard] = useState<{ name: string; since: string }[] | null>(null);
-  const [clockOut, setClockOut] = useState(true); // closing time: nobody should stay on the clock
+  // Off by default (owner's call, Oct 2026): signing out of the POS never clocks anyone out unless they tick it.
+  const [clockOut, setClockOut] = useState(false);
   const [pending, start] = useTransition();
   useEffect(() => { getClockBoard().then(setBoard).catch(() => setBoard([])); }, []);
   useEffect(() => {

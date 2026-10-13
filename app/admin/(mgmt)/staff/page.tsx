@@ -1,9 +1,9 @@
-import { format } from "date-fns";
 import { requireRole } from "@/lib/supabase/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { cn } from "@/lib/utils";
 import { InviteStaffForm, StaffRowActions } from "@/components/admin/staff-controls";
 import AccountsPeople from "@/components/admin/accounts-people";
+import { npDate } from "@/lib/nepal-time";
 
 export const dynamic = "force-dynamic";
 
@@ -45,7 +45,7 @@ export default async function StaffPage(props: { searchParams: Promise<{ q?: str
                 <div className="flex items-start justify-between gap-2">
                   <div className="min-w-0">
                     <p className="font-bold">{p.full_name}</p>
-                    <p className="text-xs text-stone-500">{p.phone ?? "No phone"} · {p.branches?.name ?? "No branch"} · joined {format(new Date(p.created_at), "d MMM yyyy")}</p>
+                    <p className="text-xs text-stone-500">{p.phone ?? "No phone"} · {p.branches?.name ?? "No branch"} · joined {npDate(p.created_at)}</p>
                   </div>
                   <span className={cn("badge shrink-0", ROLE_BADGE[p.role])}>{p.role}</span>
                 </div>
@@ -81,7 +81,7 @@ export default async function StaffPage(props: { searchParams: Promise<{ q?: str
                         : !p.invite_accepted_at ? <span className="badge bg-yellow-100 text-yellow-800">Invite pending</span>
                         : <span className="badge bg-green-100 text-green-800">Active</span>}
                     </td>
-                    <td className="px-4 py-3 text-stone-500">{format(new Date(p.created_at), "d MMM yyyy")}</td>
+                    <td className="px-4 py-3 text-stone-500">{npDate(p.created_at)}</td>
                     <td className="px-4 py-3">
                       <StaffRowActions userId={p.id} isActive={p.is_active} role={p.role} branches={(branches ?? []) as never} inviteAccepted={!!p.invite_accepted_at} />
                     </td>

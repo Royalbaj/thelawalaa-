@@ -15,7 +15,7 @@ export default async function AdminDashboard() {
   // Locked till: the layout shows the PIN screen, so don't load the menu and orders.
   if (await posLockOn() && !(await getPosStaff(posLoginKey(user)))) return null;
 
-  const [{ data: products }, { data: categories }, { data: recentOrders }, { data: drivers }, { data: settings }, stock, managerDeal] = await Promise.all([
+  const [{ data: products }, { data: categories }, { data: recentOrders }, { data: drivers }, { data: settings }, stock, managerDeal, { data: nextCard }] = await Promise.all([
     supabaseAdmin
       .from("products")
       .select("id, name, price, half_price, image_url, category_id, is_available, is_veg, student_discount_eligible, member_price, is_membership_card, is_frozen")
@@ -30,11 +30,12 @@ export default async function AdminDashboard() {
       .eq("is_active", true),
     supabaseAdmin
       .from("app_settings")
-      .select("opening_promo_enabled, opening_promo_momo_price, opening_promo_starts_at, opening_promo_ends_at, pos_can_cancel, staff_free_items")
+      .select("opening_promo_enabled, opening_promo_momo_price, opening_promo_starts_at, opening_promo_ends_at, pos_can_cancel, staff_free_items, pos_delivery_enabled, delivery_fee, free_delivery_from")
       .eq("id", 1)
       .single(),
     getPosStock(),
     hasManager(), // the Manager button shows once the admin has picked a manager
+    supabaseAdmin.rpc("peek_membership_card"), // "give card no. 118" when selling a membership card
   ]);
 
   return (
@@ -45,6 +46,9 @@ export default async function AdminDashboard() {
       canCancel={settings?.pos_can_cancel ?? true}
       staffFreeItems={Number(settings?.staff_free_items ?? 0)}
       managerDeal={managerDeal}
+      nextCard={(nextCard as number | null) ?? null}
+      posDelivery={settings?.pos_delivery_enabled ?? true}
+      deliveryFee={{ delivery_fee: settings?.delivery_fee ?? null, free_delivery_from: settings?.free_delivery_from ?? null }}
       initialOrders={(recentOrders ?? []) as any}
       drivers={(drivers ?? []) as any}
       stock={stock}
