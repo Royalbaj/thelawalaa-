@@ -4,9 +4,9 @@ import Footer from "@/components/footer";
 export default function PublicLayout({ children }: { children: React.ReactNode }) {
   return (
     <>
-      <Navbar />
+      <Navbar lang="en" />
       <main>{children}</main>
-      <Footer />
+      <Footer lang="en" />
     </>
   );
 }

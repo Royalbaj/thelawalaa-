@@ -105,7 +105,7 @@ export function orderConfirmedEmail(o: {
   subtotal: number; promoDiscount: number; pointsDiscount: number; pointsUsed: number; total: number;
   deliveryFee?: number; // Rs 20 under Rs 99 of food (lib/delivery-fee.ts); 0 = free
   pointsToEarn: number; otp: string | null;
-  scheduled?: string | null; // a booked delivery slot, e.g. "Tomorrow 11:00 am – 11:30 am"
+  scheduled?: string | null; // a booked delivery or pickup slot, e.g. "Tomorrow 11:00 am – 11:30 am"
 }) {
   const rs = (n: number) => `Rs ${n.toLocaleString("en-IN")}`;
   const no = o.dailyNumber != null ? `#${String(o.dailyNumber).padStart(2, "0")}` : o.orderNumber;
@@ -125,6 +125,8 @@ export function orderConfirmedEmail(o: {
           ? `Your order is in. We'll bring it to your door <b>${o.scheduled}</b> — you can follow every step live.`
           : o.type === "delivery"
           ? "Your order is in. We'll cook it fresh and bring it to your door — you can follow every step live."
+          : o.scheduled
+          ? `Your order is in. We'll have it ready to collect at Godam Chowk <b>${o.scheduled}</b> — you can follow every step live.`
           : "Your order is in. We'll cook it fresh at Godam Chowk — you can follow every step live and we'll tell you when it's ready to collect."),
         receipt(
           o.items.map((i) => ({ name: i.name, qty: i.qty, amount: i.lineTotal ? rs(i.lineTotal) : "FREE" })),

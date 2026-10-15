@@ -93,7 +93,7 @@ export default async function AdminOrders(props: { searchParams: Promise<{ statu
                   {o.staff_name && <> · sold by <b className="text-stone-600">{o.staff_name}</b></>}
                 </p>
                 {o.scheduled_for && o.scheduled_until && (
-                  <p className="mt-1 inline-block rounded-full bg-sky-50 px-2 py-0.5 text-[11px] font-bold text-sky-800">Deliver {slotLabel({ start: o.scheduled_for, end: o.scheduled_until })}</p>
+                  <p className="mt-1 inline-block rounded-full bg-sky-50 px-2 py-0.5 text-[11px] font-bold text-sky-800">{o.type === "delivery" ? "Deliver" : "Pickup"} {slotLabel({ start: o.scheduled_for, end: o.scheduled_until })}</p>
                 )}
               </div>
               <p className="shrink-0 font-display text-lg font-bold text-brand-brown">{npr(Number(o.total))}</p>

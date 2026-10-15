@@ -21,7 +21,7 @@ import { deliveryArea, outsideArea, distanceKm, fmtKm } from "@/lib/geo";
 import { deliveryFeeFor, deliveryFeeRules, toFreeDelivery } from "@/lib/delivery-fee";
 import { phoneDisplay, telHref } from "@/lib/utils";
 import { guestCodeKey } from "@/lib/guest-order";
-import { deliveryHours, deliveryOpenNow, deliverySlots, dayWord, minutesLabel, nextStartLabel, slotLabel } from "@/lib/delivery-hours";
+import { orderHours, deliveryOpenNow, deliverySlots, dayWord, minutesLabel, nextStartLabel, slotLabel } from "@/lib/delivery-hours";
 
 type Product = { id: string; name: string; description: string | null; price: number; category_id: string | null; spice_level: number; image_url?: string | null };
 type Category = { id: string; name: string };
@@ -80,9 +80,10 @@ export default function OrderPage() {
   const [favorites, setFavorites] = useState<string[]>([]);
   const [settings, setSettings] = useState<{
     esewa_enabled: boolean; delivery_enabled: boolean; delivery_radius_km?: number | null; store_lat?: number | null; store_lng?: number | null;
-    // Delivery hours (Admin → Settings): ASAP only inside them; otherwise a booked slot.
+    // Delivery hours and store hours (Admin → Settings): ASAP only inside them; otherwise a booked slot.
     delivery_hours_enabled?: boolean; delivery_start?: string; delivery_end?: string;
     delivery_slot_minutes?: number; delivery_lead_minutes?: number; delivery_days_ahead?: number;
+    store_hours_enabled?: boolean; store_open?: string; store_close?: string; pickup_slot_minutes?: number; pickup_days_ahead?: number;
     // Delivery charge (Admin → Settings → Delivery area): Rs 20 under Rs 99 of food.
     delivery_fee?: number | string | null; free_delivery_from?: number | string | null;
   }>({ esewa_enabled: false, delivery_enabled: false });
@@ -117,7 +118,9 @@ export default function OrderPage() {
       supabase.from("categories").select("id, name").order("sort_order"),
       supabase.from("branches").select("id, name, address"),
       supabase.from("addresses").select("id, label, full_address, lat, lng"),
-      supabase.from("app_settings").select("esewa_enabled, delivery_enabled, opening_promo_enabled, opening_promo_momo_price, opening_promo_starts_at, opening_promo_ends_at, delivery_radius_km, store_lat, store_lng, delivery_hours_enabled, delivery_start, delivery_end, delivery_slot_minutes, delivery_lead_minutes, delivery_days_ahead, delivery_fee, free_delivery_from").eq("id", 1).single(),
+      // "*" (the row is public anyway): a column added by a migration that hasn't been
+      // applied yet then reads as missing instead of failing the whole settings fetch.
+      supabase.from("app_settings").select("*").eq("id", 1).single(),
       supabase.from("site_content").select("value").eq("key", "contact.whatsapp").maybeSingle(),
     ]).then(([p, c, b, a, s, phone]) => {
       if (phone.data?.value) setShopPhone(phone.data.value as string);
@@ -148,14 +151,15 @@ export default function OrderPage() {
   const checkPoint = pin ?? (savedPinned ? { lat: Number(savedPinned.lat), lng: Number(savedPinned.lng) } : null);
   const tooFar = type === "delivery" && !!checkPoint && outsideArea(area, checkPoint);
 
-  // Delivery hours (Admin → Settings → Delivery hours). The clock ticks so slots
+  // Opening hours (Admin → Settings): pickup follows the store hours, delivery the
+  // delivery hours (or the store's when those are off). The clock ticks so slots
   // that get too close (under the notice time) drop off while the page is open.
   useEffect(() => { const t = setInterval(() => setNow(Date.now()), 30_000); return () => clearInterval(t); }, []);
-  const hours = useMemo(() => deliveryHours(settings), [settings]);
+  const hours = useMemo(() => orderHours(type, settings), [type, settings]);
   const openNow = deliveryOpenNow(hours, now);
   const slots = useMemo(() => deliverySlots(hours, now), [hours, now]);
-  const scheduling = type === "delivery" && hours.enabled && (!openNow || when === "later");
-  const noSlots = type === "delivery" && hours.enabled && !openNow && slots.length === 0;
+  const scheduling = hours.enabled && (!openNow || when === "later");
+  const noSlots = hours.enabled && !openNow && slots.length === 0;
   // Keep a slot that can still be booked picked (the earliest by default).
   useEffect(() => {
     if (scheduling && !slots.some((sl) => sl.start === slotStart)) setSlotStart(slots[0]?.start ?? "");
@@ -255,8 +259,8 @@ export default function OrderPage() {
       }
       if (type === "pickup" && !branchId) { toast.error("Pick a branch"); return; }
       if (tooFar) { toast.error("We're not delivering to that location right now — please call us to confirm, or choose pickup"); return; }
-      if (noSlots) { toast.error("No delivery times left to book — please choose pickup"); return; }
-      if (scheduling && !pickedSlot) { toast.error("Pick a delivery time"); return; }
+      if (noSlots) { toast.error(type === "delivery" ? "No delivery times left to book — please choose pickup" : "No pickup times left to book — please try again later"); return; }
+      if (scheduling && !pickedSlot) { toast.error(type === "delivery" ? "Pick a delivery time" : "Pick a pickup time"); return; }
 
       const delivery_address_id = (type === "delivery" && !isGuest) ? await ensureAddress() : undefined;
 
@@ -288,9 +292,10 @@ export default function OrderPage() {
         return;
       }
 
+      const slotText = scheduling && pickedSlot ? slotLabel(pickedSlot).replace(/^Today/, "today").replace(/^Tomorrow/, "tomorrow") : "";
       const collectionNote = type === "pickup"
-        ? ` Your order number is ${ok.dailyNumber ?? ok.orderNumber} — tell this to our counter staff when you arrive.`
-        : `${scheduling && pickedSlot ? ` We'll deliver ${slotLabel(pickedSlot).replace(/^Today/, "today").replace(/^Tomorrow/, "tomorrow")}.` : ""}${ok.deliveryCode ? ` Your delivery code is ${ok.deliveryCode} — give it to the rider.` : ""}`;
+        ? `${slotText ? ` It'll be ready ${slotText}.` : ""} Your order number is ${ok.dailyNumber ?? ok.orderNumber} — tell this to our counter staff when you arrive.`
+        : `${slotText ? ` We'll deliver ${slotText}.` : ""}${ok.deliveryCode ? ` Your delivery code is ${ok.deliveryCode} — give it to the rider.` : ""}`;
       toast.success(
         `Order placed!${collectionNote} ${payment === "qr" ? "Scan the QR when your order arrives." : `Keep Rs ${ok.total} cash ready.`}`,
         { duration: 7000 }
@@ -561,55 +566,63 @@ export default function OrderPage() {
                         </div>
                       </div>
                     )}
-                    {hours.enabled && (
-                      <div className="rounded-2xl bg-white p-4 ring-1 ring-orange-100">
-                        {!openNow && (
-                          <p role="status" className="mb-3 flex items-start gap-2 rounded-xl bg-amber-50 p-3 text-sm text-amber-900 ring-1 ring-amber-200">
-                            <Clock size={17} className="mt-0.5 shrink-0" />
-                            <span>
-                              <b>Delivery isn&apos;t available right now.</b> We start delivering {nextStartLabel(hours, now)}
-                              {" "}({minutesLabel(hours.start)} – {minutesLabel(hours.end)}).
-                              {slots.length > 0 ? " You can book a delivery time below — or choose pickup." : " Please choose pickup for now."}
-                            </span>
-                          </p>
-                        )}
-                        <p className="label">When should we deliver?</p>
-                        {openNow && (
-                          <div className="grid grid-cols-2 gap-2">
-                            {([["asap", "As soon as possible"], ["later", "Schedule for later"]] as const).map(([k, label]) => (
-                              <button key={k} type="button" onClick={() => setWhen(k)} aria-pressed={when === k}
-                                className={`rounded-xl px-3 py-2.5 text-sm font-bold ring-1 transition ${when === k ? "bg-orange-50 text-brand-orange ring-2 ring-brand-orange" : "bg-white text-stone-600 ring-stone-200 hover:bg-orange-50"}`}>
-                                {label}
-                              </button>
-                            ))}
-                          </div>
-                        )}
-                        {scheduling && (
-                          slots.length > 0 ? (
-                            <select aria-label="Delivery time" className={`input ${openNow ? "mt-2" : ""}`} value={slotStart} onChange={(e) => setSlotStart(e.target.value)}>
-                              {[...new Set(slots.map((sl) => dayWord(new Date(sl.start).getTime(), now)))].map((day) => (
-                                <optgroup key={day} label={day}>
-                                  {slots.filter((sl) => dayWord(new Date(sl.start).getTime(), now) === day).map((sl) => (
-                                    <option key={sl.start} value={sl.start}>{slotLabel(sl, now)}</option>
-                                  ))}
-                                </optgroup>
-                              ))}
-                            </select>
-                          ) : (
-                            <p className="mt-2 text-sm font-bold text-stone-600">No delivery times left to book.</p>
-                          )
-                        )}
-                        <p className="mt-2 text-xs text-stone-500">
-                          We deliver {minutesLabel(hours.start)} – {minutesLabel(hours.end)} · book at least {hours.lead} minutes ahead
-                        </p>
-                      </div>
-                    )}
                     <p className={`text-xs font-bold ${deliveryFee ? "text-stone-600" : "text-brand-green"}`}>
                       {feeRules.fee === 0
                         ? `Free home delivery within ${area.radiusKm} km of Godam Chowk`
                         : deliveryFee
                         ? `Delivery ${npr(deliveryFee)} — add ${npr(moreForFree)} more for free delivery (free from ${npr(feeRules.freeFrom)})`
                         : `Free delivery — your order is over ${npr(feeRules.freeFrom)}`}
+                    </p>
+                  </div>
+                )}
+
+                {/* Opening hours: as soon as possible while open, otherwise (or by choice) a booked time. */}
+                {hours.enabled && (
+                  <div className="rounded-2xl bg-white p-4 ring-1 ring-orange-100">
+                    {!openNow && (
+                      <p role="status" className="mb-3 flex items-start gap-2 rounded-xl bg-amber-50 p-3 text-sm text-amber-900 ring-1 ring-amber-200">
+                        <Clock size={17} className="mt-0.5 shrink-0" />
+                        <span>
+                          {type === "delivery" ? (
+                            <><b>Delivery isn&apos;t available right now.</b> We start delivering {nextStartLabel(hours, now)}</>
+                          ) : (
+                            <><b>We&apos;re closed right now.</b> We open {nextStartLabel(hours, now)}</>
+                          )}
+                          {" "}({minutesLabel(hours.start)} – {minutesLabel(hours.end)}).
+                          {slots.length > 0
+                            ? type === "delivery" ? " You can book a delivery time below — or choose pickup." : " You can order now and book a time to pick it up below."
+                            : type === "delivery" ? " Please choose pickup for now." : " Please try again later."}
+                        </span>
+                      </p>
+                    )}
+                    <p className="label">{type === "delivery" ? "When should we deliver?" : "When will you pick it up?"}</p>
+                    {openNow && (
+                      <div className="grid grid-cols-2 gap-2">
+                        {([["asap", "As soon as possible"], ["later", "Schedule for later"]] as const).map(([k, label]) => (
+                          <button key={k} type="button" onClick={() => setWhen(k)} aria-pressed={when === k}
+                            className={`rounded-xl px-3 py-2.5 text-sm font-bold ring-1 transition ${when === k ? "bg-orange-50 text-brand-orange ring-2 ring-brand-orange" : "bg-white text-stone-600 ring-stone-200 hover:bg-orange-50"}`}>
+                            {label}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                    {scheduling && (
+                      slots.length > 0 ? (
+                        <select aria-label={type === "delivery" ? "Delivery time" : "Pickup time"} className={`input ${openNow ? "mt-2" : ""}`} value={slotStart} onChange={(e) => setSlotStart(e.target.value)}>
+                          {[...new Set(slots.map((sl) => dayWord(new Date(sl.start).getTime(), now)))].map((day) => (
+                            <optgroup key={day} label={day}>
+                              {slots.filter((sl) => dayWord(new Date(sl.start).getTime(), now) === day).map((sl) => (
+                                <option key={sl.start} value={sl.start}>{slotLabel(sl, now)}</option>
+                              ))}
+                            </optgroup>
+                          ))}
+                        </select>
+                      ) : (
+                        <p className="mt-2 text-sm font-bold text-stone-600">No {type === "delivery" ? "delivery" : "pickup"} times left to book.</p>
+                      )
+                    )}
+                    <p className="mt-2 text-xs text-stone-500">
+                      {type === "delivery" ? "We deliver" : "Open"} {minutesLabel(hours.start)} – {minutesLabel(hours.end)} · book at least {hours.lead} minutes ahead
                     </p>
                   </div>
                 )}

@@ -15,7 +15,7 @@ import { npr, phoneDisplay } from "@/lib/utils";
 import { deliveryOtp, hashOtp } from "@/lib/delivery-otp";
 import { deliveryArea, outsideArea, distanceKm, fmtKm } from "@/lib/geo";
 import { getSiteText } from "@/lib/site-content";
-import { bookableSlot, deliveryHours, deliveryOpenNow, nextStartLabel, slotLabel, type Slot } from "@/lib/delivery-hours";
+import { bookableSlot, deliveryOpenNow, minutesLabel, nextStartLabel, orderHours, slotLabel, type Slot } from "@/lib/delivery-hours";
 import { deliveryFeeFor } from "@/lib/delivery-fee";
 import { throttled, clientIp } from "@/lib/throttle";
 import { findCode, codeProblem, codeAmount, useCode } from "@/lib/promo-codes";
@@ -45,17 +45,21 @@ export async function createOrder(input: unknown) {
   if (data.type === "delivery" && !settings?.delivery_enabled) {
     return { error: "Delivery isn't available right now — please choose pickup" };
   }
-  // Delivery hours (migration 039): "as soon as possible" only while delivery is
-  // open; otherwise (or by choice) a booked slot — re-checked here, never trusted.
+  // Opening hours: pickup follows the store's hours (migration 046), delivery its
+  // own hours (migration 039, or the store's when those are off). "As soon as
+  // possible" only while open; otherwise (or by choice) a booked slot —
+  // re-checked here, never trusted.
   let slot: Slot | null = null;
-  if (data.type === "delivery") {
-    const hours = deliveryHours(settings);
-    if (data.scheduled_for) {
-      slot = bookableSlot(hours, data.scheduled_for);
-      if (!slot) return { error: "That delivery time can't be booked any more — please pick another" };
-    } else if (!deliveryOpenNow(hours)) {
-      return { error: `We start delivering ${nextStartLabel(hours)} — please schedule your delivery for later, or choose pickup` };
-    }
+  const hours = orderHours(data.type, settings);
+  if (data.scheduled_for) {
+    slot = bookableSlot(hours, data.scheduled_for);
+    if (!slot) return { error: `That ${data.type === "delivery" ? "delivery" : "pickup"} time can't be booked any more — please pick another` };
+  } else if (!deliveryOpenNow(hours)) {
+    return {
+      error: data.type === "delivery"
+        ? `We start delivering ${nextStartLabel(hours)} — please book a delivery time, or choose pickup`
+        : `We're closed now — we open ${nextStartLabel(hours)} (${minutesLabel(hours.start)} – ${minutesLabel(hours.end)}). Please book a pickup time`,
+    };
   }
   if (data.payment_method === "esewa" && !settings?.esewa_enabled) {
     return { error: "eSewa isn't available right now — please choose cash or QR" };
@@ -305,7 +309,7 @@ export async function createOrder(input: unknown) {
     const no = order.daily_number != null ? `#${String(order.daily_number).padStart(2, "0")}` : order.order_number;
     after(() => pushToStaff({
       title: `New online order ${no}`,
-      body: `${data.type === "delivery" ? (slot ? `Delivery for ${slotLabel(slot)}` : "Delivery") : "Pickup"} · ${itemRows.map((r) => `${r.quantity}× ${r.product_name}`).join(", ")} · ${npr(total)}`,
+      body: `${data.type === "delivery" ? "Delivery" : "Pickup"}${slot ? ` for ${slotLabel(slot)}` : ""} · ${itemRows.map((r) => `${r.quantity}× ${r.product_name}`).join(", ")} · ${npr(total)}`,
       tag: order.id,
       url: "/admin",
     }));

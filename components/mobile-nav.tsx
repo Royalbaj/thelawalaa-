@@ -2,8 +2,10 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Home, ShoppingCart, Utensils, User, Gift, Package, UserRound } from "lucide-react";
+import { Home, ShoppingCart, Utensils, User, Gift, Package, UserRound, MapPin } from "lucide-react";
 import { useViewerRole } from "@/lib/use-viewer";
+import { useSiteLang } from "@/lib/use-site-lang";
+import { UI } from "@/lib/site-lang";
 import { ROLE_HOME } from "@/lib/role-home";
 import { cn } from "@/lib/utils";
 
@@ -21,21 +23,24 @@ const CUSTOMER_NAV = [
 export default function MobileNav() {
   const pathname = usePathname();
   const { role, ready } = useViewerRole();
+  const { lang, home } = useSiteLang(); // the homepage is English at / and Nepali at /ne
+  const L = UI[lang].mobile;
 
   if (["/admin", "/pos", "/delivery", "/staff", "/auth"].some((p) => pathname.startsWith(p))) return null;
 
   const items = role === "customer" ? CUSTOMER_NAV : [
-    { id: "site", label: "Home", href: "/", icon: Home },
-    { id: "menu", label: "Menu", href: "/#menu", icon: Utensils },
-    { id: "order", label: "Order", href: "/order", icon: ShoppingCart },
+    { id: "site", label: L.home, href: home, icon: Home },
+    { id: "menu", label: L.menu, href: `${home}#menu`, icon: Utensils },
+    { id: "order", label: L.order, href: "/order", icon: ShoppingCart },
+    { id: "location", label: L.location, href: `${home}#location`, icon: MapPin },
     role
-      ? { id: "portal", label: "My portal", href: ROLE_HOME[role] ?? "/", icon: UserRound }
-      : { id: "signin", label: "Sign in", href: "/auth/login", icon: UserRound },
+      ? { id: "portal", label: L.portal, href: ROLE_HOME[role] ?? "/", icon: UserRound }
+      : { id: "signin", label: L.signIn, href: "/auth/login", icon: UserRound },
   ];
 
   const active = items.find((item) => {
-    if (item.href === "/" || item.href === "/account") return pathname === item.href;
-    if (item.href.startsWith("/#")) return false;
+    if (item.href.includes("#")) return false;
+    if (item.href === "/" || item.href === "/ne" || item.href === "/account") return pathname === item.href;
     return pathname.startsWith(item.href);
   })?.id;
 

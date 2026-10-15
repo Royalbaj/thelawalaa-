@@ -29,7 +29,7 @@ export interface Order {
   payment_status: string;
   payment_method: string | null;
   placed_by?: string | null; // set = a POS (counter) order: one tap to Served/Collected
-  scheduled_for?: string | null; // a booked delivery slot (Admin → Settings → Delivery hours)
+  scheduled_for?: string | null; // a booked delivery or pickup slot (Admin → Settings → Delivery / Store hours)
   scheduled_until?: string | null;
   created_at: string;
   notes: string | null;
@@ -282,7 +282,7 @@ export default function LiveOrdersPanel({
                 )}
                 {o.scheduled_for && o.scheduled_until && !CLOSED.includes(o.status) && (
                   <p className="mt-1.5 flex items-center gap-1.5 rounded-lg bg-sky-50 px-2 py-1 text-xs font-extrabold text-sky-800 dark:bg-sky-950/40 dark:text-sky-300">
-                    <Clock size={13} className="shrink-0" /> Deliver {slotLabel({ start: o.scheduled_for, end: o.scheduled_until })}
+                    <Clock size={13} className="shrink-0" /> {o.type === "delivery" ? "Deliver" : "Pickup"} {slotLabel({ start: o.scheduled_for, end: o.scheduled_until })}
                   </p>
                 )}
                 {note && <p className="mt-1.5 rounded-lg bg-yellow-50 px-2 py-1 text-xs font-bold text-yellow-900 dark:bg-yellow-900/30 dark:text-yellow-200"><MessageSquareText size={12} className="mr-1 inline -mt-0.5" />{note}</p>}

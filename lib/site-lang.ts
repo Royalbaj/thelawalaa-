@@ -1,0 +1,70 @@
+// English / Nepali for the homepage. The Nepali homepage is /ne (its own URL,
+// so Google can list it for Nepali searches); every other page is English.
+// The wording of each homepage section is editable website text
+// (lib/site-content.ts, with a Nepali box per field); this file holds only
+// the small fixed words around it — menu links, labels, "Open now".
+// No server-only imports: client components use it too.
+
+export type SiteLang = "en" | "ne";
+
+export const langOfPath = (path: string | null | undefined): SiteLang =>
+  path === "/ne" || path?.startsWith("/ne/") ? "ne" : "en";
+export const homePath = (lang: SiteLang) => (lang === "ne" ? "/ne" : "/");
+
+const EN = {
+  nav: { home: "Home", about: "About", menu: "Menu", order: "Order Now", faq: "FAQ", contact: "Contact", location: "Find Us" },
+  signIn: "Sign in", myAccount: "My account", myPortal: "My portal",
+  // The button that switches language is written in the language it switches TO.
+  switchTo: "नेपाली", switchAria: "यो पेज नेपालीमा हेर्नुहोस्",
+  mobile: { home: "Home", menu: "Menu", order: "Order", location: "Find us", signIn: "Sign in", portal: "My portal" },
+  footer: { follow: "Follow Us", order: "Order", feedback: "Feedback", terms: "Terms & Conditions", privacy: "Privacy", rights: "All rights reserved" },
+  heroAlt: "Thelawalaa chatpate and momo in branded takeaway boxes",
+  nowOpenDelivery: "Now open — order online for pickup or home delivery",
+  nowOpenPickup: "Now open — order online for pickup",
+  veg: "Veg", nonVeg: "Non-Veg", spiceAria: "Spice", spice: ["Mild", "Medium", "Hot", "Extra hot"],
+  openingOffer: "Opening offer",
+  add: "Add", added: (name: string) => `${name} added`,
+  delivery: "Delivery",
+  chatWhatsapp: "Chat on WhatsApp",
+  watchOnYoutube: "Watch on YouTube",
+  mapTitle: "Map showing Thelawalaa at Godam Chowk, Banepa",
+  openNow: "Open now", closedNow: "Closed now",
+  opens: (time: string, tomorrow: boolean) => `opens ${tomorrow ? "tomorrow " : ""}${time}`,
+  form: { name: "Name", email: "Email", phone: "Phone (optional)", message: "Message", send: "Send message", sending: "Sending…", sent: "Message sent — we'll reply soon!" },
+};
+
+const NE: typeof EN = {
+  nav: { home: "गृहपृष्ठ", about: "हाम्रो बारेमा", menu: "मेनु", order: "अर्डर गर्नुहोस्", faq: "प्रश्नहरू", contact: "सम्पर्क", location: "हामी कहाँ छौं" },
+  signIn: "साइन इन", myAccount: "मेरो खाता", myPortal: "मेरो पोर्टल",
+  switchTo: "English", switchAria: "See this page in English",
+  mobile: { home: "गृहपृष्ठ", menu: "मेनु", order: "अर्डर", location: "ठेगाना", signIn: "साइन इन", portal: "पोर्टल" },
+  footer: { follow: "हामीलाई फलो गर्नुहोस्", order: "अर्डर", feedback: "सुझाव", terms: "नियम र सर्तहरू", privacy: "गोपनीयता", rights: "सर्वाधिकार सुरक्षित" },
+  heroAlt: "ठेलावालाको ब्रान्डेड बट्टामा चटपटे र मोमो",
+  nowOpenDelivery: "अब खुला छ — पिकअप वा होम डेलिभरीका लागि अनलाइन अर्डर गर्नुहोस्",
+  nowOpenPickup: "अब खुला छ — पिकअपका लागि अनलाइन अर्डर गर्नुहोस्",
+  veg: "शाकाहारी", nonVeg: "मांसाहारी", spiceAria: "पिरो", spice: ["कम पिरो", "मध्यम पिरो", "पिरो", "धेरै पिरो"],
+  openingOffer: "उद्घाटन अफर",
+  add: "थप्नुहोस्", added: (name: string) => `${name} कार्टमा थपियो`,
+  delivery: "डेलिभरी",
+  chatWhatsapp: "व्हाट्सएपमा कुरा गर्नुहोस्",
+  watchOnYoutube: "युट्युबमा हेर्नुहोस्",
+  mapTitle: "गोदाम चोक, बनेपामा ठेलावाला देखाउने नक्सा",
+  openNow: "अहिले खुला छ", closedNow: "अहिले बन्द छ",
+  opens: (time: string, tomorrow: boolean) => `${tomorrow ? "भोलि " : ""}${time} खुल्छ`,
+  form: { name: "नाम", email: "इमेल", phone: "फोन (चाहे मात्र)", message: "सन्देश", send: "सन्देश पठाउनुहोस्", sending: "पठाउँदै…", sent: "सन्देश पुग्यो — हामी छिट्टै जवाफ दिन्छौं!" },
+};
+
+export const UI: Record<SiteLang, typeof EN> = { en: EN, ne: NE };
+
+/** "9:00 am" / "बिहान 9 बजे" — minutes after midnight, Banepa time. */
+export function clockText(min: number, lang: SiteLang) {
+  const h = Math.floor(min / 60) % 24, m = min % 60, h12 = ((h + 11) % 12) + 1;
+  const mm = String(m).padStart(2, "0");
+  if (lang === "en") return `${h12}:${mm} ${h < 12 ? "am" : "pm"}`;
+  const part = h < 4 ? "राति" : h < 12 ? "बिहान" : h < 16 ? "दिउँसो" : h < 19 ? "साँझ" : "बेलुका";
+  return `${part} ${h12}${m ? `:${mm}` : ""} बजे`;
+}
+
+/** "9:00 am – 7:00 pm" / "बिहान 9 बजेदेखि बेलुका 7 बजेसम्म". */
+export const hoursText = (start: number, end: number, lang: SiteLang) =>
+  lang === "en" ? `${clockText(start, "en")} – ${clockText(end, "en")}` : `${clockText(start, "ne")}देखि ${clockText(end, "ne")}सम्म`;

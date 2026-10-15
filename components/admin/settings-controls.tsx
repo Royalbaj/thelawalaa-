@@ -4,8 +4,8 @@ import toast from "react-hot-toast";
 import { Facebook, Instagram, Link2, Trash2 } from "lucide-react";
 import TikTokIcon from "@/components/icons/tiktok";
 import { createBranch, setBranchActive, createPromoCode, setPromoActive } from "@/app/actions/admin-crud";
-import { updateAppSettings, updateOpeningPromo, addSocialLink, setSocialLinkActive, deleteSocialLink, updateDeliveryArea, updateStaffSale, updateDeliveryHours, updateDeliveryCharge } from "@/app/actions/settings";
-import { deliveryHours, deliverySlots, minutesLabel, slotLabel } from "@/lib/delivery-hours";
+import { updateAppSettings, updateOpeningPromo, addSocialLink, setSocialLinkActive, deleteSocialLink, updateDeliveryArea, updateStaffSale, updateDeliveryHours, updateDeliveryCharge, updateStoreHours } from "@/app/actions/settings";
+import { deliveryHours, deliverySlots, minutesLabel, slotLabel, storeHours } from "@/lib/delivery-hours";
 import { toNepalInput } from "@/lib/nepal-time";
 
 function platformIcon(platform: string) {
@@ -475,12 +475,12 @@ export function DeliveryHoursForm({ initial }: {
           <h3 className="font-display font-bold text-brand-brown">Delivery hours</h3>
           <p className="text-xs text-stone-500">
             Website delivery &ldquo;as soon as possible&rdquo; only inside these hours. Outside them, checkout says when you start delivering and
-            customers can book a later time slot (they can always book one).
+            customers can book a later time slot (they can always book one). Off: delivery follows the store hours above.
           </p>
         </div>
         <button onClick={() => setEnabled((v) => !v)} aria-pressed={enabled}
           className={enabled ? "badge shrink-0 bg-green-100 text-green-800" : "badge shrink-0 bg-stone-200 text-stone-600"}>
-          {enabled ? "On" : "Off — any time"}
+          {enabled ? "On" : "Off — store hours"}
         </button>
       </div>
       <div className="grid grid-cols-2 gap-3">
@@ -512,6 +512,73 @@ export function DeliveryHoursForm({ initial }: {
           : "The end time has to be after the start time, with room for at least one slot."}
       </p>
       <button disabled={pending} onClick={save} className="btn-primary w-full !py-2.5 text-sm">{pending ? "Saving…" : "Save delivery hours"}</button>
+    </div>
+  );
+}
+
+/**
+ * Store opening hours (migration 046). On: website orders "as soon as possible"
+ * only while the shop is open; when it's closed, checkout says when it opens and
+ * the customer books a pickup time after opening. Delivery follows these too
+ * while the delivery hours are off. The POS isn't affected. Off: any time.
+ */
+export function StoreHoursForm({ initial }: {
+  initial: { enabled: boolean; open: string; close: string; slot: number; days: number };
+}) {
+  const [enabled, setEnabled] = useState(initial.enabled);
+  const [open, setOpen] = useState(initial.open);
+  const [close, setClose] = useState(initial.close);
+  const [slot, setSlot] = useState(initial.slot);
+  const [days, setDays] = useState(initial.days);
+  const [pending, startSave] = useTransition();
+
+  const h = storeHours({ store_hours_enabled: true, store_open: open, store_close: close, pickup_slot_minutes: slot, pickup_days_ahead: 1 });
+  const ok = h.end - h.start >= h.slot;
+  const save = () => startSave(async () => {
+    const r = await updateStoreHours({ store_hours_enabled: enabled, store_open: open, store_close: close, pickup_slot_minutes: slot, pickup_days_ahead: days });
+    if (r?.error) toast.error(r.error); else toast.success("Opening hours saved");
+  });
+  const select = "input !py-2 text-base sm:text-sm";
+
+  return (
+    <div className="card space-y-4 p-5">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <h3 className="font-display font-bold text-brand-brown">Store hours</h3>
+          <p className="text-xs text-stone-500">
+            When the shop is open. Outside these hours the website takes no &ldquo;as soon as possible&rdquo; orders — checkout says when you open
+            and customers book a pickup time after opening. Delivery follows these too unless Delivery hours are on. The POS isn&apos;t affected.
+          </p>
+        </div>
+        <button onClick={() => setEnabled((v) => !v)} aria-pressed={enabled}
+          className={enabled ? "badge shrink-0 bg-green-100 text-green-800" : "badge shrink-0 bg-stone-200 text-stone-600"}>
+          {enabled ? "On" : "Off — any time"}
+        </button>
+      </div>
+      <div className="grid grid-cols-2 gap-3">
+        <label className="text-xs font-bold text-stone-500">Opens
+          <input type="time" value={open} onChange={(e) => setOpen(e.target.value)} className={`${select} mt-1`} />
+        </label>
+        <label className="text-xs font-bold text-stone-500">Closes
+          <input type="time" value={close} onChange={(e) => setClose(e.target.value)} className={`${select} mt-1`} />
+        </label>
+        <label className="text-xs font-bold text-stone-500">Pickup time slot
+          <select value={slot} onChange={(e) => setSlot(Number(e.target.value))} className={`${select} mt-1`}>
+            {[15, 30, 45, 60].map((m) => <option key={m} value={m}>{m < 60 ? `${m} minutes` : "1 hour"}</option>)}
+          </select>
+        </label>
+        <label className="text-xs font-bold text-stone-500">Customers can book
+          <select value={days} onChange={(e) => setDays(Number(e.target.value))} className={`${select} mt-1`}>
+            {[1, 2, 3, 4, 5, 6, 7].map((d) => <option key={d} value={d}>{d === 1 ? "Today only" : d === 2 ? "Today and tomorrow" : `Up to ${d} days ahead`}</option>)}
+          </select>
+        </label>
+      </div>
+      <p className="rounded-xl bg-orange-50 px-3 py-2 text-xs text-stone-600">
+        {ok
+          ? <>Open {minutesLabel(h.start)} – {minutesLabel(h.end)}. While closed, customers book a pickup in {slot}-minute slots, at least 30 minutes ahead.</>
+          : "Closing time has to be after opening time, with room for at least one pickup slot."}
+      </p>
+      <button disabled={pending} onClick={save} className="btn-primary w-full !py-2.5 text-sm">{pending ? "Saving…" : "Save store hours"}</button>
     </div>
   );
 }

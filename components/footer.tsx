@@ -2,6 +2,7 @@ import { Link2 } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { FacebookGlyph, InstagramGlyph, TikTokGlyph, WhatsAppGlyph } from "@/components/icons/brand-glyphs";
 import { getSiteText } from "@/lib/site-content";
+import { UI, homePath, type SiteLang } from "@/lib/site-lang";
 import BrandLogo from "@/components/brand-logo";
 
 function platformIcon(platform: string) {
@@ -13,12 +14,13 @@ function platformIcon(platform: string) {
   return Link2;
 }
 
-export default async function Footer() {
+export default async function Footer({ lang = "en" }: { lang?: SiteLang }) {
   const supabase = await createClient();
   const [{ data: socialLinks }, t] = await Promise.all([
     supabase.from("social_links").select("id, platform, url").order("sort_order"),
-    getSiteText(),
+    getSiteText(lang),
   ]);
+  const L = UI[lang], home = homePath(lang);
 
   return (
     <footer className="bg-brand-brown px-4 py-12 text-white">
@@ -28,7 +30,7 @@ export default async function Footer() {
           <p className="mt-3 text-sm text-orange-100/80">{t["footer.tagline"]}</p>
           {(socialLinks ?? []).length > 0 && (
             <div className="mt-4">
-              <p className="text-xs font-bold uppercase tracking-wide text-orange-100/60">Follow Us</p>
+              <p className="text-xs font-bold uppercase tracking-wide text-orange-100/60">{L.footer.follow}</p>
               <div className="mt-2 flex gap-2">
                 {(socialLinks ?? []).map((s) => {
                   const Icon = platformIcon(s.platform);
@@ -47,16 +49,17 @@ export default async function Footer() {
           )}
         </div>
         <nav className="flex flex-wrap content-start gap-x-6 gap-y-2 text-sm font-bold text-orange-100/90">
-          <a href="/#home" className="hover:text-white">Home</a>
-          <a href="/#menu" className="hover:text-white">Menu</a>
-          <a href="/order" className="hover:text-white">Order</a>
-          <a href="/#faq" className="hover:text-white">FAQ</a>
-          <a href="/#contact" className="hover:text-white">Contact</a>
-          <a href="/feedback" className="hover:text-white">Feedback</a>
+          <a href={`${home}#home`} className="hover:text-white">{L.nav.home}</a>
+          <a href={`${home}#menu`} className="hover:text-white">{L.nav.menu}</a>
+          <a href="/order" className="hover:text-white">{L.footer.order}</a>
+          <a href={`${home}#faq`} className="hover:text-white">{L.nav.faq}</a>
+          <a href={`${home}#contact`} className="hover:text-white">{L.nav.contact}</a>
+          <a href={`${home}#location`} className="hover:text-white">{L.nav.location}</a>
+          <a href="/feedback" className="hover:text-white">{L.footer.feedback}</a>
         </nav>
         <div className="text-sm text-orange-100/70">
-          <p className="font-bold"><a href="/terms" className="hover:text-white">Terms &amp; Conditions</a> · <a href="/terms#privacy" className="hover:text-white">Privacy</a></p>
-          <p className="mt-2">© {new Date().getFullYear()} Thelawalaa.com — All rights reserved</p>
+          <p className="font-bold"><a href="/terms" className="hover:text-white">{L.footer.terms}</a> · <a href="/terms#privacy" className="hover:text-white">{L.footer.privacy}</a></p>
+          <p className="mt-2">© {new Date().getFullYear()} Thelawalaa.com — {L.footer.rights}</p>
         </div>
       </div>
     </footer>

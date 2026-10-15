@@ -61,5 +61,5 @@ export const SITE = {
     "https://www.instagram.com/thelawalaa",
     "https://www.tiktok.com/@thelawalaa",
   ],
-  openingHours: "Mo-Su 10:00-21:00",
+  openingHours: "Mo-Su 09:00-19:00", // keep in step with Admin → Settings → Store hours
 } as const;

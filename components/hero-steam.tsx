@@ -7,8 +7,7 @@ import { useEffect, useRef } from "react";
 // is "screen"-blended over the photo so it lightens like real steam in that
 // warm light. Drawn at low resolution (steam is soft) and capped at 30 fps;
 // it stops when off screen, in a background tab, for reduced-motion users,
-// and simply doesn't appear where WebGL isn't available — the photo already
-// has still steam of its own.
+// and simply doesn't appear where WebGL isn't available.
 
 const VERT = `attribute vec2 p; void main(){ gl_Position = vec4(p, 0.0, 1.0); }`;
 
@@ -45,7 +44,7 @@ void main() {
   // spreads out as it cools — like the steam already in the photo.
   float sway = 0.06 * sin(uv.y * 4.0 - t * 0.55) + 0.035 * sin(uv.y * 9.0 + t * 0.9);
   float cx = 0.56 + 0.12 * h + sway;
-  float width = 0.16 + 0.30 * h;
+  float width = 0.20 + 0.30 * h; // six momo side by side: a wide base
   float dx = (uv.x - cx) / width;
   float column = exp(-dx * dx * 2.2);
 
@@ -71,7 +70,7 @@ void main() {
 
   // Warm-white, lit by the same light as the photo. Premultiplied alpha.
   vec3 col = mix(vec3(0.93, 0.90, 0.86), vec3(1.0, 0.97, 0.93), wisps);
-  float a = d * 0.55;
+  float a = d * 0.7; // the photo has no steam of its own, so this is all of it
   gl_FragColor = vec4(col * a, a);
 }`;
 
@@ -83,7 +82,7 @@ export default function HeroSteam({ className }: { className?: string }) {
     if (!canvas) return;
     if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
     const gl = canvas.getContext("webgl", { premultipliedAlpha: true, alpha: true, antialias: false, powerPreference: "low-power" });
-    if (!gl) return;
+    if (!gl || gl.isContextLost()) return;
 
     const compile = (type: number, src: string) => {
       const s = gl.createShader(type)!;
@@ -140,12 +139,19 @@ export default function HeroSteam({ className }: { className?: string }) {
     canvas.style.opacity = "1";
     run();
 
+    // Free what was made, but keep the context itself: a canvas has only one, so
+    // losing it on purpose would leave a re-mounted canvas (React dev runs every
+    // effect twice) with a dead context — a white box over the photo.
     return () => {
       stop();
       io.disconnect();
       ro.disconnect();
       document.removeEventListener("visibilitychange", onVis);
-      gl.getExtension("WEBGL_lose_context")?.loseContext();
+      canvas.style.opacity = "0";
+      gl.deleteBuffer(buf);
+      gl.deleteProgram(prog);
+      gl.deleteShader(vs);
+      gl.deleteShader(fs);
     };
   }, []);
 

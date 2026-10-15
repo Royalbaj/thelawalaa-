@@ -1,7 +1,9 @@
-// Delivery hours and booked delivery slots (migration 039, Admin → Settings →
-// Delivery hours). Shared by checkout (what it offers) and createOrder (what
-// it accepts) so the two can't disagree. Banepa local time — Nepal is
-// UTC+5:45 all year (no daylight saving), so plain offset maths is exact.
+// Opening hours and booked time slots: delivery hours (migration 039, Admin →
+// Settings → Delivery hours) and the store's opening hours for pickup
+// (migration 046, Admin → Settings → Store hours). Shared by checkout (what it
+// offers) and createOrder (what it accepts) so the two can't disagree. Banepa
+// local time — Nepal is UTC+5:45 all year (no daylight saving), so plain
+// offset maths is exact.
 
 const NPT_OFFSET_MS = (5 * 60 + 45) * 60_000;
 const DAY_MS = 86_400_000;
@@ -14,6 +16,8 @@ export type Slot = { start: string; end: string }; // ISO instants
 type SettingsLike = {
   delivery_hours_enabled?: boolean | null; delivery_start?: string | null; delivery_end?: string | null;
   delivery_slot_minutes?: number | null; delivery_lead_minutes?: number | null; delivery_days_ahead?: number | null;
+  store_hours_enabled?: boolean | null; store_open?: string | null; store_close?: string | null;
+  pickup_slot_minutes?: number | null; pickup_days_ahead?: number | null;
 };
 
 const toMinutes = (t: string | null | undefined, fallback: number) => {
@@ -30,6 +34,32 @@ export function deliveryHours(s: SettingsLike | null | undefined): DeliveryHours
     lead: Math.max(30, Number(s?.delivery_lead_minutes ?? 30)), // never less than 30 minutes' notice
     days: Number(s?.delivery_days_ahead ?? 2),
   };
+}
+
+/** The shop's opening hours, with the slots a pickup can be booked in (at least 30 minutes' notice). */
+export function storeHours(s: SettingsLike | null | undefined): DeliveryHours {
+  return {
+    enabled: !!s?.store_hours_enabled,
+    start: toMinutes(s?.store_open, 9 * 60),
+    end: toMinutes(s?.store_close, 19 * 60),
+    slot: Number(s?.pickup_slot_minutes ?? 30),
+    lead: 30,
+    days: Number(s?.pickup_days_ahead ?? 2),
+  };
+}
+
+/**
+ * The hours a website order of this type follows. Pickup / dine-in: the store's hours.
+ * Delivery: the delivery hours when they're on — otherwise the store's hours
+ * (booked in delivery-sized slots), so nothing is delivered while the shop is shut.
+ * `enabled: false` = any time, as before either was switched on.
+ */
+export function orderHours(type: string, s: SettingsLike | null | undefined): DeliveryHours {
+  if (type !== "delivery") return storeHours(s); // pickup (and dine-in) follow the shop's hours
+  const d = deliveryHours(s);
+  if (d.enabled) return d;
+  const st = storeHours(s);
+  return { ...d, enabled: st.enabled, start: st.start, end: st.end };
 }
 
 /** Banepa midnight at the start of the Nepal day that contains `t` (epoch ms). */

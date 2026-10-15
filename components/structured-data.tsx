@@ -19,7 +19,7 @@ export default function StructuredData({
     name: b.name,
     servesCuisine: ["Street Food", "Nepali", "Chatpate", "Momo", "Chaat"],
     priceRange: "Rs",
-    image: `${SITE.url}/og.png`,
+    image: `${SITE.url}/og.png?v=2`,
     url: SITE.url,
     telephone: b.phone,
     address: {
@@ -70,7 +70,7 @@ export default function StructuredData({
       telephone: SITE.telephone,
       servesCuisine: ["Street Food", "Chatpate", "Momo", "Nepali"],
       priceRange: "Rs",
-      image: `${SITE.url}/og.png`,
+      image: `${SITE.url}/og.png?v=2`,
       hasMenu: menu.length
         ? {
             "@type": "Menu",

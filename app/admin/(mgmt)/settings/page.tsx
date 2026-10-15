@@ -1,7 +1,7 @@
 import { requireRole } from "@/lib/supabase/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { npr } from "@/lib/utils";
-import { BranchForm, PromoForm, ActiveToggle, FeatureFlagsForm, OpeningPromoForm, SocialLinksManager, DeliveryAreaForm, StaffSaleForm, DeliveryHoursForm, DeliveryChargeForm } from "@/components/admin/settings-controls";
+import { BranchForm, PromoForm, ActiveToggle, FeatureFlagsForm, OpeningPromoForm, SocialLinksManager, DeliveryAreaForm, StaffSaleForm, DeliveryHoursForm, DeliveryChargeForm, StoreHoursForm } from "@/components/admin/settings-controls";
 import ResetSalesData from "@/components/admin/reset-sales-data";
 import EmailSetupPanel from "@/components/admin/email-setup";
 import { npDateTime } from "@/lib/nepal-time";
@@ -90,6 +90,13 @@ export default async function SettingsPage() {
       <div className="space-y-4">
         <FeatureFlagsForm esewaEnabled={settings?.esewa_enabled ?? false} deliveryEnabled={settings?.delivery_enabled ?? false} posCanCancel={settings?.pos_can_cancel ?? true} posDelivery={settings?.pos_delivery_enabled ?? true} />
         <StaffSaleForm freeItems={Number(settings?.staff_free_items ?? 2)} />
+        <StoreHoursForm initial={{
+          enabled: settings?.store_hours_enabled ?? false,
+          open: String(settings?.store_open ?? "09:00").slice(0, 5),
+          close: String(settings?.store_close ?? "19:00").slice(0, 5),
+          slot: Number(settings?.pickup_slot_minutes ?? 30),
+          days: Number(settings?.pickup_days_ahead ?? 2),
+        }} />
         <DeliveryHoursForm initial={{
           enabled: settings?.delivery_hours_enabled ?? false,
           start: String(settings?.delivery_start ?? "11:00").slice(0, 5),

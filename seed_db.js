@@ -4,7 +4,7 @@ const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL, process.env.
 async function run() {
   console.log("Seeding branch...");
   const { error: bErr } = await supabase.from('branches').insert([
-    { name: 'Manigram Store', address: 'Manigram, Tilottama, Butwal, Rupandehi 32907', phone: '+977 9801011111' }
+    { name: 'Godam Chowk Store', address: 'Godam Chowk, Banepa, Kavrepalanchok 45210', phone: '+977 9801011111' }
   ]);
   if (bErr) console.error("Branch err:", bErr);
 

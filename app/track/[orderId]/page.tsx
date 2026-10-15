@@ -16,7 +16,7 @@ import { npDateTime } from "@/lib/nepal-time";
 type TrackOrder = {
   id: string; order_number: string; daily_number: number | null; status: string; type: string;
   total: number | null; delivery_fee?: number | null; payment_status: string; payment_method: string | null; created_at: string; delivery_address: string | null;
-  scheduled_for?: string | null; scheduled_until?: string | null; // a booked delivery slot
+  scheduled_for?: string | null; scheduled_until?: string | null; // a booked delivery or pickup slot
 };
 type TrackItem = { product_name: string; quantity: number; line_total: number | null };
 
@@ -170,9 +170,9 @@ function TrackContent() {
             </p>
           )}
 
-          {order.type === "delivery" && order.scheduled_for && order.scheduled_until && !done && (
+          {order.scheduled_for && order.scheduled_until && !done && (
             <p className="mt-6 flex gap-2 rounded-xl bg-orange-50 p-3 text-sm font-bold text-brand-brown">
-              <Clock size={16} className="mt-0.5 shrink-0 text-brand-orange" /> Delivery booked for {slotLabel({ start: order.scheduled_for, end: order.scheduled_until })}
+              <Clock size={16} className="mt-0.5 shrink-0 text-brand-orange" /> {order.type === "delivery" ? "Delivery" : "Pickup"} booked for {slotLabel({ start: order.scheduled_for, end: order.scheduled_until })}
             </p>
           )}
           {order.type === "delivery" && order.delivery_address && !done && (

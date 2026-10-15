@@ -32,7 +32,8 @@ export const metadata: Metadata = {
     url: SITE.url,
     title: `${SITE.name} — ${SITE.tagline}`,
     description: SITE.description,
-    images: [{ url: "/og.png", width: 1200, height: 630, alt: `${SITE.name} — street food in Banepa` }],
+    // "?v=2": the Banepa picture (Oct 2026) — a new URL so Facebook / WhatsApp drop their cached old one.
+    images: [{ url: "/og.png?v=2", width: 1200, height: 630, alt: `${SITE.name} — chatpate & momo at Godam Chowk, Banepa` }],
   },
   twitter: {
     card: "summary_large_image",
@@ -40,7 +41,7 @@ export const metadata: Metadata = {
     creator: SITE.twitter,
     title: `${SITE.name} — ${SITE.tagline}`,
     description: SITE.description,
-    images: ["/og.png"],
+    images: ["/og.png?v=2"],
   },
   icons: {
     icon: [{ url: "/favicon.ico" }, { url: "/icon.svg", type: "image/svg+xml" }],

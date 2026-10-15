@@ -44,6 +44,10 @@ body { @apply font-body bg-brand-cream text-stone-900 antialiased; }
   }
 }
 
+/* Letter-spacing breaks the line along the top of Nepali (Devanagari) words —
+   the small spaced-out headings on the Nepali homepage (/ne) go back to normal. */
+[lang="ne"] .tracking-widest, [lang="ne"] .tracking-\[0\.2em\] { letter-spacing: normal; }
+
 /* iPhone Safari zooms the whole page into any field under 16px when it's tapped. */
 @media (max-width: 639px) {
   input:not([type="checkbox"]):not([type="radio"]):not([type="range"]), select, textarea { font-size: 16px; }

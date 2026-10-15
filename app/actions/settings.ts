@@ -151,6 +151,33 @@ export async function updateDeliveryHours(input: unknown) {
   return { ok: true };
 }
 
+// ── Store opening hours (migration 046) ───────────────────────────
+// Website pickup "as soon as possible" only while open; otherwise a booked pickup
+// time. Delivery follows these too when its own hours are off. Not the POS.
+const storeHoursSchema = z.object({
+  store_hours_enabled: z.boolean(),
+  store_open: hm,
+  store_close: hm,
+  pickup_slot_minutes: z.number().int().min(15, "Slots are at least 15 minutes").max(240, "Slots are at most 4 hours"),
+  pickup_days_ahead: z.number().int().min(1).max(7),
+})
+  .refine((d) => toMin(d.store_close) > toMin(d.store_open), { message: "The shop has to close after it opens (same day)" })
+  .refine((d) => toMin(d.store_close) - toMin(d.store_open) >= d.pickup_slot_minutes, { message: "A pickup slot is longer than the opening hours" });
+
+export async function updateStoreHours(input: unknown) {
+  const { user } = await requireRole(["super_admin"]);
+  const parsed = storeHoursSchema.safeParse(input);
+  if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Check the opening hours" };
+  const { error } = await supabaseAdmin.from("app_settings")
+    .update({ ...parsed.data, updated_at: new Date().toISOString() }).eq("id", 1);
+  if (error) return { error: "Could not save the opening hours" };
+  await audit({ actor_id: user.id, action: "UPDATE_STORE_HOURS", target_table: "app_settings", target_id: "1", new_data: parsed.data });
+  revalidatePath("/admin/settings");
+  revalidatePath("/order");
+  revalidatePath("/");
+  return { ok: true };
+}
+
 // ── Staff sale: how many items one staff sale gets free (migration 035) ──
 // ── Delivery charge (migration 042) ───────────────────────────────
 // Rs `delivery_fee` when the food comes to less than `free_delivery_from`; 0 = always free.
