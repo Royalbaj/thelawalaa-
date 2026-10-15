@@ -2,8 +2,14 @@
 @tailwind components;
 @tailwind utilities;
 
-html { scroll-behavior: smooth; }
+/* scroll-padding: a jump to #menu, #faq … stops below the sticky top bar instead of under it. */
+html { scroll-behavior: smooth; scroll-padding-top: 4.5rem; }
+@media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
 body { @apply font-body bg-brand-cream text-stone-900 antialiased; }
+/* The website in dark mode (ThemeRoot htmlClass, app/(public)/layout.tsx and app/ne/layout.tsx):
+   the page edge past the content, and the browser's own controls (scrollbars, video, inputs). */
+html.site-dark { color-scheme: dark; }
+html.site-dark body { @apply bg-stone-950; }
 
 .brand-gradient-text {
   @apply bg-gradient-to-r from-brand-orange via-brand-yellow to-brand-green bg-clip-text text-transparent;

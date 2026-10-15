@@ -34,7 +34,7 @@ function Body({ text }: { text: string }) {
     else blocks.push({ kind: "p", text: line });
   }
   return (
-    <div className="space-y-3 text-[15px] leading-relaxed text-stone-700">
+    <div className="space-y-3 text-[15px] leading-relaxed text-stone-700 dark:text-stone-300">
       {blocks.map((b, i) => b.kind === "ul" ? (
         <ul key={i} className="space-y-2.5">
           {b.items.map((item, j) => (
@@ -49,28 +49,28 @@ function Body({ text }: { text: string }) {
 export default async function TermsPage() {
   const t = await getSiteText();
   return (
-    <section className="bg-brand-cream px-4 py-10 md:py-16">
+    <section className="bg-brand-cream px-4 dark:bg-stone-950 py-10 md:py-16">
       <div className="mx-auto grid max-w-5xl gap-8 lg:grid-cols-[220px_minmax(0,1fr)]">
         <aside className="hidden lg:block">
           <nav aria-label="On this page" className="sticky top-24 space-y-1 text-sm">
             <p className="mb-2 text-xs font-bold uppercase tracking-widest text-stone-400">On this page</p>
             {SECTIONS.map((s, i) => (
-              <a key={s.id} href={`#${s.id}`} className="block rounded-lg px-3 py-1.5 font-bold text-stone-600 hover:bg-white hover:text-brand-orange">
+              <a key={s.id} href={`#${s.id}`} className="block rounded-lg px-3 py-1.5 font-bold text-stone-600 dark:text-stone-300 hover:bg-white hover:text-brand-orange dark:hover:bg-stone-900">
                 {i + 1}. {t[s.title]}
               </a>
             ))}
           </nav>
         </aside>
 
-        <article className="rounded-3xl bg-white p-6 shadow-sm ring-1 ring-stone-100 sm:p-10">
+        <article className="rounded-3xl bg-white p-6 shadow-sm ring-1 ring-stone-100 dark:bg-stone-900 dark:ring-stone-800 sm:p-10">
           <p className="text-xs font-bold uppercase tracking-widest text-brand-orange">Legal</p>
-          <h1 className="mt-1 font-display text-3xl font-extrabold text-brand-brown md:text-4xl">Terms &amp; Conditions</h1>
-          <p className="mt-2 text-sm text-stone-500">Last updated: {t["terms.updated"]}</p>
-          <div className="mt-6 border-b border-stone-100 pb-6"><Body text={t["terms.intro"]} /></div>
+          <h1 className="mt-1 font-display text-3xl font-extrabold text-brand-brown dark:text-orange-50 md:text-4xl">Terms &amp; Conditions</h1>
+          <p className="mt-2 text-sm text-stone-500 dark:text-stone-400">Last updated: {t["terms.updated"]}</p>
+          <div className="mt-6 border-b border-stone-100 pb-6 dark:border-stone-800"><Body text={t["terms.intro"]} /></div>
 
           {SECTIONS.map((s, i) => (
-            <section key={s.id} id={s.id} className="scroll-mt-24 border-b border-stone-100 py-7 last:border-0 last:pb-0">
-              <h2 className="mb-4 font-display text-xl font-bold text-brand-brown">{i + 1}. {t[s.title]}</h2>
+            <section key={s.id} id={s.id} className="scroll-mt-24 border-b border-stone-100 py-7 dark:border-stone-800 last:border-0 last:pb-0">
+              <h2 className="mb-4 font-display text-xl font-bold text-brand-brown dark:text-orange-50">{i + 1}. {t[s.title]}</h2>
               <Body text={t[s.body]} />
             </section>
           ))}

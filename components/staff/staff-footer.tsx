@@ -16,7 +16,7 @@ export default function StaffFooter() {
   return (
     <footer className="border-t border-stone-200 px-4 py-3 text-[11px] font-bold text-stone-400 dark:border-stone-800 dark:text-stone-500"
       style={{ paddingBottom: "calc(env(safe-area-inset-bottom) + 0.75rem)" }}>
-      <div className="mx-auto flex max-w-2xl flex-wrap items-center justify-between gap-x-4 gap-y-1">
+      <div className="mx-auto flex max-w-3xl flex-wrap items-center justify-between gap-x-4 gap-y-1">
         <span>© {new Date().getFullYear()} Thelawalaa · Staff training</span>
         <span className="hidden sm:inline">Godam Chowk, Banepa</span>
         <span className={cn("flex items-center gap-1", online ? "text-green-600 dark:text-green-500" : "text-brand-red")} role="status">

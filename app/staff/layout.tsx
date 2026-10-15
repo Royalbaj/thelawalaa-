@@ -24,7 +24,7 @@ export default async function StaffLayout({ children }: { children: React.ReactN
       className="flex min-h-dvh flex-col bg-brand-cream text-stone-900 dark:bg-stone-950 dark:text-stone-100">
       <SessionGuard userId={profile.id} />
       <StaffHeader backHref={ROLE_HOME[profile.role] ?? "/"} />
-      <main className="mx-auto w-full max-w-2xl flex-1">{children}</main>
+      <main className="mx-auto w-full max-w-3xl flex-1">{children}</main>
       <StaffFooter />
     </ThemeRoot>
   );

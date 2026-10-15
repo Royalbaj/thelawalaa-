@@ -52,7 +52,9 @@ export default function MobileNav() {
       <div aria-hidden className="h-28 md:hidden" />
       <nav
         aria-label="Main"
+        // [.site-dark_&]: the website in dark mode — this bar sits outside its wrapper (components/theme-toggle.tsx).
         className={cn("fixed inset-x-3 z-50 rounded-3xl bg-white/95 p-1.5 shadow-[0_8px_30px_rgba(28,10,0,0.18)] ring-1 ring-stone-200 backdrop-blur-md transition-opacity md:hidden",
+          "[.site-dark_&]:bg-stone-900/95 [.site-dark_&]:shadow-[0_8px_30px_rgba(0,0,0,0.5)] [.site-dark_&]:ring-stone-800",
           !ready && "opacity-0")}
         style={{ bottom: "calc(env(safe-area-inset-bottom) + 0.75rem)" }}
       >
@@ -66,7 +68,7 @@ export default function MobileNav() {
                 href={item.href}
                 aria-current={isActive ? "page" : undefined}
                 className={cn("flex min-h-[60px] flex-1 flex-col items-center justify-center gap-1 rounded-2xl text-[11px] font-bold transition active:scale-95",
-                  isActive ? "bg-orange-50 text-brand-orange" : "text-stone-500")}
+                  isActive ? "bg-orange-50 text-brand-orange [.site-dark_&]:bg-orange-500/15 [.site-dark_&]:text-orange-300" : "text-stone-500 [.site-dark_&]:text-stone-400")}
               >
                 <Icon size={22} />
                 {item.label}

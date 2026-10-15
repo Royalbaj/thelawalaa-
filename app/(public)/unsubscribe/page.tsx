@@ -11,10 +11,10 @@ export const metadata: Metadata = {
 export default async function UnsubscribePage({ searchParams }: { searchParams: Promise<{ u?: string; t?: string }> }) {
   const { u = "", t = "" } = await searchParams;
   return (
-    <section className="bg-brand-cream px-4 py-16 md:py-24">
-      <div className="mx-auto max-w-md rounded-3xl bg-white p-8 text-center shadow-sm ring-1 ring-stone-100">
-        <h1 className="font-display text-2xl font-extrabold text-brand-brown">Stop offers emails?</h1>
-        <p className="mt-2 text-sm text-stone-600">You&apos;ll still get emails about your orders and account. You can join offers again any time from your profile.</p>
+    <section className="bg-brand-cream px-4 dark:bg-stone-950 py-16 md:py-24">
+      <div className="mx-auto max-w-md rounded-3xl bg-white p-8 text-center shadow-sm ring-1 ring-stone-100 dark:bg-stone-900 dark:ring-stone-800">
+        <h1 className="font-display text-2xl font-extrabold text-brand-brown dark:text-orange-50">Stop offers emails?</h1>
+        <p className="mt-2 text-sm text-stone-600 dark:text-stone-300">You&apos;ll still get emails about your orders and account. You can join offers again any time from your profile.</p>
         <UnsubscribeButton profileId={u} token={t} />
       </div>
     </section>

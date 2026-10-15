@@ -12,10 +12,11 @@ export default function TrainingPinPad() {
   }, []);
 
   return (
-    <div className="card mx-auto max-w-sm p-6 text-center">
-      <p className="font-display text-lg font-bold text-brand-brown dark:text-orange-100">Who&apos;s training?</p>
-      <p className="text-sm text-stone-500">Type your own training PIN — the manager gave it to you.</p>
+    <section aria-labelledby="who" className="card mx-auto max-w-sm p-6 text-center sm:p-8">
+      <span aria-hidden className="mx-auto block h-0.5 w-10 rounded-full bg-brand-orange" />
+      <h2 id="who" className="mt-4 font-display text-xl font-bold text-brand-brown dark:text-orange-50">Who&apos;s training?</h2>
+      <p className="mt-1 text-sm text-stone-500 dark:text-stone-400">Type your own 4-digit training PIN — the manager gave it to you.</p>
       <PinPad submit={submit} />
-    </div>
+    </section>
   );
 }

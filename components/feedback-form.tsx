@@ -20,11 +20,11 @@ export default function FeedbackForm({ orderRef }: { orderRef?: string }) {
     return (
       <div className="card p-8 text-center">
         <CheckCircle2 size={48} className="mx-auto text-brand-green" />
-        <h2 className="mt-3 font-display text-2xl font-bold text-brand-brown">Thank you!</h2>
-        <p className="mt-2 text-stone-600">We read every message — it helps us make Thelawalaa better.</p>
+        <h2 className="mt-3 font-display text-2xl font-bold text-brand-brown dark:text-orange-50">Thank you!</h2>
+        <p className="mt-2 text-stone-600 dark:text-stone-300">We read every message — it helps us make Thelawalaa better.</p>
         <div className="mt-6 flex flex-wrap justify-center gap-3">
           <Link href="/order" className="btn-primary">Order again</Link>
-          <Link href="/" className="rounded-full border-2 border-stone-200 px-6 py-3 font-bold text-brand-brown hover:bg-stone-50">Back to home</Link>
+          <Link href="/" className="rounded-full border-2 border-stone-200 px-6 py-3 font-bold text-brand-brown hover:bg-stone-50 dark:border-stone-700 dark:text-orange-50 dark:hover:bg-stone-800">Back to home</Link>
         </div>
       </div>
     );
@@ -41,7 +41,7 @@ export default function FeedbackForm({ orderRef }: { orderRef?: string }) {
       });
     }}>
       <fieldset>
-        <legend className="font-display text-lg font-bold text-brand-brown">How was it?</legend>
+        <legend className="font-display text-lg font-bold text-brand-brown dark:text-orange-50">How was it?</legend>
         <div className="mt-3 flex flex-col items-center gap-2 sm:flex-row sm:gap-4" onMouseLeave={() => setHover(0)}>
           <div className="flex gap-1" role="radiogroup" aria-label="Your rating">
             {[1, 2, 3, 4, 5].map((n) => (
@@ -49,11 +49,11 @@ export default function FeedbackForm({ orderRef }: { orderRef?: string }) {
                 onClick={() => setRating(n)} onMouseEnter={() => setHover(n)}
                 className="rounded-lg p-1 transition active:scale-90">
                 <Star size={40} strokeWidth={1.5}
-                  className={cn("transition", n <= (hover || rating) ? "fill-amber-400 text-amber-400" : "fill-transparent text-stone-300")} />
+                  className={cn("transition", n <= (hover || rating) ? "fill-amber-400 text-amber-400" : "fill-transparent text-stone-300 dark:text-stone-600")} />
               </button>
             ))}
           </div>
-          <span className={cn("min-h-6 text-sm font-bold", hover || rating ? "text-brand-brown" : "text-stone-400")}>
+          <span className={cn("min-h-6 text-sm font-bold", hover || rating ? "text-brand-brown dark:text-orange-50" : "text-stone-400")}>
             {LABELS[hover || rating] || "Tap to rate"}
           </span>
         </div>
@@ -65,7 +65,7 @@ export default function FeedbackForm({ orderRef }: { orderRef?: string }) {
           {VISITS.map(([v, label]) => (
             <button key={v} type="button" onClick={() => setVisit(visit === v ? "" : v)} aria-pressed={visit === v}
               className={cn("rounded-full px-4 py-2 text-sm font-bold ring-1 transition",
-                visit === v ? "bg-brand-brown text-white ring-brand-brown" : "bg-white text-stone-600 ring-stone-200")}>
+                visit === v ? "bg-brand-brown text-white ring-brand-brown dark:bg-orange-500 dark:ring-orange-500" : "bg-white text-stone-600 ring-stone-200 dark:bg-stone-800 dark:text-stone-300 dark:ring-stone-700")}>
               {label}
             </button>
           ))}

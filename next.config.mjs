@@ -12,7 +12,7 @@ const csp = [
   `script-src 'self' 'unsafe-inline'${process.env.NODE_ENV === "development" ? " 'unsafe-eval'" : ""} https://maps.googleapis.com https://www.youtube.com`,
   "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
   "font-src 'self' https://fonts.gstatic.com",
-  `img-src 'self' data: blob: https://*.supabase.co https://maps.gstatic.com https://maps.googleapis.com https://images.unsplash.com`,
+  `img-src 'self' data: blob: https://*.supabase.co https://maps.gstatic.com https://maps.googleapis.com https://images.unsplash.com https://i.ytimg.com`,
   `connect-src 'self' https://${supabaseHost} wss://${supabaseHost} https://maps.googleapis.com`,
   // The homepage's how-to-order video: public/videos, or an upload in Supabase Storage (site-media);
   // blob: lets Admin → Website text read a picked video to make its cover picture.

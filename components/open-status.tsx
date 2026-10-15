@@ -29,8 +29,8 @@ export default function OpenStatus({ start, end, lang, tone = "light", className
   return (
     <span className={cn("inline-flex items-center gap-1.5 whitespace-nowrap rounded-full px-2.5 py-0.5 text-xs font-bold",
       open
-        ? tone === "dark" ? "bg-green-500/15 text-green-300" : "bg-green-50 text-green-700"
-        : tone === "dark" ? "bg-white/10 text-amber-100/80" : "bg-stone-100 text-stone-600",
+        ? tone === "dark" ? "bg-green-500/15 text-green-300" : "bg-green-50 text-green-700 dark:bg-green-500/15 dark:text-green-300"
+        : tone === "dark" ? "bg-white/10 text-amber-100/80" : "bg-stone-100 text-stone-600 dark:bg-stone-800 dark:text-stone-300",
       className)}>
       <span aria-hidden className={cn("h-2 w-2 rounded-full", open ? "bg-green-500" : "bg-red-500")} />
       {open ? L.openNow : `${L.closedNow} · ${L.opens(clockText(start, lang), minute >= end)}`}

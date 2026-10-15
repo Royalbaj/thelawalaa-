@@ -10,12 +10,15 @@ export type SiteLang = "en" | "ne";
 export const langOfPath = (path: string | null | undefined): SiteLang =>
   path === "/ne" || path?.startsWith("/ne/") ? "ne" : "en";
 export const homePath = (lang: SiteLang) => (lang === "ne" ? "/ne" : "/");
+/** Light / dark for the website (English and Nepali pages alike), set by the moon button in the top bar. */
+export const SITE_THEME_COOKIE = "site-theme";
 
 const EN = {
   nav: { home: "Home", about: "About", menu: "Menu", order: "Order Now", faq: "FAQ", contact: "Contact", location: "Find Us" },
   signIn: "Sign in", myAccount: "My account", myPortal: "My portal",
   // The button that switches language is written in the language it switches TO.
   switchTo: "नेपाली", switchAria: "यो पेज नेपालीमा हेर्नुहोस्",
+  theme: { toDark: "Switch to dark mode", toLight: "Switch to light mode" },
   mobile: { home: "Home", menu: "Menu", order: "Order", location: "Find us", signIn: "Sign in", portal: "My portal" },
   footer: { follow: "Follow Us", order: "Order", feedback: "Feedback", terms: "Terms & Conditions", privacy: "Privacy", rights: "All rights reserved" },
   heroAlt: "Thelawalaa chatpate and momo in branded takeaway boxes",
@@ -37,6 +40,7 @@ const NE: typeof EN = {
   nav: { home: "गृहपृष्ठ", about: "हाम्रो बारेमा", menu: "मेनु", order: "अर्डर गर्नुहोस्", faq: "प्रश्नहरू", contact: "सम्पर्क", location: "हामी कहाँ छौं" },
   signIn: "साइन इन", myAccount: "मेरो खाता", myPortal: "मेरो पोर्टल",
   switchTo: "English", switchAria: "See this page in English",
+  theme: { toDark: "डार्क मोडमा हेर्नुहोस्", toLight: "लाइट मोडमा हेर्नुहोस्" },
   mobile: { home: "गृहपृष्ठ", menu: "मेनु", order: "अर्डर", location: "ठेगाना", signIn: "साइन इन", portal: "पोर्टल" },
   footer: { follow: "हामीलाई फलो गर्नुहोस्", order: "अर्डर", feedback: "सुझाव", terms: "नियम र सर्तहरू", privacy: "गोपनीयता", rights: "सर्वाधिकार सुरक्षित" },
   heroAlt: "ठेलावालाको ब्रान्डेड बट्टामा चटपटे र मोमो",
