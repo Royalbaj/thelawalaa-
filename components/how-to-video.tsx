@@ -85,7 +85,7 @@ export function HowToVideoButton({ label, ...props }: Video & { label: string })
       <button
         type="button"
         onClick={open}
-        className="group inline-flex items-center gap-3 rounded-full bg-white/10 py-2 pl-2 pr-6 text-lg font-bold text-amber-50 ring-1 ring-white/20 transition hover:bg-white/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/60"
+        className="group inline-flex items-center justify-center gap-3 rounded-full bg-white/10 py-2 pl-2 pr-6 text-lg font-bold text-amber-50 ring-1 ring-white/20 transition hover:bg-white/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/60"
       >
         <span className="flex h-10 w-10 items-center justify-center rounded-full bg-brand-orange text-white shadow-lg shadow-orange-600/40 transition group-hover:scale-105">
           <Play size={16} fill="currentColor" className="ml-0.5" aria-hidden />

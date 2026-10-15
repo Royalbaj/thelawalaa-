@@ -49,6 +49,7 @@ export default async function HomePage({ lang }: { lang: SiteLang }) {
     supabase
       .from("announcements")
       .select("message, link_url")
+      .eq("is_active", true)
       .order("created_at", { ascending: false })
       .limit(1)
       .maybeSingle(),
@@ -101,11 +102,16 @@ export default async function HomePage({ lang }: { lang: SiteLang }) {
           {/* Text side: darker for reading (phones: lower part, under the photo) */}
           <div className="absolute inset-0 bg-gradient-to-b from-transparent via-[#0e0805]/70 to-[#0e0805] lg:bg-gradient-to-r lg:from-[#0e0805] lg:via-[#0e0805]/80 lg:to-transparent" />
         </div>
-        <div className="relative z-20 border-b border-white/10 bg-black/40 py-2.5 text-center text-sm font-bold text-amber-100">
-          {announcement?.message ?? (deliveryEnabled ? L.nowOpenDelivery : L.nowOpenPickup)}
-        </div>
+        {/* Only a real announcement (Admin → Announcements) — no filler line. */}
+        {announcement?.message && (
+          <div className="relative z-20 border-b border-white/10 bg-black/40 px-4 py-2.5 text-center text-sm font-bold text-amber-100">
+            {announcement.link_url ? (
+              <a href={announcement.link_url} className="underline-offset-4 hover:underline">{announcement.message}</a>
+            ) : announcement.message}
+          </div>
+        )}
 
-        <div className="relative mx-auto max-w-7xl lg:flex lg:min-h-[620px] lg:items-center lg:static">
+        <div className="relative mx-auto max-w-7xl lg:flex lg:min-h-[min(600px,calc(100svh-4rem))] lg:items-center lg:static">
           {/* Photo. Phones/tablets: full width on top. Wide screens: whole 3:2 shot
               on the right, reaching the screen edge, faded on its other sides. */}
           <div className="relative lg:absolute lg:inset-y-0 lg:right-0 lg:flex lg:w-[60%] lg:max-w-[1100px] lg:items-center">
@@ -130,47 +136,35 @@ export default async function HomePage({ lang }: { lang: SiteLang }) {
           {/* Warm glow over everything (text side and photo alike, so no seam), like the photo's own light */}
           <div aria-hidden className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_70%_60%_at_15%_55%,rgba(235,104,52,0.14),transparent_70%)]" />
 
-          {/* Words */}
-          <div className="relative z-10 -mt-10 px-4 pb-28 text-center sm:-mt-16 lg:mt-0 lg:w-[44%] lg:pt-20 lg:pb-32 lg:pl-8 lg:text-left xl:w-[46%] xl:pl-4">
-            <p className="text-xs font-bold uppercase tracking-[0.2em] text-brand-orange">{t["hero.eyebrow"]}</p>
-            <h1 className={cn("mt-3 font-display text-4xl font-extrabold text-amber-50 sm:text-5xl md:text-6xl",
+          {/* Words — only what matters, so the whole dark part fits on one screen
+              (owner's call): the headline, one line about us, Order + how-to video,
+              and where & when ONCE (the short location opens directions). */}
+          <div className="relative z-10 -mt-14 px-4 pb-[4.5rem] text-center sm:-mt-16 lg:mt-0 lg:w-[44%] lg:py-16 lg:pl-8 lg:text-left xl:w-[46%] xl:pl-4">
+            <h1 className={cn("font-display text-4xl font-extrabold text-amber-50 sm:text-5xl md:text-6xl",
               lang === "ne" ? "leading-snug lg:text-5xl xl:text-6xl" : "leading-tight lg:text-5xl xl:text-7xl")}>
               {t["hero.title"]}
               <span className="brand-gradient-text"> {t["hero.highlight"]}</span>
             </h1>
-            <p className="mx-auto mt-5 max-w-lg whitespace-pre-line text-lg leading-relaxed text-amber-100/75 lg:mx-0">
+            <p className="mx-auto mt-4 max-w-lg whitespace-pre-line text-base leading-relaxed text-amber-100/75 sm:text-lg lg:mx-0">
               {t["hero.text"]}
             </p>
-            <div className="mt-8 flex flex-wrap justify-center gap-4 lg:justify-start">
+            <div className="mx-auto mt-7 grid max-w-xs gap-3 sm:flex sm:max-w-none sm:flex-wrap sm:justify-center lg:justify-start">
               <Link href="/order" className="btn-primary px-8 py-3.5 text-lg shadow-lg shadow-orange-600/40">
                 {t["hero.button"]}
               </Link>
-              <a href="#menu" className="rounded-full border-2 border-amber-100/40 px-8 py-3.5 text-lg font-bold text-amber-50 transition hover:border-amber-100/70 hover:bg-white/10">
-                {t["hero.button2"]}
-              </a>
               {video && <HowToVideoButton {...video} label={t["hero.video_button"]} />}
             </div>
-            {/* Where we are and when we're open — straight from the top of the page. */}
-            <ul className="mt-8 space-y-2.5 text-sm font-bold">
-              <li className="flex flex-wrap items-center justify-center gap-x-3 gap-y-1.5 lg:justify-start">
-                <a href="#location" className="inline-flex items-center gap-2 text-amber-50 hover:text-white">
-                  <MapPin size={17} className="shrink-0 text-brand-orange" aria-hidden />
-                  {t["contact.address"]}
-                </a>
-                <a href={directions} target="_blank" rel="noopener noreferrer"
-                  className="inline-flex items-center gap-1.5 rounded-full bg-white/10 px-3 py-1 text-amber-50 ring-1 ring-white/15 transition hover:bg-white/20">
-                  <Navigation size={13} className="text-brand-orange" aria-hidden />
-                  {t["location.directions"]}
-                </a>
-              </li>
-              <li className="flex flex-wrap items-center justify-center gap-x-3 gap-y-1.5 text-amber-100/80 lg:justify-start">
-                <span className="inline-flex items-center gap-2">
-                  <Clock size={17} className="shrink-0 text-brand-orange" aria-hidden />
-                  {hoursLine}
-                </span>
+            <div className="mt-6 flex flex-wrap items-center justify-center gap-x-4 gap-y-2 text-sm font-bold lg:justify-start">
+              <a href={directions} target="_blank" rel="noopener noreferrer"
+                className="inline-flex items-center gap-1.5 text-amber-50 underline-offset-4 hover:underline">
+                <MapPin size={16} className="shrink-0 text-brand-orange" aria-hidden />
+                {t["hero.eyebrow"]}
+              </a>
+              <span className="inline-flex flex-wrap items-center justify-center gap-2 text-amber-100/75">
                 <OpenStatus start={hours.start} end={hours.end} lang={lang} tone="dark" />
-              </li>
-            </ul>
+                {hoursLine}
+              </span>
+            </div>
           </div>
         </div>
       </section>

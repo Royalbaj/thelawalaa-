@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { MapPin, MessageCircle, ChevronRight, BadgeCheck, FileText } from "lucide-react";
+import { MessageCircle, ChevronRight, BadgeCheck, FileText } from "lucide-react";
 import { getVerifiedUser } from "@/lib/supabase/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { OffersToggle } from "@/components/account/offers-join";
@@ -48,7 +48,6 @@ export default async function ProfilePage() {
 
       <section className="divide-y divide-stone-100 overflow-hidden rounded-3xl bg-white shadow-sm ring-1 ring-stone-100">
         {[
-          { href: "/account/addresses", icon: MapPin, title: "Saved addresses", body: "For home delivery" },
           { href: "/whatsapp", icon: MessageCircle, title: "Help & support", body: "Chat with us on WhatsApp" },
           { href: "/terms", icon: FileText, title: "Terms & privacy", body: "Orders, offers, rewards and your data" },
         ].map((l) => (

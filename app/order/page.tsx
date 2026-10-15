@@ -26,7 +26,6 @@ import { orderHours, deliveryOpenNow, deliverySlots, dayWord, minutesLabel, next
 type Product = { id: string; name: string; description: string | null; price: number; category_id: string | null; spice_level: number; image_url?: string | null };
 type Category = { id: string; name: string };
 type Branch = { id: string; name: string; address: string };
-type Address = { id: string; label: string; full_address: string; lat: number | null; lng: number | null };
 type Pin = { lat: number; lng: number; accuracy: number };
 
 /** eSewa's integration model is a full-page redirect via POSTed form, not a fetch. */
@@ -52,11 +51,10 @@ export default function OrderPage() {
   const [products, setProducts] = useState<Product[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [branches, setBranches] = useState<Branch[]>([]);
-  const [addresses, setAddresses] = useState<Address[]>([]);
   const [activeCat, setActiveCat] = useState<string | null>(null);
   const [type, setType] = useState<"pickup" | "delivery">("pickup");
   const [branchId, setBranchId] = useState("");
-  const [addressId, setAddressId] = useState("");
+  // Typed address: only staff ordering for someone else (they can't share that person's location).
   const [newAddress, setNewAddress] = useState("");
   const [promo, setPromo] = useState("");
   const [payment, setPayment] = useState<"cash" | "qr" | "esewa">("cash");
@@ -117,21 +115,17 @@ export default function OrderPage() {
       supabase.from("products").select("id, name, description, price, category_id, spice_level, image_url").eq("pos_only", false).order("sort_order"),
       supabase.from("categories").select("id, name").order("sort_order"),
       supabase.from("branches").select("id, name, address"),
-      supabase.from("addresses").select("id, label, full_address, lat, lng"),
       // "*" (the row is public anyway): a column added by a migration that hasn't been
       // applied yet then reads as missing instead of failing the whole settings fetch.
       supabase.from("app_settings").select("*").eq("id", 1).single(),
       supabase.from("site_content").select("value").eq("key", "contact.whatsapp").maybeSingle(),
-    ]).then(([p, c, b, a, s, phone]) => {
+    ]).then(([p, c, b, s, phone]) => {
       if (phone.data?.value) setShopPhone(phone.data.value as string);
       setProducts((p.data as Product[]) ?? []);
       setCategories((c.data as Category[]) ?? []);
       setBranches((b.data as Branch[]) ?? []);
       // Auto-select the branch — there's only one store, no reason to make anyone pick it.
       if (b.data && b.data.length > 0) setBranchId(b.data[0].id);
-      setAddresses((a.data as Address[]) ?? []);
-      // Default to the customer's saved address instead of an empty "new address" box.
-      if (a.data && a.data.length > 0) setAddressId(a.data[0].id);
       if (s.data) { setSettings(s.data); setOpeningPromo(s.data); }
       setMenuLoading(false);
     });
@@ -145,10 +139,13 @@ export default function OrderPage() {
   // and staff placing an order for someone else, type a name and number.
   const asksContact = isGuest || (!!account && account.role !== "customer");
 
-  // Delivery area (Admin → Settings): a shared pin, or a saved address with one, outside it can't be delivered to online.
+  // Delivery goes to a location shared from the phone — never a typed address
+  // (owner's call, Oct 2026), so every delivery can be checked against the
+  // delivery area and the rider gets the exact spot. Staff ordering for someone
+  // else are the exception: they type the address (createOrder agrees).
+  const staffOrder = !!account && ["super_admin", "pos_user"].includes(account.role);
   const area = deliveryArea(settings);
-  const savedPinned = addresses.find((a) => a.id === addressId && a.lat != null && a.lng != null);
-  const checkPoint = pin ?? (savedPinned ? { lat: Number(savedPinned.lat), lng: Number(savedPinned.lng) } : null);
+  const checkPoint = pin;
   const tooFar = type === "delivery" && !!checkPoint && outsideArea(area, checkPoint);
 
   // Opening hours (Admin → Settings): pickup follows the store hours, delivery the
@@ -209,24 +206,9 @@ export default function OrderPage() {
     setCheckingPromo(false);
   }
 
-  /** A signed-in customer's new address is saved for next time (with the pin, if shared). */
-  async function ensureAddress(): Promise<string | null> {
-    if (addressId) return addressId;
-    if (newAddress.trim().length < 3) return null;
-    const supabase = createClient();
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return null;
-    const { data } = await supabase
-      .from("addresses")
-      .insert({ customer_id: user.id, full_address: newAddress.trim().slice(0, 300), lat: pin?.lat ?? null, lng: pin?.lng ?? null })
-      .select("id")
-      .single();
-    return data?.id ?? null;
-  }
-
   function shareLocation() {
     setLocError(null);
-    if (!("geolocation" in navigator)) { setLocError("This phone can't share its location — type your full address instead."); return; }
+    if (!("geolocation" in navigator)) { setLocError("यो ब्राउजरले लोकेसन पठाउन सक्दैन। Chrome मा खोलेर फेरि प्रयास गर्नुहोस्, वा पिकअप रोज्नुहोस्।"); return; }
     setLocating(true);
     navigator.geolocation.getCurrentPosition(
       (pos) => {
@@ -236,8 +218,8 @@ export default function OrderPage() {
       (err) => {
         setLocating(false);
         setLocError(err.code === err.PERMISSION_DENIED
-          ? "Location is blocked for this site. Allow it in your browser settings, or type your full address."
-          : "Couldn't get your location — try again outside, or type your full address.");
+          ? "लोकेसनको अनुमति बन्द छ। ब्राउजरको सेटिङमा गएर यो साइटलाई Location दिनुहोस्, अनि फेरि थिच्नुहोस्।"
+          : "लोकेसन भेटिएन। फोनको Location (GPS) खोलेर, खुला ठाउँमा फेरि थिच्नुहोस्।");
       },
       { enableHighAccuracy: true, timeout: 20000, maximumAge: 0 },
     );
@@ -252,29 +234,29 @@ export default function OrderPage() {
         toast.error("Please enter a valid Nepali mobile number");
         return;
       }
-      const savedAddress = addresses.find((a) => a.id === addressId);
-      if (type === "delivery" && !pin && !savedAddress && newAddress.trim().length < 10) {
-        toast.error("Add your full address (tole/street, house, landmark) — or share your location");
+      if (type === "delivery" && !staffOrder && !pin) {
+        toast.error("डेलिभरीका लागि पहिले आफ्नो लोकेसन पठाउनुहोस्");
+        return;
+      }
+      if (type === "delivery" && staffOrder && !pin && newAddress.trim().length < 10) {
+        toast.error("Type the customer's full address (tole/street, house, landmark)");
         return;
       }
       if (type === "pickup" && !branchId) { toast.error("Pick a branch"); return; }
-      if (tooFar) { toast.error("We're not delivering to that location right now — please call us to confirm, or choose pickup"); return; }
+      if (tooFar) { toast.error("यो ठाउँमा अहिले डेलिभरी हुँदैन — फोन गरेर सोध्नुहोस्, वा पिकअप रोज्नुहोस्"); return; }
       if (noSlots) { toast.error(type === "delivery" ? "No delivery times left to book — please choose pickup" : "No pickup times left to book — please try again later"); return; }
       if (scheduling && !pickedSlot) { toast.error(type === "delivery" ? "Pick a delivery time" : "Pick a pickup time"); return; }
-
-      const delivery_address_id = (type === "delivery" && !isGuest) ? await ensureAddress() : undefined;
 
       const res = await createOrder({
         type,
         branch_id: type === "pickup" ? branchId : undefined,
-        delivery_address_id: delivery_address_id ?? undefined,
         payment_method: payment,
         promo_code: promo || undefined,
         use_points: pointsPlan.points > 0 || undefined,
         use_free_item: useFree || undefined,
         guest_name: asksContact ? guestName.trim() : undefined,
         guest_phone: needPhone ? guestPhone.trim() : undefined,
-        guest_address: type === "delivery" && !delivery_address_id ? newAddress.trim() : undefined,
+        guest_address: type === "delivery" && staffOrder ? newAddress.trim() : undefined,
         delivery_location: type === "delivery" && pin ? pin : undefined,
         scheduled_for: scheduling && pickedSlot ? pickedSlot.start : undefined,
         items: items.map((i) => ({ product_id: i.product_id, quantity: i.quantity })),
@@ -509,67 +491,72 @@ export default function OrderPage() {
                   ) : null
                 ) : (
                   <div className="space-y-4">
-                    {/* The exact pin: the rider gets a map and directions to it. */}
-                    <div className="rounded-2xl bg-orange-50/70 p-4 ring-1 ring-orange-100">
+                    {/* Where it goes: a location shared from the phone (the rider gets the exact
+                        spot on a map) — never typed, so the delivery area can always be checked.
+                        In Nepali (owner's call). Staff ordering for someone else type the address. */}
+                    <div lang="ne" className="rounded-2xl bg-orange-50/70 p-4 ring-1 ring-orange-100">
                       {pin ? (
                         <div className="flex items-start gap-3">
                           <MapPin size={20} className={`mt-0.5 shrink-0 ${outsideArea(area, pin) ? "text-brand-red" : "text-brand-green"}`} />
                           <div className="min-w-0 flex-1">
-                            <p className="text-sm font-bold text-brand-brown">Location shared</p>
-                            <p className="text-xs text-stone-600">
-                              Accurate to about {fmtKm(pin.accuracy / 1000)} · {fmtKm(distanceKm(area.shop, pin))} from our shop
+                            <p className="font-bold text-brand-brown">लोकेसन पाइयो</p>
+                            <p className="text-sm text-stone-600">
+                              करिब ±{pin.accuracy} मिटरसम्म सही · पसलबाट {fmtKm(distanceKm(area.shop, pin))} टाढा
                             </p>
-                            {pin.accuracy > 150 && <p className="mt-1 text-xs font-bold text-amber-700">That&apos;s approximate — add a landmark below so the rider finds you.</p>}
+                            {pin.accuracy > 150 && (
+                              <p className="mt-1 text-xs font-bold text-amber-700">लोकेसन ठ्याक्कै आएन — खुला ठाउँ वा झ्यालनजिक गएर फेरि पठाउनुहोस्।</p>
+                            )}
+                            <button type="button" onClick={shareLocation} disabled={locating}
+                              className="mt-2 inline-flex items-center gap-1.5 text-xs font-bold text-brand-orange disabled:opacity-60">
+                              {locating ? <Loader2 size={13} className="animate-spin" /> : <LocateFixed size={13} />}
+                              {locating ? "लोकेसन खोज्दै…" : "फेरि पठाउनुहोस्"}
+                            </button>
                           </div>
-                          <button type="button" onClick={() => setPin(null)} aria-label="Remove shared location" className="rounded-full p-1.5 text-stone-400 hover:bg-white hover:text-stone-600"><X size={16} /></button>
+                          <button type="button" onClick={() => setPin(null)} aria-label="लोकेसन हटाउनुहोस्" className="rounded-full p-1.5 text-stone-400 hover:bg-white hover:text-stone-600"><X size={16} /></button>
                         </div>
                       ) : (
                         <>
+                          <p className="font-bold text-brand-brown">खाना कहाँ पुर्‍याउने?</p>
+                          <p className="mt-1 text-sm leading-relaxed text-stone-600">
+                            {staffOrder
+                              ? "ग्राहकको लोकेसन छैन भने तल ठेगाना लेख्नुहोस्।"
+                              : "खाना पुर्‍याउने ठाउँमै बसेर तलको बटन थिच्नुहोस्। राइडरले नक्सामा तपाईंको ठ्याक्कै ठाउँ देख्छन्।"}
+                          </p>
                           <button type="button" onClick={shareLocation} disabled={locating}
-                            className="flex w-full items-center justify-center gap-2 rounded-full bg-white py-3 text-sm font-bold text-brand-orange shadow-sm ring-1 ring-orange-200 transition hover:bg-orange-50 disabled:opacity-60">
-                            {locating ? <Loader2 size={17} className="animate-spin" /> : <LocateFixed size={17} />}
-                            {locating ? "Finding you…" : "Share my current location"}
+                            className="mt-3 flex w-full items-center justify-center gap-2 rounded-full bg-brand-orange py-3 font-bold text-white shadow-md shadow-orange-500/25 transition hover:brightness-110 disabled:opacity-60">
+                            {locating ? <Loader2 size={18} className="animate-spin" /> : <LocateFixed size={18} />}
+                            {locating ? "लोकेसन खोज्दै…" : "मेरो लोकेसन पठाउनुहोस्"}
                           </button>
-                          <p className="mt-2 text-center text-xs text-stone-500">Best if you&apos;re at the delivery address now — our rider gets the exact spot on a map.</p>
-                          {locError && <p className="mt-2 text-center text-xs font-bold text-brand-red">{locError}</p>}
+                          <p className="mt-2 text-center text-xs text-stone-500">फोनले अनुमति माग्छ — &ldquo;Allow&rdquo; थिच्नुहोस्।</p>
+                          {locError && <p role="alert" className="mt-2 text-center text-sm font-bold text-brand-red">{locError}</p>}
                         </>
                       )}
                     </div>
 
-                    {addresses.length > 0 && (
-                      <div>
-                        <label className="label" htmlFor="addr">Saved addresses</label>
-                        <select id="addr" className="input" value={addressId} onChange={(e) => setAddressId(e.target.value)}>
-                          <option value="">Use a new address</option>
-                          {addresses.map((a) => <option key={a.id} value={a.id}>{a.label} — {a.full_address}</option>)}
-                        </select>
-                      </div>
-                    )}
-                    {!addressId && (
+                    {staffOrder && (
                       <div>
                         <label className="label" htmlFor="newaddr">
-                          {pin ? <>Address details <span className="font-normal text-stone-400">(house, floor, landmark — helps the rider)</span></> : "Full delivery address"}
+                          {pin ? <>Address details <span className="font-normal text-stone-400">(house, floor, landmark — helps the rider)</span></> : "Customer's full delivery address"}
                         </label>
-                        <textarea id="newaddr" name="tw-delivery-address" autoComplete={isGuest ? "off" : "street-address"} className="input" rows={2} maxLength={300}
+                        <textarea id="newaddr" name="tw-delivery-address" autoComplete="off" className="input" rows={2} maxLength={300}
                           value={newAddress} onChange={(e) => setNewAddress(e.target.value)}
                           placeholder="Tole / street, house or building, nearest landmark" />
-                        {!pin && <p className="mt-1 text-xs text-stone-500">No location shared, so we need the full address — e.g. &ldquo;Ward 5, Shanti Tole, blue house behind Banepa Hospital&rdquo;.</p>}
                       </div>
                     )}
                     {tooFar && (
-                      <div role="alert" className="rounded-2xl bg-red-50 p-4 ring-1 ring-red-200">
-                        <p className="flex items-center gap-2 font-bold text-red-800"><MapPinOff size={18} className="shrink-0" /> We&apos;re not delivering to this location right now</p>
+                      <div role="alert" lang="ne" className="rounded-2xl bg-red-50 p-4 ring-1 ring-red-200">
+                        <p className="flex items-center gap-2 font-bold text-red-800"><MapPinOff size={18} className="shrink-0" /> यो ठाउँमा अहिले डेलिभरी हुँदैन</p>
                         <p className="mt-1 text-sm text-red-900/80">
-                          It&apos;s about {fmtKm(farKm)} from our shop, and we deliver within {area.radiusKm} km of Godam Chowk. Please call us to confirm whether we can bring it to you — or pick it up instead.
+                          तपाईंको ठाउँ पसलबाट करिब {fmtKm(farKm)} टाढा छ। हामी गोदाम चोकबाट {area.radiusKm} km भित्र मात्र डेलिभरी गर्छौं। फोन गरेर सोध्नुहोस्, वा पसलबाटै लैजानुहोस्।
                         </p>
                         <div className="mt-3 flex flex-wrap gap-2">
                           {shopPhone && (
                             <a href={telHref(shopPhone)} className="inline-flex items-center gap-1.5 rounded-full bg-red-600 px-4 py-2 text-sm font-bold text-white hover:bg-red-700">
-                              <Phone size={15} /> Call {phoneDisplay(shopPhone)}
+                              <Phone size={15} /> फोन गर्नुहोस् {phoneDisplay(shopPhone)}
                             </a>
                           )}
-                          <a href="/whatsapp" target="_blank" rel="noopener noreferrer" className="inline-flex items-center rounded-full bg-white px-4 py-2 text-sm font-bold text-red-700 ring-1 ring-red-200 hover:bg-red-50">WhatsApp us</a>
-                          <button type="button" onClick={() => setType("pickup")} className="inline-flex items-center rounded-full bg-white px-4 py-2 text-sm font-bold text-stone-700 ring-1 ring-stone-200 hover:bg-stone-50">Switch to pickup</button>
+                          <a href="/whatsapp" target="_blank" rel="noopener noreferrer" className="inline-flex items-center rounded-full bg-white px-4 py-2 text-sm font-bold text-red-700 ring-1 ring-red-200 hover:bg-red-50">WhatsApp</a>
+                          <button type="button" onClick={() => setType("pickup")} className="inline-flex items-center rounded-full bg-white px-4 py-2 text-sm font-bold text-stone-700 ring-1 ring-stone-200 hover:bg-stone-50">पिकअप रोज्नुहोस्</button>
                         </div>
                       </div>
                     )}

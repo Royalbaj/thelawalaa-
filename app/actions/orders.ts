@@ -112,11 +112,20 @@ export async function createOrder(input: unknown) {
     };
   });
 
-  // ── Where a delivery goes: a saved address (theirs only) or the typed one,
-  // plus the pin if they shared their location. No pin → a proper address.
+  // ── Where a delivery goes. Customers and guests: ONLY a location shared from
+  // their phone (owner's call, Oct 2026 — no typed or saved addresses), so the
+  // delivery area is always checked and the rider gets the exact spot. Staff
+  // ordering for someone else may type the address (they can't share theirs).
   let deliveryAddress = "";
   let pin: { lat: number; lng: number; accuracy: number | null } | null = null;
-  if (data.type === "delivery") {
+  if (data.type === "delivery" && !isStaff) {
+    if (!data.delivery_location) {
+      return { error: "डेलिभरीका लागि आफ्नो लोकेसन पठाउनुहोस् (Share your location for delivery)" };
+    }
+    const { lat, lng, accuracy } = data.delivery_location;
+    pin = { lat, lng, accuracy: accuracy != null ? Math.round(accuracy) : null };
+    deliveryAddress = `Shared location${pin.accuracy != null ? ` (±${pin.accuracy} m)` : ""}`;
+  } else if (data.type === "delivery") {
     if (data.delivery_address_id) {
       if (!isSelfCheckout) return { error: "Invalid delivery address" };
       const { data: addr } = await supabaseAdmin
@@ -135,13 +144,15 @@ export async function createOrder(input: unknown) {
       pin = { lat, lng, accuracy: accuracy != null ? Math.round(accuracy) : null };
     }
     if (!pin && deliveryAddress.length < 10) {
-      return { error: "Add your full delivery address (tole/street, house and a landmark) — or share your location" };
+      return { error: "Add the full delivery address (tole/street, house and a landmark) — or share the location" };
     }
+  }
+  if (data.type === "delivery") {
     // Outside the delivery area (Admin → Settings → Delivery area): not online — call to confirm.
     const area = deliveryArea(settings);
     if (pin && outsideArea(area, pin)) {
       const phone = phoneDisplay((await getSiteText())["contact.whatsapp"]);
-      return { error: `We're not delivering to that location right now (about ${fmtKm(distanceKm(area.shop, pin))} away — we deliver within ${area.radiusKm} km). Please call us on ${phone} to confirm, or choose pickup.` };
+      return { error: `यो ठाउँमा अहिले डेलिभरी हुँदैन (पसलबाट करिब ${fmtKm(distanceKm(area.shop, pin))} टाढा — हामी ${area.radiusKm} km भित्र डेलिभरी गर्छौं)। ${phone} मा फोन गरेर सोध्नुहोस्, वा पिकअप रोज्नुहोस्।` };
     }
   }
   const contactPhone = isSelfCheckout ? (profile.phone || data.guest_phone || null) : data.guest_phone;
@@ -199,7 +210,7 @@ export async function createOrder(input: unknown) {
   
   let finalNotes = data.notes ? data.notes.trim() : "";
   const addressLine = data.type === "delivery"
-    ? `\nAddress: ${(deliveryAddress || "Shared location pin").replace(/\s*\n\s*/g, ", ")}${pin && deliveryAddress ? " (pin shared)" : ""}`
+    ? `\nAddress: ${(deliveryAddress || "Shared location pin").replace(/\s*\n\s*/g, ", ")}${pin && deliveryAddress && !deliveryAddress.startsWith("Shared location") ? " (pin shared)" : ""}`
     : "";
 
   if (isStaff) {
