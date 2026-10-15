@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import { Home, ShoppingCart, Utensils, User, Gift, Package, UserRound, MapPin } from "lucide-react";
 import { useViewerRole } from "@/lib/use-viewer";
 import { useSiteLang } from "@/lib/use-site-lang";
+import { HOME_SECTIONS, useScrollSpy } from "@/lib/use-scroll-spy";
 import { UI } from "@/lib/site-lang";
 import { ROLE_HOME } from "@/lib/role-home";
 import { cn } from "@/lib/utils";
@@ -23,13 +24,16 @@ const CUSTOMER_NAV = [
 export default function MobileNav() {
   const pathname = usePathname();
   const { role, ready } = useViewerRole();
-  const { lang, home } = useSiteLang(); // the homepage is English at / and Nepali at /ne
+  const { lang, home, onHome } = useSiteLang(); // the homepage is English at / and Nepali at /ne
   const L = UI[lang].mobile;
+  // On the homepage, light up where the visitor is: the top, the menu or the map.
+  const section = useScrollSpy(HOME_SECTIONS, onHome && role !== "customer");
 
   if (["/admin", "/pos", "/delivery", "/staff", "/auth"].some((p) => pathname.startsWith(p))) return null;
 
   const items = role === "customer" ? CUSTOMER_NAV : [
-    { id: "site", label: L.home, href: home, icon: Home },
+    // On the homepage itself "Home" goes back to the top (a link to the same page wouldn't move).
+    { id: "site", label: L.home, href: onHome ? `${home}#home` : home, icon: Home },
     { id: "menu", label: L.menu, href: `${home}#menu`, icon: Utensils },
     { id: "order", label: L.order, href: "/order", icon: ShoppingCart },
     { id: "location", label: L.location, href: `${home}#location`, icon: MapPin },
@@ -38,7 +42,8 @@ export default function MobileNav() {
       : { id: "signin", label: L.signIn, href: "/auth/login", icon: UserRound },
   ];
 
-  const active = items.find((item) => {
+  const SECTION_ITEM: Record<string, string> = { home: "site", about: "site", menu: "menu", location: "location" };
+  const active = onHome && role !== "customer" ? SECTION_ITEM[section ?? "home"] : items.find((item) => {
     if (item.href.includes("#")) return false;
     if (item.href === "/" || item.href === "/ne" || item.href === "/account") return pathname === item.href;
     return pathname.startsWith(item.href);
@@ -48,8 +53,10 @@ export default function MobileNav() {
     <>
       {/* Room at the end of the page so the floating bar never covers the last
           of the content. Here, not as body padding, so staff screens (no bar)
-          don't get a blank strip — on the POS that made the till scroll. */}
-      <div aria-hidden className="h-28 md:hidden" />
+          don't get a blank strip — on the POS that made the till scroll.
+          Pages with the website footer don't need it (globals.css): the footer
+          makes that room itself, so its colour runs to the bottom of the screen. */}
+      <div aria-hidden className="mobile-nav-spacer h-28 md:hidden" />
       <nav
         aria-label="Main"
         // [.site-dark_&]: the website in dark mode — this bar sits outside its wrapper (components/theme-toggle.tsx).

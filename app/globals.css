@@ -10,6 +10,12 @@ body { @apply font-body bg-brand-cream text-stone-900 antialiased; }
    the page edge past the content, and the browser's own controls (scrollbars, video, inputs). */
 html.site-dark { color-scheme: dark; }
 html.site-dark body { @apply bg-stone-950; }
+/* The website footer leaves room for the phone bottom bar itself (components/footer.tsx). */
+body:has([data-site-footer]) .mobile-nav-spacer { display: none; }
+
+/* No blue browser focus ring around the how-to-order video or its window while it plays
+   (components/how-to-video.tsx gives keyboard users a neutral ring instead). */
+video:focus, video:focus-visible, dialog:focus, dialog:focus-visible { outline: none; }
 
 .brand-gradient-text {
   @apply bg-gradient-to-r from-brand-orange via-brand-yellow to-brand-green bg-clip-text text-transparent;

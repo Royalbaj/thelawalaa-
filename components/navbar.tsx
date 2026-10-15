@@ -1,12 +1,12 @@
 "use client";
 
-import { useEffect, useState } from "react";
 import Link from "next/link";
 import { Languages, ShoppingCart, UserRound } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useCart } from "@/lib/store/cart";
 import { useViewerRole } from "@/lib/use-viewer";
 import { useSiteLang } from "@/lib/use-site-lang";
+import { HOME_SECTIONS, useScrollSpy } from "@/lib/use-scroll-spy";
 import { ROLE_HOME } from "@/lib/role-home";
 import { UI, type SiteLang } from "@/lib/site-lang";
 import BrandLogo from "@/components/brand-logo";
@@ -30,29 +30,14 @@ const LINKS = [
 // cart there (Sign in / My account are in the bottom bar). The homepage is
 // English at / and Nepali at /ne.
 export default function Navbar({ lang = "en" }: { lang?: SiteLang }) {
-  const [active, setActive] = useState<string | null>(null);
   const itemCount = useCart((s) => s.items.reduce((n, i) => n + i.quantity, 0));
   const { role, ready } = useViewerRole();
   const { home, onHome } = useSiteLang();
+  const active = useScrollSpy(HOME_SECTIONS, onHome);
   const L = UI[lang];
   const { dark } = useTheme();
   const accountHref = role ? ROLE_HOME[role] ?? "/" : "/auth/login";
   const accountLabel = !role ? L.signIn : role === "customer" ? L.myAccount : L.myPortal;
-
-  useEffect(() => {
-    const observer = new IntersectionObserver(
-      (entries) => {
-        for (const e of entries) if (e.isIntersecting) setActive(e.target.id);
-      },
-      { rootMargin: "-40% 0px -50% 0px" }
-    );
-    LINKS.forEach((link) => {
-      if ("href" in link) return;
-      const el = document.getElementById(link.id);
-      if (el) observer.observe(el);
-    });
-    return () => observer.disconnect();
-  }, []);
 
   return (
     <header className="sticky top-0 z-50 border-b border-stone-200/80 bg-white/90 shadow-sm backdrop-blur-md dark:border-stone-800 dark:bg-stone-950/85 dark:shadow-none">

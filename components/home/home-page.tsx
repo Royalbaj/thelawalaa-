@@ -384,7 +384,7 @@ export default async function HomePage({ lang }: { lang: SiteLang }) {
                 </div>
               )}
             </div>
-            <div className="mt-7 flex flex-wrap gap-3">
+            <div className="mt-7 grid gap-3 sm:flex sm:flex-wrap">
               <a href={directions} target="_blank" rel="noopener noreferrer" className="btn-primary shadow-lg shadow-orange-500/20">
                 <Navigation size={18} aria-hidden /> {t["location.directions"]}
               </a>

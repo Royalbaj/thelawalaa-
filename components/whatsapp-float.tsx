@@ -4,17 +4,24 @@ import { WhatsAppGlyph } from "@/components/icons/brand-glyphs";
 import { cn } from "@/lib/utils";
 
 /**
- * The round WhatsApp button in the corner of the homepage. It comes in only
- * once the top of the page (#home) has scrolled away: on a phone it used to
- * sit on top of the hero's buttons, which have their own ways to order.
+ * The round WhatsApp button in the corner of the homepage. It shows only
+ * between the hero and the footer: on a phone it used to sit on top of the
+ * hero's buttons and the footer's text, and both have their own WhatsApp /
+ * order links anyway.
  */
 export default function WhatsAppFloat({ href, label }: { href: string; label: string }) {
   const [show, setShow] = useState(false);
   useEffect(() => {
     const hero = document.getElementById("home");
-    if (!hero) { setShow(true); return; }
-    const io = new IntersectionObserver(([e]) => setShow(!e.isIntersecting), { rootMargin: "-120px 0px 0px 0px" });
-    io.observe(hero);
+    const footer = document.querySelector("[data-site-footer]");
+    const inView = new Map<Element, boolean>();
+    const io = new IntersectionObserver((entries) => {
+      for (const e of entries) inView.set(e.target, e.isIntersecting);
+      setShow(!(hero && inView.get(hero)) && !(footer && inView.get(footer)));
+    }, { rootMargin: "-120px 0px 0px 0px" });
+    if (hero) io.observe(hero);
+    if (footer) io.observe(footer);
+    if (!hero && !footer) setShow(true);
     return () => io.disconnect();
   }, []);
   return (

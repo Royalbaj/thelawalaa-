@@ -29,7 +29,7 @@ export function HowToVideo(props: Video) {
   };
 
   return (
-    <div className="relative aspect-[9/16] overflow-hidden rounded-[1.75rem] bg-black shadow-2xl shadow-black/50 ring-4 ring-white/10">
+    <div className="relative aspect-[9/16] overflow-hidden rounded-[1.75rem] bg-black shadow-2xl shadow-black/50 ring-4 ring-white/10 [-webkit-tap-highlight-color:transparent]">
       <video
         ref={ref}
         src={s.src}
@@ -42,13 +42,13 @@ export function HowToVideo(props: Video) {
         onPlay={() => setState("playing")}
         onEnded={() => setState("ended")}
         aria-label={props.title}
-        className="absolute inset-0 h-full w-full object-cover"
+        className="absolute inset-0 h-full w-full object-cover focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-white/30"
       />
       {state !== "playing" && (
         <button
           type="button"
           onClick={start}
-          className="group absolute inset-0 flex flex-col items-center justify-center gap-3 bg-gradient-to-t from-black/60 via-black/10 to-black/20"
+          className="group absolute inset-0 flex flex-col items-center justify-center gap-3 bg-gradient-to-t from-black/60 via-black/10 to-black/20 outline-none [-webkit-tap-highlight-color:transparent] focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-white/40"
         >
           <span className="flex h-20 w-20 items-center justify-center rounded-full bg-brand-orange text-white shadow-xl shadow-orange-600/40 ring-8 ring-white/15 transition group-hover:scale-105 group-active:scale-95">
             {state === "ended" ? <RotateCcw size={32} aria-hidden /> : <Play size={34} fill="currentColor" className="ml-1.5" aria-hidden />}
@@ -85,7 +85,7 @@ export function HowToVideoButton({ label, ...props }: Video & { label: string })
       <button
         type="button"
         onClick={open}
-        className="group inline-flex items-center gap-3 rounded-full bg-white/10 py-2 pl-2 pr-6 text-lg font-bold text-amber-50 ring-1 ring-white/20 transition hover:bg-white/15"
+        className="group inline-flex items-center gap-3 rounded-full bg-white/10 py-2 pl-2 pr-6 text-lg font-bold text-amber-50 ring-1 ring-white/20 transition hover:bg-white/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/60"
       >
         <span className="flex h-10 w-10 items-center justify-center rounded-full bg-brand-orange text-white shadow-lg shadow-orange-600/40 transition group-hover:scale-105">
           <Play size={16} fill="currentColor" className="ml-0.5" aria-hidden />
@@ -110,13 +110,13 @@ export function HowToVideoButton({ label, ...props }: Video & { label: string })
             controls
             controlsList="nodownload noplaybackrate noremoteplayback"
             disablePictureInPicture
-            className="h-full w-full rounded-3xl bg-black object-cover shadow-2xl"
+            className="h-full w-full rounded-3xl bg-black object-cover shadow-2xl focus-visible:ring-2 focus-visible:ring-white/30"
           />
           <button
             type="button"
             onClick={close}
             aria-label={L.close}
-            className="absolute right-3 top-3 flex h-11 w-11 items-center justify-center rounded-full bg-black/60 text-white backdrop-blur-sm transition hover:bg-black/80"
+            className="absolute right-3 top-3 flex h-11 w-11 items-center justify-center rounded-full bg-black/60 text-white backdrop-blur-sm transition hover:bg-black/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/60"
           >
             <X size={22} aria-hidden />
           </button>

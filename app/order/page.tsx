@@ -15,7 +15,7 @@ import { getEsewaPaymentForm } from "@/app/actions/payments";
 import { npr } from "@/lib/utils";
 import { UtensilsCrossed, Sparkles, CupSoda, LocateFixed, Loader2, X, MapPin, Phone, MapPinOff, Clock } from "lucide-react";
 import AddToCartButton from "@/components/add-to-cart-button";
-import BrandLogo from "@/components/brand-logo";
+import BrandLogo, { BrandMark } from "@/components/brand-logo";
 import { applyOpeningPromoPrice, isOpeningPromoActive, type OpeningPromoSettings } from "@/lib/promo";
 import { deliveryArea, outsideArea, distanceKm, fmtKm } from "@/lib/geo";
 import { deliveryFeeFor, deliveryFeeRules, toFreeDelivery } from "@/lib/delivery-fee";
@@ -314,9 +314,13 @@ export default function OrderPage() {
       <div className="sticky top-0 z-40 bg-brand-cream/95 backdrop-blur-md border-b border-stone-200/50 shadow-sm py-3 px-4 mb-6">
         <div className="mx-auto max-w-4xl flex items-center justify-between gap-3">
           <div className="flex min-w-0 items-center gap-4">
-            <Link href={account ? "/account" : "/"} className="hidden shrink-0 sm:block"><BrandLogo size="sm" /></Link>
+            {/* The way back home — just the TW tile on phones, the full logo from sm. */}
+            <Link href={account ? "/account" : "/"} aria-label="Thelawalaa home" className="shrink-0">
+              <BrandMark size={34} className="sm:hidden" />
+              <BrandLogo size="sm" className="hidden sm:inline-flex" />
+            </Link>
             <div className="min-w-0 sm:border-l sm:border-stone-200 sm:pl-4">
-              <h1 className="font-display text-2xl font-bold text-brand-brown">Place your order</h1>
+              <h1 className="font-display text-xl font-bold text-brand-brown sm:text-2xl">Place your order</h1>
               <p className="mt-0.5 text-xs text-stone-500 sm:text-sm">Browse menu → Add items → Checkout</p>
             </div>
           </div>
@@ -353,8 +357,8 @@ export default function OrderPage() {
               </div>
               <div className="mt-4 grid gap-4 sm:grid-cols-2">
                 {menuLoading && Array.from({ length: 6 }).map((_, i) => (
-                  <div key={i} className="card p-4 animate-pulse">
-                    <div className="h-32 w-full rounded-lg bg-stone-200" />
+                  <div key={i} className="card animate-pulse p-3 sm:p-4">
+                    <div className="h-24 w-24 rounded-xl bg-stone-200 sm:h-32 sm:w-full sm:rounded-lg" />
                     <div className="mt-3 h-4 w-2/3 rounded bg-stone-200" />
                     <div className="mt-2 h-3 w-full rounded bg-stone-100" />
                     <div className="mt-4 h-8 w-full rounded-full bg-stone-100" />
@@ -363,7 +367,7 @@ export default function OrderPage() {
                 {!menuLoading && visible.map((p, idx) => {
                   const isFav = favorites.includes(p.id);
                   return (
-                    <div key={p.id} className="card p-4 flex flex-col relative group">
+                    <div key={p.id} className="card group relative flex gap-3 p-3 sm:flex-col sm:gap-0 sm:p-4">
                       {!isGuest && (
                         <button
                           onClick={async () => {
@@ -374,33 +378,36 @@ export default function OrderPage() {
                               toast.success(res.isFavorite ? "Added to favorites" : "Removed from favorites");
                             }
                           }}
-                          className={`absolute top-6 right-6 h-8 w-8 rounded-full bg-white/90 backdrop-blur-sm flex items-center justify-center transition shadow-sm ${isFav ? "text-red-500" : "text-stone-300 hover:text-red-400"}`}
+                          aria-label={isFav ? `Remove ${p.name} from favourites` : `Add ${p.name} to favourites`}
+                          className={`absolute right-3 top-3 z-10 h-8 w-8 rounded-full bg-white/90 backdrop-blur-sm flex items-center justify-center transition shadow-sm sm:right-6 sm:top-6 ${isFav ? "text-red-500" : "text-stone-300 hover:text-red-400"}`}
                         >
                           <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill={isFav ? "currentColor" : "none"} stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4"><path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z"/></svg>
                         </button>
                       )}
                       {p.image_url ? (
-                        <div className="relative mb-3 h-32 w-full overflow-hidden rounded-lg">
-                          <Image src={p.image_url} alt={p.name} fill sizes="(min-width: 640px) 300px, 50vw" className="object-cover" priority={idx < 2} />
+                        <div className="relative h-24 w-24 shrink-0 overflow-hidden rounded-xl sm:mb-3 sm:h-32 sm:w-full sm:rounded-lg">
+                          <Image src={p.image_url} alt={p.name} fill sizes="(min-width: 640px) 300px, 96px" className="object-cover" priority={idx < 2} />
                         </div>
                       ) : (
-                        <div className="h-32 w-full bg-brand-cream rounded-lg mb-3 flex items-center justify-center text-stone-300" aria-hidden><UtensilsCrossed size={32} /></div>
+                        <div className="flex h-24 w-24 shrink-0 items-center justify-center rounded-xl bg-brand-cream text-stone-300 sm:mb-3 sm:h-32 sm:w-full sm:rounded-lg" aria-hidden><UtensilsCrossed size={32} /></div>
                       )}
                       {isDiscounted(p) && (
-                        <span className="absolute left-6 top-6 rounded-full bg-brand-green px-2.5 py-1 text-[10px] font-bold text-white shadow">Opening offer</span>
+                        <span className="absolute left-4 top-4 rounded-full bg-brand-green px-2.5 py-1 text-[10px] font-bold text-white shadow sm:left-6 sm:top-6">Opening offer</span>
                       )}
-                      <p className="font-bold pr-8">{p.name}</p>
-                      <p className="line-clamp-2 text-sm text-stone-600 flex-1">{p.description}</p>
-                      <div className="mt-2 flex items-center justify-between">
-                        {isDiscounted(p) ? (
-                          <p className="font-display font-bold text-brand-orange flex items-center gap-1.5">
-                            {npr(priceOf(p))}
-                            <span className="text-xs font-normal text-stone-400 line-through">{npr(Number(p.price))}</span>
-                          </p>
-                        ) : (
-                          <p className="font-display font-bold text-brand-orange">{npr(Number(p.price))}</p>
-                        )}
-                        <AddToCartButton product={{ product_id: p.id, name: p.name, price: priceOf(p) }} />
+                      <div className="flex min-w-0 flex-1 flex-col">
+                        <p className="pr-9 font-bold leading-snug sm:pr-8">{p.name}</p>
+                        <p className="mt-0.5 line-clamp-2 flex-1 text-sm text-stone-600">{p.description}</p>
+                        <div className="mt-2 flex items-center justify-between">
+                          {isDiscounted(p) ? (
+                            <p className="font-display font-bold text-brand-orange flex items-center gap-1.5">
+                              {npr(priceOf(p))}
+                              <span className="text-xs font-normal text-stone-400 line-through">{npr(Number(p.price))}</span>
+                            </p>
+                          ) : (
+                            <p className="font-display font-bold text-brand-orange">{npr(Number(p.price))}</p>
+                          )}
+                          <AddToCartButton product={{ product_id: p.id, name: p.name, price: priceOf(p) }} />
+                        </div>
                       </div>
                     </div>
                   );
