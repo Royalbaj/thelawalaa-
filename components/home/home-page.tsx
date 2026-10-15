@@ -7,7 +7,7 @@ import { applyOpeningPromoPrice, isOpeningPromoActive } from "@/lib/promo";
 import { getSiteText, whatsappHref } from "@/lib/site-content";
 import { storeHours } from "@/lib/delivery-hours";
 import { deliveryArea, directionsUrl, embedUrl } from "@/lib/geo";
-import { extractYouTubeId } from "@/lib/youtube";
+import { DEFAULT_HOWTO_VIDEO, ownMediaUrl } from "@/lib/site-media";
 import { UI, hoursText, type SiteLang } from "@/lib/site-lang";
 import heroImage from "@/public/images/hero/thelawalaa-momo-chatpate-boxes.webp";
 import ContactForm from "@/components/contact-form";
@@ -16,6 +16,7 @@ import AddToCartButton from "@/components/add-to-cart-button";
 import StructuredData from "@/components/structured-data";
 import HeroSteam from "@/components/hero-steam";
 import OpenStatus from "@/components/open-status";
+import { HowToVideo, HowToVideoButton } from "@/components/how-to-video";
 import { WhatsAppGlyph } from "@/components/icons/brand-glyphs";
 
 /**
@@ -66,8 +67,14 @@ export default async function HomePage({ lang }: { lang: SiteLang }) {
   // The shop's spot as set in Admin → Settings → Delivery area (else lib/seo.ts's approximate one).
   const shop = deliveryArea(settings).shop;
   const directions = directionsUrl(shop);
-  const videoId = extractYouTubeId(t["order.video"]);
-  const video = videoId && /^[\w-]{11}$/.test(videoId) ? videoId : null;
+  // The how-to-order video (Admin → Website text): our own file, "off" hides it and its button.
+  const videoOff = t["order.video"].trim().toLowerCase() === "off";
+  const video = videoOff ? null : {
+    src: ownMediaUrl(t["order.video"], "video") ?? DEFAULT_HOWTO_VIDEO,
+    poster: ownMediaUrl(t["order.video_poster"], "image"),
+    title: t["order.video_title"],
+    lang,
+  };
 
   return (
     <>
@@ -136,6 +143,7 @@ export default async function HomePage({ lang }: { lang: SiteLang }) {
               <a href="#menu" className="rounded-full border-2 border-amber-100/40 px-8 py-3.5 text-lg font-bold text-amber-50 transition hover:border-amber-100/70 hover:bg-white/10">
                 {t["hero.button2"]}
               </a>
+              {video && <HowToVideoButton {...video} label={t["hero.video_button"]} />}
             </div>
             {/* Where we are and when we're open — straight from the top of the page. */}
             <ul className="mt-8 space-y-2.5 text-sm font-bold">
@@ -259,7 +267,7 @@ export default async function HomePage({ lang }: { lang: SiteLang }) {
         </div>
       </section>
 
-      {/* HOW TO ORDER — the video (Admin → Website text → How-to-order video) beside the three steps */}
+      {/* HOW TO ORDER — the video (Admin → Website text → How-to-order video, our own player) beside the three steps */}
       <section id="order" className="bg-brand-dark px-4 py-12 md:py-20 text-white">
         <div className="mx-auto max-w-6xl">
           <div className="text-center">
@@ -270,24 +278,8 @@ export default async function HomePage({ lang }: { lang: SiteLang }) {
           <div className={cn("mt-12", video && "grid items-center gap-10 lg:grid-cols-[320px_1fr] lg:gap-16")}>
             {video && (
               <figure className="mx-auto w-full max-w-[300px] lg:max-w-none">
-                <div className="relative aspect-[9/16] overflow-hidden rounded-[1.75rem] bg-black shadow-2xl shadow-black/50 ring-4 ring-white/10">
-                  <iframe
-                    src={`https://www.youtube-nocookie.com/embed/${video}?rel=0&playsinline=1`}
-                    title={t["order.video_title"]}
-                    loading="lazy"
-                    allow="accelerometer; encrypted-media; gyroscope; picture-in-picture; web-share"
-                    allowFullScreen
-                    referrerPolicy="strict-origin-when-cross-origin"
-                    className="absolute inset-0 h-full w-full"
-                  />
-                </div>
-                <figcaption className="mt-3 text-center text-sm font-bold text-orange-100/80">
-                  {t["order.video_title"]}
-                  <a href={`https://www.youtube.com/watch?v=${video}`} target="_blank" rel="noopener noreferrer"
-                    className="mt-1 block text-xs font-bold text-orange-100/50 underline-offset-4 hover:text-orange-100 hover:underline">
-                    {L.watchOnYoutube}
-                  </a>
-                </figcaption>
+                <HowToVideo {...video} />
+                <figcaption className="mt-3 text-center text-sm font-bold text-orange-100/80">{t["order.video_title"]}</figcaption>
               </figure>
             )}
             <div>

@@ -14,6 +14,9 @@ const csp = [
   "font-src 'self' https://fonts.gstatic.com",
   `img-src 'self' data: blob: https://*.supabase.co https://maps.gstatic.com https://maps.googleapis.com https://images.unsplash.com`,
   `connect-src 'self' https://${supabaseHost} wss://${supabaseHost} https://maps.googleapis.com`,
+  // The homepage's how-to-order video: public/videos, or an upload in Supabase Storage (site-media);
+  // blob: lets Admin → Website text read a picked video to make its cover picture.
+  `media-src 'self' blob: https://${supabaseHost}`,
   "frame-src https://www.google.com https://www.youtube.com https://www.youtube-nocookie.com",
   "object-src 'none'",
   "base-uri 'self'",

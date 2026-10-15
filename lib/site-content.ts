@@ -1,6 +1,7 @@
 import { cache } from "react";
 import { createClient } from "@/lib/supabase/server";
 import type { SiteLang } from "@/lib/site-lang";
+import { DEFAULT_HOWTO_POSTER, DEFAULT_HOWTO_VIDEO } from "@/lib/site-media";
 
 // Website text the admin edits in Admin → Website text (site_content,
 // migration 026). Every field has a built-in default — the site as written —
@@ -32,6 +33,8 @@ export const SITE_TEXT_SECTIONS = [
         { multiline: true, ne: "चार किसिमका चटपटे, मोमो र चिसो पेय — ताजा सामग्रीले हाम्रो सफा भान्सामा बनाइएको, तातै तपाईंको ढोकासम्म।" }),
       f("hero.button", "Main button", "Order Now →", 30, { ne: "अहिले अर्डर गर्नुहोस् →" }),
       f("hero.button2", "Second button", "See Menu", 30, { ne: "मेनु हेर्नुहोस्" }),
+      // Nepali on both pages (owner's call). Opens the how-to-order video over the page.
+      f("hero.video_button", "Button that plays the how-to-order video", "कसरी अर्डर गर्ने?", 30),
       f("hero.badge1", "Badge 1", "Kitchen Hygiene Certified", 40, { ne: "भान्साको सरसफाइ प्रमाणित" }),
       f("hero.badge2", "Badge 2", "Fresh Ingredients Daily", 40, { ne: "हरेक दिन ताजा सामग्री" }),
       f("hero.badge3_delivery", "Badge 3 — when delivery is ON", "Free Delivery from Rs 99", 40, { ne: "रु 99 देखि निःशुल्क डेलिभरी" }),
@@ -78,8 +81,11 @@ export const SITE_TEXT_SECTIONS = [
       f("order.title", "Heading", "How to Order", 60, { ne: "कसरी अर्डर गर्ने?" }),
       f("order.text", "Text under the heading", "Fresh food, ready in minutes. No app download required.", 200,
         { multiline: true, ne: "केही मिनेटमै ताजा खाना। कुनै एप डाउनलोड गर्नु पर्दैन।" }),
-      f("order.video", "How-to-order video (YouTube link)", "https://www.youtube.com/shorts/CxZxRMS6Ld0", 200,
-        { hint: "Paste any YouTube link — a Short, a normal video or youtu.be. Type off to hide the video." }),
+      // Played by our own player (components/how-to-video.tsx), never YouTube — changed with the upload button in the editor.
+      f("order.video", "How-to-order video", DEFAULT_HOWTO_VIDEO, 300,
+        { hint: "Change it with “Upload a new video” (MP4, up to 50 MB). Type off to hide the video and its button." }),
+      f("order.video_poster", "Video cover picture", DEFAULT_HOWTO_POSTER, 300,
+        { hint: "Shown before the video plays — made for you when you upload a video." }),
       f("order.video_title", "Line under the video", "Watch: ordering takes a minute", 60, { ne: "हेर्नुहोस्: अर्डर गर्न एक मिनेट मात्र" }),
       f("order.step1_title", "Step 1 title", "Browse & Add", 40, { ne: "रोज्नुहोस् र थप्नुहोस्" }),
       f("order.step1_text", "Step 1 text", "Pick your favourites from our menu and add them to your cart.", 200,

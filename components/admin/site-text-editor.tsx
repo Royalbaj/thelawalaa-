@@ -3,6 +3,7 @@ import { useMemo, useState, useTransition } from "react";
 import toast from "react-hot-toast";
 import { ExternalLink, RotateCcw, Save } from "lucide-react";
 import { saveSiteText } from "@/app/actions/site-content";
+import VideoUpload from "@/components/admin/video-upload";
 import { cn } from "@/lib/utils";
 
 type Field = { key: string; label: string; default: string; max: number; multiline?: boolean; hint?: string; ne?: string; neMax?: number };
@@ -105,6 +106,9 @@ export default function SiteTextEditor({ sections, saved }: { sections: readonly
             <div key={f.key}>
               {box(f, f.key, f.label, f.hint)}
               {f.ne != null && box(neInput(f), `ne.${f.key}`, "Nepali", undefined, true)}
+              {f.key === "order.video" && (
+                <VideoUpload onUploaded={(video, poster) => { set("order.video", video); set("order.video_poster", poster); }} />
+              )}
             </div>
           ))}
         </section>
