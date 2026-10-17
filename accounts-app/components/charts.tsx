@@ -39,11 +39,13 @@ function Tip({ title, rows }: { title: string; rows: TipRow[] }) {
 export type InOutPoint = { label: string; in: number; out: number };
 
 /** Money in vs money out per day (or month): grouped columns, legend above, table below. */
-export function InOutColumns({ data, height = 240 }: { data: InOutPoint[]; height?: number }) {
+export function InOutColumns({ data, height = 240, labels = { in: "Money in", out: "Money out" } }: {
+  data: InOutPoint[]; height?: number; labels?: { in: string; out: string };
+}) {
   const empty = data.every((d) => !d.in && !d.out);
   return (
     <div>
-      <div className="mb-2 flex gap-4"><Key color={IN_COLOR} label="Money in" /><Key color={OUT_COLOR} label="Money out" /></div>
+      <div className="mb-2 flex flex-wrap gap-4"><Key color={IN_COLOR} label={labels.in} /><Key color={OUT_COLOR} label={labels.out} /></div>
       {empty ? (
         <p className="flex items-center justify-center rounded-xl bg-stone-50 text-sm text-stone-400" style={{ height }}>Nothing entered for these dates yet.</p>
       ) : (
@@ -56,13 +58,13 @@ export function InOutColumns({ data, height = 240 }: { data: InOutPoint[]; heigh
               cursor={{ fill: "rgba(11,11,11,0.04)" }}
               content={({ active, payload, label }) => active && payload?.length ? (
                 <Tip title={String(label)} rows={[
-                  { color: IN_COLOR, label: "Money in", value: Number(payload[0]?.payload.in ?? 0) },
-                  { color: OUT_COLOR, label: "Money out", value: Number(payload[0]?.payload.out ?? 0) },
+                  { color: IN_COLOR, label: labels.in, value: Number(payload[0]?.payload.in ?? 0) },
+                  { color: OUT_COLOR, label: labels.out, value: Number(payload[0]?.payload.out ?? 0) },
                 ]} />
               ) : null}
             />
-            <Bar dataKey="in" name="Money in" fill={IN_COLOR} radius={[4, 4, 0, 0]} maxBarSize={24} isAnimationActive={false} />
-            <Bar dataKey="out" name="Money out" fill={OUT_COLOR} radius={[4, 4, 0, 0]} maxBarSize={24} isAnimationActive={false} />
+            <Bar dataKey="in" name={labels.in} fill={IN_COLOR} radius={[4, 4, 0, 0]} maxBarSize={24} isAnimationActive={false} />
+            <Bar dataKey="out" name={labels.out} fill={OUT_COLOR} radius={[4, 4, 0, 0]} maxBarSize={24} isAnimationActive={false} />
           </BarChart>
         </ResponsiveContainer>
       )}

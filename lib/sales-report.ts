@@ -1,6 +1,6 @@
 import "server-only";
 import { supabaseAdmin } from "@/lib/supabase/admin";
-import { addDays, dayCount, eachDay, eachMonth, monthLabel, shortDate, startOfMonth, type Ymd } from "@/lib/dates";
+import { addDays, addMonths, dayCount, eachDay, eachMonth, endOfMonth, monthLabel, nepalToday, shortDate, startOfMonth, type Ymd } from "@/lib/dates";
 import { servingStats } from "@/lib/serving-time";
 
 // Admin → Reports: what the orders say (POS + website), by Nepal date.
@@ -126,12 +126,34 @@ export async function getSalesReport(from: Ymd, to: Ymd) {
     bump(product, i.product_name, i.line_total, i.quantity);
   });
 
+  // Projection: the period's own average, carried forward (days still to come
+  // in the range — e.g. the rest of "This month" — don't drag the average down).
+  const today = nepalToday();
+  const lastDay = to > today ? today : to;
+  const days = lastDay < from ? 0 : dayCount(from, lastDay);
+  const sellingDays = new Set(paid.map((o) => nepalDay(o.created_at))).size;
+  const avg = {
+    days, sellingDays,
+    perDay: days ? sales / days : 0,
+    perSellingDay: sellingDays ? sales / sellingDays : 0,
+    ordersPerDay: days ? paid.length / days : 0,
+  };
+  // The next stretch on the chart: 7 days, or 3 months, after the period.
+  const future = unit === "day"
+    ? Array.from({ length: 7 }, (_, i) => { const d = addDays(to, i + 1); return { key: d, label: shortDate(d), days: 1 }; })
+    : Array.from({ length: 3 }, (_, i) => {
+        const m = startOfMonth(addMonths(startOfMonth(to), i + 1));
+        return { key: m, label: monthLabel(m), days: dayCount(m, endOfMonth(m)) };
+      });
+
   return {
-    orders, items, kpis, unit, periods, hours,
+    orders, items, kpis, unit, periods, hours, avg, future,
     byMethod: slices(method, (k) => METHOD_LABELS[k] ?? k),
     byType: slices(type, (k) => TYPE_LABELS[k] ?? k),
     byChannel: slices(channel),
     byCategory: slices(category),
+    // Every category on the menu, in a fixed order — a pie's colours follow it, never the ranking.
+    categoryOrder: [...new Set([...categoryOf.values()])].sort(),
     topProducts: [...product.entries()]
       .map(([name, v]) => ({ id: name, name, amount: v.amount, count: v.count }))
       .sort((a, b) => b.count - a.count || b.amount - a.amount),

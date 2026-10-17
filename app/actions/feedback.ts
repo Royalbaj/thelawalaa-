@@ -6,6 +6,7 @@ import { headers } from "next/headers";
 import { revalidatePath } from "next/cache";
 import { requireRole } from "@/lib/supabase/server";
 import { supabaseAdmin, audit } from "@/lib/supabase/admin";
+import { ALL_TAGS, ASPECTS } from "@/lib/feedback";
 
 // /feedback is public, so this is the one action without requireRole: it is
 // Zod-validated, has a honeypot, and throttles by a keyed hash of the IP
@@ -15,8 +16,14 @@ const MAX_PER_WINDOW = 3;
 const WINDOW_MINUTES = 10;
 
 const blank = (v: unknown) => (typeof v === "string" && v.trim() === "" ? undefined : v);
+const score = z.number().int().min(1).max(5);
 const feedbackSchema = z.object({
   rating: z.coerce.number().int().min(1, "Pick how it was").max(5),
+  // Only the form's own choices (lib/feedback.ts).
+  tags: z.array(z.string().refine((t) => ALL_TAGS.includes(t))).max(12).default([]),
+  aspects: z.object(Object.fromEntries(ASPECTS.map((a) => [a.key, score.optional()])) as Record<string, z.ZodOptional<typeof score>>).default({}),
+  recommend: z.boolean().optional(),
+  wants_reply: z.boolean().default(false),
   comment: z.preprocess(blank, z.string().trim().max(1000, "Keep it under 1,000 characters").optional()),
   name: z.preprocess(blank, z.string().trim().max(80).optional()),
   contact: z.preprocess(blank, z.string().trim().max(80).optional()),
@@ -35,6 +42,8 @@ export async function submitFeedback(input: unknown) {
   if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Please check the form" };
   const { website, ...d } = parsed.data;
   if (website) return { ok: true }; // a bot filled the hidden field — pretend it worked
+  if (d.wants_reply && !d.contact) return { error: "Add a phone number or email so we can get back to you" };
+  const aspects = Object.fromEntries(Object.entries(d.aspects).filter(([, v]) => v != null));
 
   const ip = (await headers()).get("x-forwarded-for")?.split(",")[0]?.trim() || "unknown";
   const hash = ipHash(ip);
@@ -46,6 +55,8 @@ export async function submitFeedback(input: unknown) {
   const { error } = await supabaseAdmin.from("feedback").insert({
     rating: d.rating, comment: d.comment ?? null, name: d.name ?? null, contact: d.contact ?? null,
     order_ref: d.order_ref ?? null, visit: d.visit ?? null, ip_hash: hash,
+    tags: [...new Set(d.tags)], aspects: Object.keys(aspects).length ? aspects : null,
+    recommend: d.recommend ?? null, wants_reply: d.wants_reply,
   });
   if (error) return { error: "Couldn't send it — please try again" };
   revalidatePath("/admin/feedback");

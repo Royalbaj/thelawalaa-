@@ -1,8 +1,7 @@
 import { FileSpreadsheet } from "lucide-react";
 import { rangeQuery, prettyDate, type Range, type RangeKey } from "@/lib/dates";
-import type { SalesReport } from "@/lib/sales-report";
-import { Columns, SERIES_1, SERIES_2 } from "@/components/admin/sales-charts";
-import BarList from "@/components/admin/bar-list";
+import { METHOD_LABELS, TYPE_LABELS, type SalesReport } from "@/lib/sales-report";
+import { Breakdown, HoursChart, Projection, SalesTrend } from "@/components/admin/report-charts";
 import RangePicker from "@/components/admin/range-picker";
 import { npr, cn } from "@/lib/utils";
 import { fmtMinutes } from "@/lib/serving-time";
@@ -49,19 +48,21 @@ export default function SalesReportView({ range, r }: { range: Range; r: SalesRe
         ))}
       </div>
 
-      <section className="card p-4 sm:p-5">
-        <h2 className="mb-3 font-bold text-brand-brown">Sales by {r.unit} — counter vs online</h2>
-        <Columns
-          data={r.periods.map((p) => ({ label: p.label, counter: p.counter, online: p.online }))}
-          series={[{ key: "counter", label: "Counter (POS)", color: SERIES_1 }, { key: "online", label: "Online", color: SERIES_2 }]}
-        />
-      </section>
+      <div className="grid gap-4 xl:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
+        <section className="card p-4 sm:p-5">
+          <h2 className="mb-1 font-bold text-brand-brown">Sales by {r.unit} — counter vs online</h2>
+          <SalesTrend periods={r.periods} future={r.future} unit={r.unit} perDay={r.avg.perDay} />
+        </section>
+        <section className="card p-4 sm:p-5">
+          <h2 className="mb-3 font-bold text-brand-brown">Projected sales</h2>
+          <Projection avg={r.avg} />
+        </section>
+      </div>
 
       <section className="card p-4 sm:p-5">
         <h2 className="font-bold text-brand-brown">Busiest hours</h2>
-        <p className="mb-3 text-xs text-stone-500">Orders placed in each hour of the day, over the whole period.</p>
-        <Columns data={r.hours} series={[{ key: "count", label: "Orders", color: SERIES_1 }]} money={false} height={200}
-          empty="No orders in this period yet." tableLabel="Hour" />
+        <p className="text-xs text-stone-500">Orders placed in each hour of the day, over the whole period.</p>
+        <HoursChart hours={r.hours} />
       </section>
 
       <div className="grid gap-4 lg:grid-cols-2">
@@ -85,17 +86,16 @@ export default function SalesReportView({ range, r }: { range: Range; r: SalesRe
           <p className="mt-2 text-[11px] text-stone-400">Before discounts; cancelled orders left out.</p>
         </section>
         <section className="card p-5">
-          <h2 className="mb-3 font-bold text-brand-brown">Sales by category</h2>
-          <BarList color={SERIES_1} rows={r.byCategory} empty="No sales in this period yet." />
-          <p className="mt-2 text-[11px] text-stone-400">Before discounts.</p>
+          <Breakdown id="category" title="Sales by category" rows={r.byCategory} order={[...r.categoryOrder, "Other"]}
+            empty="No sales in this period yet." note="Before discounts." />
         </section>
         <section className="card p-5">
-          <h2 className="mb-3 font-bold text-brand-brown">How customers paid</h2>
-          <BarList color={SERIES_1} rows={r.byMethod} empty="No paid orders in this period yet." />
+          <Breakdown id="method" title="How customers paid" rows={r.byMethod} order={Object.keys(METHOD_LABELS)}
+            empty="No paid orders in this period yet." />
         </section>
         <section className="card p-5">
-          <h2 className="mb-3 font-bold text-brand-brown">Dine-in, pickup or delivery</h2>
-          <BarList color={SERIES_1} rows={r.byType} empty="No paid orders in this period yet." />
+          <Breakdown id="type" title="Dine-in, pickup or delivery" rows={r.byType} order={Object.keys(TYPE_LABELS)}
+            empty="No paid orders in this period yet." />
         </section>
       </div>
     </div>

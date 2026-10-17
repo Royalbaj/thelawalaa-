@@ -7,10 +7,14 @@ import { addDays, dayCount, eachDay, eachMonth, monthLabel, shortDate, startOfMo
 
 export type Kind = "in" | "out";
 export type Method = "cash" | "bank" | "qr";
-export type Category = { id: string; kind: Kind; name: string; sort_order: number; is_active: boolean };
+// is_operating: counts in Running cost (money out) / trading income (money in) — off for owners' and
+// lenders' money and equipment (migration 048).
+export type Category = { id: string; kind: Kind; name: string; sort_order: number; is_active: boolean; is_operating: boolean };
 export type Entry = {
   id: string; kind: Kind; amount: number; category_id: string; description: string | null;
   occurred_on: Ymd; method: Method; bill_path: string | null; created_at: string;
+  // true: a one-off/setup buy (not a running cost) whatever its category; false: counted anyway; null: the category decides.
+  one_off?: boolean | null;
   // Who typed it: the person who unlocked with their PIN (entries from
   // before per-person PINs only have the login's name).
   person?: { name: string } | null;
@@ -31,7 +35,7 @@ export async function getPeople(): Promise<{ id: string; name: string; is_active
 
 export async function getCategories(): Promise<Category[]> {
   const { data } = await supabaseAdmin.from("account_categories")
-    .select("id, kind, name, sort_order, is_active").order("sort_order").order("name");
+    .select("id, kind, name, sort_order, is_active, is_operating").order("sort_order").order("name");
   return (data ?? []) as Category[];
 }
 
@@ -42,7 +46,7 @@ export async function getEntries(from: Ymd, to: Ymd, f: EntryFilter = {}, max = 
   const out: Entry[] = [];
   for (let offset = 0; offset < max; offset += 1000) {
     let q = supabaseAdmin.from("account_transactions")
-      .select("id, kind, amount, category_id, description, occurred_on, method, bill_path, created_at, person:account_users!account_transactions_entered_by_fkey(name), creator:profiles!account_transactions_created_by_fkey(full_name)")
+      .select("id, kind, amount, category_id, description, occurred_on, method, bill_path, created_at, one_off, person:account_users!account_transactions_entered_by_fkey(name), creator:profiles!account_transactions_created_by_fkey(full_name)")
       .gte("occurred_on", from).lte("occurred_on", to)
       .order("occurred_on", { ascending: false }).order("created_at", { ascending: false })
       .range(offset, Math.min(offset + 999, max - 1));
@@ -134,3 +138,35 @@ export function runningBalance(startBalance: number, buckets: Bucket[]) {
 
 export const daysIn = (from: Ymd, to: Ymd) => dayCount(from, to);
 export const yesterdayOf = (d: Ymd) => addDays(d, -1);
+
+// ── Running cost (migration 048) ───────────────────────────────
+/** Does this entry count as running money? Its own one-off mark wins, then its category's setting. */
+export function isOperating(e: Pick<Entry, "one_off" | "category_id">, operatingCats: Map<string, boolean>) {
+  if (e.one_off != null) return !e.one_off;
+  return operatingCats.get(e.category_id) ?? true;
+}
+
+/**
+ * What it really costs to keep the shop going: trading income (day sales …)
+ * against running costs (ingredients, gas, salaries, rent …), leaving out
+ * one-off setup buys and owners'/lenders' money. "A day" divides by the days
+ * of the range up to today.
+ */
+export function runningCost(entries: Entry[], categories: Category[], from: Ymd, to: Ymd, today: Ymd) {
+  const operatingCats = new Map(categories.map((c) => [c.id, c.is_operating]));
+  const running = entries.filter((e) => isOperating(e, operatingCats));
+  const left = entries.filter((e) => !isOperating(e, operatingCats));
+  const sum = (list: Entry[], kind: Kind) => list.filter((e) => e.kind === kind).reduce((s, e) => s + e.amount, 0);
+  const income = sum(running, "in");
+  const cost = sum(running, "out");
+  const lastDay = to > today ? today : to;
+  const days = lastDay < from ? 0 : dayCount(from, lastDay);
+  const perDay = (v: number) => (days ? v / days : 0);
+  return {
+    days, income, cost, profit: income - cost,
+    margin: income ? (income - cost) / income : null,
+    incomePerDay: perDay(income), costPerDay: perDay(cost),
+    running, left,
+    leftIn: sum(left, "in"), leftOut: sum(left, "out"),
+  };
+}

@@ -6,6 +6,7 @@ import { InOutColumns, BalanceArea } from "@/components/charts";
 import BarList from "@/components/bar-list";
 import RangePicker from "@/components/range-picker";
 import PrintButton from "@/components/print-button";
+import { ReportTabs } from "@/components/report-tabs";
 import { npr, cn } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
@@ -42,7 +43,8 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
           <h1 className="font-display text-2xl font-bold text-brand-brown">Reports</h1>
           <p className="text-sm text-stone-500">{prettyDate(range.from)} – {prettyDate(range.to)}</p>
         </div>
-        <div className="flex flex-wrap gap-2 text-sm print:hidden">
+        <div className="flex flex-wrap items-center gap-2 text-sm print:hidden">
+          <ReportTabs current="reports" />
           <a href={`/export?${rq}&format=xlsx`} className="flex items-center gap-1.5 rounded-full bg-white px-3.5 py-2 font-bold text-green-800 ring-1 ring-stone-200 hover:bg-green-50"><FileSpreadsheet size={15} /> Excel</a>
           <a href={`/export?${rq}&format=csv`} className="flex items-center gap-1.5 rounded-full bg-white px-3.5 py-2 font-bold text-stone-700 ring-1 ring-stone-200 hover:bg-stone-50"><FileText size={15} /> CSV</a>
           <PrintButton />

@@ -74,6 +74,7 @@ export default async function Footer({ lang = "en" }: { lang?: SiteLang }) {
                 <li><a href={`${home}#order`} className={link}>{F.howToOrder}</a></li>
                 <li><a href={`${home}#about`} className={link}>{L.nav.about}</a></li>
                 <li><a href={`${home}#faq`} className={link}>{L.nav.faq}</a></li>
+                <li><Link href="/careers" className={link}>{F.careers}</Link></li>
               </ul>
             </nav>
             <nav aria-label={F.help}>

@@ -141,6 +141,19 @@ export const SITE_TEXT_SECTIONS = [
     ],
   },
   {
+    // /careers — job listings come from Admin → Careers; this is the wording around them.
+    id: "careers", title: "Careers page", where: "/careers",
+    fields: [
+      f("careers.eyebrow", "Small heading", "Careers", 40),
+      f("careers.title", "Heading", "Work with Thelawalaa", 60),
+      f("careers.text", "Text under the heading", "We're a growing street-food kitchen at Godam Chowk, Banepa. We look for friendly, hard-working people who care about clean, tasty food — experience helps, but we train you.", 400, { multiline: true }),
+      f("careers.none_title", "When no jobs are open — heading", "No openings right now", 60),
+      f("careers.none_text", "When no jobs are open — text", "We're always happy to hear from good people. Send your CV below and we'll call you when a job opens.", 300, { multiline: true }),
+      f("careers.form_title", "Form heading", "Send your application", 60),
+      f("careers.privacy", "Line under the form", "We use your details only to consider you for jobs at Thelawalaa, and delete them if you ask.", 200),
+    ],
+  },
+  {
     id: "footer", title: "Footer", where: "/#home",
     fields: [
       f("footer.tagline", "Line under the logo", "Crispy, spicy, straight from the thela — now at your door.", 120,

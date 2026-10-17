@@ -116,12 +116,26 @@ export async function addCategory(kind: unknown, name: unknown) {
 export async function updateCategory(id: string, patch: unknown) {
   const { user } = await requireAuth();
   if (!z.string().uuid().safeParse(id).success) return { error: "Bad category" };
-  const parsed = z.object({ name: categoryName.optional(), is_active: z.boolean().optional() }).safeParse(patch);
+  const parsed = z.object({ name: categoryName.optional(), is_active: z.boolean().optional(), is_operating: z.boolean().optional() }).safeParse(patch);
   if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Check the name" };
   const { error } = await supabaseAdmin.from("account_categories").update(parsed.data).eq("id", id);
   if (error?.code === "23505") return { error: "That category already exists" };
   if (error) return { error: "Couldn't update the category" };
   await audit({ actor_id: user.id, action: "ACCOUNT_CATEGORY_EDIT", target_table: "account_categories", target_id: id, new_data: parsed.data });
+  refresh();
+  return { ok: true };
+}
+
+/** Running cost → "is this a running cost?": mark one entry as a one-off (true), counted (false), or back to its category (null). */
+export async function setEntryOneOff(id: string, oneOff: unknown) {
+  const { user, person } = await requireAuth();
+  if (!z.string().uuid().safeParse(id).success) return { error: "Bad entry" };
+  const parsed = z.boolean().nullable().safeParse(oneOff);
+  if (!parsed.success) return { error: "Bad choice" };
+  const { error } = await supabaseAdmin.from("account_transactions")
+    .update({ one_off: parsed.data, updated_by: user.id, edited_by: person.id, updated_at: new Date().toISOString() }).eq("id", id);
+  if (error) return { error: "Couldn't save" };
+  await audit({ actor_id: user.id, action: "ACCOUNT_ENTRY_ONE_OFF", target_table: "account_transactions", target_id: id, new_data: { one_off: parsed.data, person: person.name } });
   refresh();
   return { ok: true };
 }

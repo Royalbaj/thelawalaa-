@@ -2,7 +2,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
-import { LayoutDashboard, ListOrdered, BarChart3, Settings, Package, Lock, LogOut, Plus, ArrowDownLeft, ArrowUpRight, X, UserRound } from "lucide-react";
+import { LayoutDashboard, ListOrdered, BarChart3, Settings, Package, Lock, LogOut, Plus, ArrowDownLeft, ArrowUpRight, X, UserRound, Gauge } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { lockAccounts } from "@/app/actions/pin";
 import { cn } from "@/lib/utils";
@@ -12,6 +12,7 @@ const NAV = [
   { href: "/entries", label: "Entries", icon: ListOrdered },
   { href: "/stock", label: "Stock", icon: Package },
   { href: "/reports", label: "Reports", icon: BarChart3 },
+  { href: "/running", label: "Running cost", icon: Gauge },
   { href: "/settings", label: "Settings", icon: Settings },
 ];
 const IDLE_LOCK_MS = 15 * 60_000;
@@ -33,7 +34,8 @@ function Badge({ n }: { n: number }) {
 export default function Shell({ person, lowStock, children }: { person: string; lowStock: number; children: React.ReactNode }) {
   const pathname = usePathname();
   const [adding, setAdding] = useState(false);
-  const isActive = (href: string) => (href === "/" ? pathname === "/" : pathname.startsWith(href));
+  // Running cost lives under the Reports tab on phones (the bottom bar has no room for a sixth tab).
+  const isActive = (href: string) => (href === "/" ? pathname === "/" : pathname.startsWith(href) || (href === "/reports" && pathname.startsWith("/running")));
   // The entry form brings its own pinned Save bar on phones — no tabs underneath it.
   const onForm = pathname === "/entries/new" || /^\/entries\/[0-9a-f-]{36}$/.test(pathname);
 
@@ -79,10 +81,13 @@ export default function Shell({ person, lowStock, children }: { person: string; 
             <Link href="/" className="font-display text-lg font-bold brand-gradient-text">Accounts</Link>
             <nav className="hidden items-center gap-1 md:flex">
               {NAV.map(({ href, label, icon: Icon }) => (
-                <Link key={href} href={href}
-                  className={cn("relative flex items-center gap-1.5 rounded-full px-3.5 py-2 text-sm font-bold transition",
-                    isActive(href) ? "bg-brand-orange text-white" : "text-stone-500 hover:bg-orange-50 hover:text-brand-brown")}>
-                  <span className="relative"><Icon size={15} />{href === "/stock" && <Badge n={lowStock} />}</span> {label}
+                <Link key={href} href={href} title={label} aria-label={label}
+                  className={cn("relative flex items-center gap-1.5 rounded-full px-3 py-2 text-sm font-bold transition lg:px-3.5",
+                    // Here Running cost has its own item, so Reports isn't lit on it too.
+                    isActive(href) && !(href === "/reports" && pathname.startsWith("/running"))
+                      ? "bg-brand-orange text-white" : "text-stone-500 hover:bg-orange-50 hover:text-brand-brown")}>
+                  {/* Labels from lg: six items don't fit a tablet's width with them. */}
+                  <span className="relative"><Icon size={15} />{href === "/stock" && <Badge n={lowStock} />}</span> <span className="hidden lg:inline">{label}</span>
                 </Link>
               ))}
             </nav>

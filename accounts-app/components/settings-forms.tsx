@@ -8,7 +8,7 @@ import { changePin } from "@/app/actions/pin";
 import { cn } from "@/lib/utils";
 
 type Kind = "in" | "out";
-type Cat = { id: string; kind: Kind; name: string; is_active: boolean };
+type Cat = { id: string; kind: Kind; name: string; is_active: boolean; is_operating: boolean };
 
 export function OpeningBalanceForm({ value }: { value: number }) {
   const router = useRouter();
@@ -37,7 +37,7 @@ function CategoryItem({ c }: { c: Cat }) {
   const [editing, setEditing] = useState(false);
   const [name, setName] = useState(c.name);
   const [pending, start] = useTransition();
-  const run = (patch: { name?: string; is_active?: boolean }, done: string) => start(async () => {
+  const run = (patch: { name?: string; is_active?: boolean; is_operating?: boolean }, done: string) => start(async () => {
     const r = await updateCategory(c.id, patch);
     if (r?.error) toast.error(r.error); else { toast.success(done); setEditing(false); router.refresh(); }
   });
@@ -52,6 +52,16 @@ function CategoryItem({ c }: { c: Cat }) {
       ) : (
         <>
           <span className="flex-1 text-sm font-bold text-stone-700">{c.name}{!c.is_active && <span className="ml-1.5 text-xs font-normal">(hidden)</span>}</span>
+          {/* Counts in Running cost (money out) / trading income (money in)? */}
+          <button disabled={pending} onClick={() => run({ is_operating: !c.is_operating },
+              c.is_operating ? "Left out of Running cost" : "Counted in Running cost")}
+            title={c.is_operating
+              ? (c.kind === "out" ? "Counted as a running cost — tap if it's a one-off buy or owners' money" : "Counted as trading income — tap if it's owners' or lenders' money")
+              : "Not counted in Running cost — tap to count it"}
+            className={cn("shrink-0 rounded-full px-2.5 py-1 text-[11px] font-bold transition",
+              c.is_operating ? "bg-green-50 text-green-700 ring-1 ring-green-200" : "bg-stone-100 text-stone-500 ring-1 ring-stone-200")}>
+            {c.is_operating ? (c.kind === "out" ? "Running cost" : "Trading income") : "Not counted"}
+          </button>
           <button onClick={() => setEditing(true)} aria-label={`Rename ${c.name}`} className="p-2 text-stone-400 hover:text-brand-orange"><Pencil size={15} /></button>
           <button disabled={pending} onClick={() => run({ is_active: !c.is_active }, c.is_active ? "Hidden from new entries" : "Shown again")}
             aria-label={c.is_active ? `Hide ${c.name}` : `Show ${c.name}`} title={c.is_active ? "Hide (old entries keep it)" : "Show again"}

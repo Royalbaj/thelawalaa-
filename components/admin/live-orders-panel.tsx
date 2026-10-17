@@ -32,6 +32,7 @@ export interface Order {
   scheduled_for?: string | null; // a booked delivery or pickup slot (Admin → Settings → Delivery / Store hours)
   scheduled_until?: string | null;
   created_at: string;
+  served_at?: string | null; // first Served/Collected/Delivered (set by a trigger, migration 028)
   notes: string | null;
   delivery_address?: string | null;
   delivery_lat?: number | null;
@@ -50,8 +51,20 @@ const CLOSED = ["delivered", "cancelled"];
 const CHIPS = [
   { key: "active", label: "Active" },
   ...STATUS_FILTERS.filter((f) => ["pending", "confirmed", "ready"].includes(f.key)),
-  { key: "all", label: "All" },
+  { key: "today", label: "Today" },
 ];
+
+// A served / collected / delivered order stays on the Active list for 5 minutes
+// (owner's call) — dimmed, with how long it has left — so the counter can still
+// see what just went out.
+const SERVED_STAYS_MS = 5 * 60_000;
+const servedAgo = (o: Order, now: number) =>
+  o.status === "delivered" && o.served_at ? now - Date.parse(o.served_at) : Infinity;
+const recentlyServed = (o: Order, now: number) => servedAgo(o, now) < SERVED_STAYS_MS;
+
+// "Today" = the Nepal calendar day the order was taken on.
+const NPT_OFFSET_MS = (5 * 60 + 45) * 60_000;
+const nepalDay = (t: number) => Math.floor((t + NPT_OFFSET_MS) / 86_400_000);
 
 const customerName = (o: Order) => noteField(o.notes, "Name") ?? o.customer?.full_name ?? "Walk-in";
 const customerPhone = (o: Order) => noteField(o.notes, "Phone") ?? o.customer?.phone ?? null;
@@ -74,7 +87,7 @@ export default function LiveOrdersPanel({
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [lingering, setLingering] = useState<string[]>([]);
-  const [, setTick] = useState(0);
+  const [now, setNow] = useState(() => Date.now());
   const busyRef = useRef<string | null>(null);
   const known = useRef(new Set(initialOrders.map((o) => o.id)));
 
@@ -130,7 +143,7 @@ export default function LiveOrdersPanel({
       .on("postgres_changes", { event: "*", schema: "public", table: "orders" }, (payload) => {
         if (payload.eventType === "INSERT") {
           const o = payload.new as Order;
-          setOrders((prev) => [o, ...prev.filter((x) => x.id !== o.id)].slice(0, 50));
+          setOrders((prev) => [o, ...prev.filter((x) => x.id !== o.id)].slice(0, 400));
           loadLines(o.id);
           announce(o);
         } else if (payload.eventType === "UPDATE") {
@@ -142,7 +155,7 @@ export default function LiveOrdersPanel({
       .subscribe((status) => { if (status === "SUBSCRIBED") sync(); });
 
     const poll = setInterval(sync, 20_000);
-    const clock = setInterval(() => setTick((n) => n + 1), 30_000); // keeps "5 min ago" current
+    const clock = setInterval(() => setNow(Date.now()), 30_000); // keeps "5 min ago" current and clears served orders
     document.addEventListener("visibilitychange", sync);
     window.addEventListener("focus", sync);
     window.addEventListener(REFRESH_EVENT, sync); // the header's refresh button
@@ -156,24 +169,25 @@ export default function LiveOrdersPanel({
     };
   }, []);
 
+  const today = nepalDay(now);
   const counts = useMemo(() => {
     const c: Record<string, number> = {
       active: orders.filter((o) => !CLOSED.includes(o.status)).length,
-      all: orders.length,
+      today: orders.filter((o) => nepalDay(Date.parse(o.created_at)) === today).length,
     };
     for (const f of STATUS_FILTERS) c[f.key] = orders.filter((o) => f.statuses.includes(o.status)).length;
     return c;
-  }, [orders]);
+  }, [orders, today]);
 
   useEffect(() => { onNewCount?.(counts.pending); }, [counts.pending, onNewCount]);
 
   // Newest first and never re-sorted on a tap — cards must not jump under a finger.
   const visible = useMemo(() => {
-    if (filter === "active") return orders.filter((o) => !CLOSED.includes(o.status) || lingering.includes(o.id));
-    if (filter === "all") return orders;
+    if (filter === "active") return orders.filter((o) => !CLOSED.includes(o.status) || lingering.includes(o.id) || recentlyServed(o, now));
+    if (filter === "today") return orders.filter((o) => nepalDay(Date.parse(o.created_at)) === today);
     const statuses = STATUS_FILTERS.find((f) => f.key === filter)?.statuses ?? [];
     return orders.filter((o) => statuses.includes(o.status) || lingering.includes(o.id));
-  }, [orders, filter, lingering]);
+  }, [orders, filter, lingering, now, today]);
 
   // Every action updates the card instantly; Realtime confirms it a moment later.
   // A thrown action (e.g. an expired login) must still roll the card back.
@@ -182,7 +196,8 @@ export default function LiveOrdersPanel({
   async function move(o: Order, status: string) {
     setBusy(o.id);
     if (CLOSED.includes(status)) linger(o.id);
-    patch(o.id, { status });
+    // Served now: the trigger stamps served_at too, but the card shouldn't wait for Realtime to know.
+    patch(o.id, status === "delivered" && !o.served_at ? { status, served_at: new Date().toISOString() } : { status });
     const r = await adminUpdateOrderStatus(o.id, status).catch(offline);
     setBusy(null);
     if (r?.error) { patch(o.id, { status: o.status }); toast.error(r.error); return false; }
@@ -256,7 +271,7 @@ export default function LiveOrdersPanel({
             <div key={o.id} className={cn("rounded-xl border p-3 transition-all",
               o.status === "pending" ? "border-amber-300 bg-amber-50/60 ring-1 ring-amber-200 dark:border-amber-600/60 dark:bg-amber-950/30 dark:ring-amber-900/60"
                 : o.status === "ready" ? "border-emerald-200 bg-emerald-50/40 dark:border-emerald-800 dark:bg-emerald-950/30" : "border-stone-100 dark:border-stone-800",
-              CLOSED.includes(o.status) && lingering.includes(o.id) && "opacity-50")}>
+              CLOSED.includes(o.status) && (lingering.includes(o.id) || (filter === "active" && recentlyServed(o, now))) && "opacity-60")}>
               <button type="button" onClick={() => setExpandedId(expanded ? null : o.id)} className="block w-full touch-manipulation text-left">
                 <div className="flex items-start justify-between gap-2">
                   <div className="flex min-w-0 items-center gap-2.5">
@@ -271,8 +286,15 @@ export default function LiveOrdersPanel({
                       </p>
                     </div>
                   </div>
-                  <span className={cn("shrink-0 rounded-full px-2 py-0.5 text-[10px] font-bold", STATUS_COLORS[o.status] ?? "bg-stone-100")}>
-                    {orderStatusLabel(o.status, o.type)}
+                  <span className="flex shrink-0 flex-col items-end gap-0.5">
+                    <span className={cn("rounded-full px-2 py-0.5 text-[10px] font-bold", STATUS_COLORS[o.status] ?? "bg-stone-100")}>
+                      {orderStatusLabel(o.status, o.type)}
+                    </span>
+                    {filter === "active" && recentlyServed(o, now) && (
+                      <span className="text-[10px] font-bold text-stone-400">
+                        leaves in {Math.max(1, Math.ceil((SERVED_STAYS_MS - servedAgo(o, now)) / 60_000))} min
+                      </span>
+                    )}
                   </span>
                 </div>
                 {o.items && o.items.length > 0 && (
