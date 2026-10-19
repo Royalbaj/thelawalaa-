@@ -3,7 +3,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
   LayoutDashboard, ShoppingBag, UtensilsCrossed, Gift, UserPlus,
-  Megaphone, Truck, Users, GraduationCap, BarChart3, Settings, LogOut, ExternalLink, HelpCircle, BookOpen, MessageSquareHeart, Type, Award, IdCard, Trophy, Send, TrendingUp, Clock, Briefcase,
+  Megaphone, Truck, Users, GraduationCap, BarChart3, Settings, LogOut, ExternalLink, HelpCircle, BookOpen, MessageSquareHeart, Type, Award, IdCard, Trophy, Send, TrendingUp, Clock, Briefcase, Mail,
 } from "lucide-react";
 import { signOutHere } from "@/lib/sign-out";
 import { ACCOUNTS_URL } from "@/lib/role-home";
@@ -22,6 +22,7 @@ export const NAV = [
   { href: "/admin/members", label: "Members", icon: IdCard, section: "marketing" },
   { href: "/admin/leaderboard", label: "Leaderboard", icon: Trophy, section: "marketing" },
   { href: "/admin/notifications", label: "Notifications", icon: Send, section: "marketing" },
+  { href: "/admin/email", label: "Email", icon: Mail, section: "marketing" },
   { href: "/admin/signups", label: "Signups", icon: UserPlus, section: "marketing" },
   { href: "/admin/announcements", label: "Announcements", icon: Megaphone, section: "marketing" },
   { href: "/admin/faqs", label: "FAQs", icon: HelpCircle, section: "marketing" },

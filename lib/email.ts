@@ -88,8 +88,11 @@ export const receipt = (items: { name: string; qty: number; amount: string }[], 
 export function renderEmail(o: {
   preheader: string; heading: string; name?: string | null; blocks: Block[];
   cta?: { label: string; url: string }; secondary?: { label: string; url: string }; reason: string;
+  /** The closing lines — the friendly kitchen one unless a business email wants "Kind regards, <name>". */
+  signoff?: { line: string; name: string };
 }) {
   const year = new Date().getFullYear();
+  const signoff = o.signoff ?? { line: "With love from the kitchen,", name: "Team Thelawalaa" };
   const button = o.cta ? `
     <table role="presentation" cellpadding="0" cellspacing="0" style="margin:8px 0 24px"><tr><td style="border-radius:999px;background:${C.orange}">
       <a href="${o.cta.url}" style="display:inline-block;padding:15px 34px;font:bold 16px ${FONT};color:#ffffff;text-decoration:none;border-radius:999px">${esc(o.cta.label)}</a>
@@ -109,7 +112,7 @@ export function renderEmail(o: {
     <tr><td style="background:#ffffff;border-radius:20px;border:1px solid ${C.line};padding:34px 30px 26px">
       <h1 style="margin:0 0 18px;font:bold 24px/1.3 ${FONT};color:${C.brown}">${esc(o.heading)}</h1>
       ${greeting}${o.blocks.map((b) => b.html).join("")}${button}${secondary}
-      <p style="margin:18px 0 0;font:15px/1.6 ${FONT};color:${C.ink}">With love from the kitchen,<br><b style="color:${C.brown}">Team Thelawalaa</b></p>
+      <p style="margin:18px 0 0;font:15px/1.6 ${FONT};color:${C.ink}">${esc(signoff.line)}<br><b style="color:${C.brown}">${esc(signoff.name)}</b></p>
     </td></tr>
     <tr><td align="center" style="padding:26px 16px 8px">
       <img src="${EMAIL_SITE}/images/email/mark.png" width="40" height="43" alt="Thelawalaa" style="display:block;border:0;width:40px;height:auto;margin:0 auto 10px">
@@ -134,7 +137,7 @@ export function renderEmail(o: {
     ...o.blocks.map((b) => b.text + "\n"),
     o.cta ? `${o.cta.label}: ${o.cta.url}\n` : "",
     o.secondary ? `${o.secondary.label}: ${o.secondary.url}\n` : "",
-    "With love from the kitchen,", "Team Thelawalaa", "",
+    signoff.line, signoff.name, "",
     "—", "Thelawalaa · Where flavour meets hygiene", "Godam Chowk, Banepa, Kavrepalanchok, Nepal", EMAIL_SITE, "", o.reason,
   ].join("\n");
   return { html, text };
