@@ -46,6 +46,14 @@ export const STARTERS: { id: string; label: string; draft: EmailDraft }[] = [
     },
   },
   {
+    // Oct 2026: thelawalaa.com couldn't receive mail, so replies to our emails bounced.
+    id: "again", label: "Ask to reply again",
+    draft: {
+      ...BLANK, subject: "Did you reply to us? Please send it again", heading: "We missed your reply",
+      body: "Thank you for getting back to us. Our email had a problem over the last few days, so replies sent to us didn't arrive — your email app may have said \"not delivered\".\n\nIt's fixed now. If you replied to our earlier email, please send your reply again — you can simply answer this email.\n\nSorry for the trouble, and thank you for your patience.",
+    },
+  },
+  {
     id: "news", label: "Announcement",
     draft: {
       ...BLANK, subject: "News from Thelawalaa", heading: "Something new at Thelawalaa",

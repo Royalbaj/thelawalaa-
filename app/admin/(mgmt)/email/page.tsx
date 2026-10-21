@@ -38,7 +38,9 @@ export default async function EmailPage({ searchParams }: { searchParams: Promis
   const { user, profile } = await requireRole(["super_admin"]);
   const sp = await searchParams;
   const replyId = sp.reply && UUID.test(sp.reply) ? sp.reply : null;
-  const tab = replyId || sp.tab === "write" ? "write" : sp.tab === "sent" ? "sent" : "inbox";
+  // Sent → "Write to them again": one earlier send's people, or "all" of them.
+  const again = sp.again === "all" || (sp.again && UUID.test(sp.again)) ? sp.again : null;
+  const tab = replyId || again || sp.tab === "write" ? "write" : sp.tab === "sent" ? "sent" : "inbox";
 
   const { count: unread } = await supabaseAdmin.from("inbox_emails").select("id", { count: "exact", head: true })
     .is("read_at", null).is("archived_at", null);
@@ -71,7 +73,7 @@ export default async function EmailPage({ searchParams }: { searchParams: Promis
       </div>
 
       {tab === "inbox" && <Inbox archived={sp.box === "archived"} />}
-      {tab === "write" && <Write replyId={replyId} me={{ name: profile.full_name, email: user.email ?? "" }} />}
+      {tab === "write" && <Write replyId={replyId} again={again} starter={sp.starter} me={{ name: profile.full_name, email: user.email ?? "" }} />}
       {tab === "sent" && <Sent />}
     </div>
   );
@@ -100,14 +102,19 @@ async function Inbox({ archived }: { archived: boolean }) {
   );
 }
 
-async function Write({ replyId, me }: { replyId: string | null; me: { name: string; email: string } }) {
-  const [{ data: applicants }, { data: replies }, { data: staff }, { data: answering }] = await Promise.all([
+async function Write({ replyId, again, starter, me }: { replyId: string | null; again: string | null; starter?: string; me: { name: string; email: string } }) {
+  const [{ data: applicants }, { data: replies }, { data: staff }, { data: answering }, { data: earlier }] = await Promise.all([
     supabaseAdmin.from("job_applications").select("name, email, position, status").not("email", "is", null)
       .in("status", ["new", "shortlisted", "interview"]).order("created_at", { ascending: false }).limit(200),
     supabaseAdmin.from("feedback").select("name, contact").eq("wants_reply", true).order("created_at", { ascending: false }).limit(200),
     supabaseAdmin.from("profiles").select("id, full_name").in("role", STAFF_ROLES).eq("is_active", true),
     replyId
       ? supabaseAdmin.from("inbox_emails").select("id, from_email, from_name, reply_to, subject, snippet, text_body, received_at").eq("id", replyId).maybeSingle()
+      : Promise.resolve({ data: null }),
+    again
+      ? (again === "all"
+        ? supabaseAdmin.from("company_emails").select("recipients").order("created_at", { ascending: false }).limit(200)
+        : supabaseAdmin.from("company_emails").select("recipients").eq("id", again))
       : Promise.resolve({ data: null }),
   ]);
 
@@ -135,7 +142,13 @@ async function Write({ replyId, me }: { replyId: string | null; me: { name: stri
     when: `${answering.from_name ?? answering.from_email} wrote on ${npDateTime(answering.received_at)}`,
   } : null;
 
-  return <EmailComposer key={reply?.inboxId ?? "new"} groups={groups} me={me} reply={reply} />;
+  // Everyone from those sends, once each, with a name when we know it (applicants, feedback, team).
+  const known = new Map(groups.flatMap((g) => g.people).filter((p) => p.name).map((p) => [p.email, p.name]));
+  const initialTo: Recipient[] = [...new Set((earlier ?? []).flatMap((e) => e.recipients as string[]))]
+    .map((email) => ({ email, name: known.get(email) ?? null }));
+
+  return <EmailComposer key={reply?.inboxId ?? again ?? "new"} groups={groups} me={me} reply={reply}
+    initialTo={initialTo} initialStarter={again ? (starter ?? "again") : starter} />;
 }
 
 async function Sent() {
@@ -144,7 +157,14 @@ async function Sent() {
     .order("created_at", { ascending: false }).limit(50);
   return (
     <section className="card overflow-hidden">
-      <h2 className="px-5 pt-5 font-bold text-brand-brown">Sent</h2>
+      <div className="flex flex-wrap items-center justify-between gap-2 px-5 pt-5">
+        <h2 className="font-bold text-brand-brown">Sent</h2>
+        {(history ?? []).length > 0 && (
+          <Link href="/admin/email?again=all" className="rounded-full bg-orange-50 px-3 py-1.5 text-xs font-bold text-brand-orange ring-1 ring-orange-100 hover:bg-orange-100">
+            Ask everyone to reply again
+          </Link>
+        )}
+      </div>
       <ul className="mt-2 divide-y divide-stone-100">
         {(history ?? []).map((h) => {
           const sender = (h.sender as unknown as { full_name: string } | null)?.full_name;
@@ -155,6 +175,7 @@ async function Sent() {
                 <p className="font-bold text-stone-900">{h.subject}</p>
                 <span className="text-xs text-stone-400">{npDateTime(h.created_at)}{sender ? ` · ${sender}` : ""}</span>
               </div>
+              <Link href={`/admin/email?again=${h.id}&starter=blank`} className="float-right ml-3 text-xs font-bold text-brand-orange hover:underline">Write to them again</Link>
               <p className="text-xs text-stone-500">
                 Sent to {h.sent_count} {h.sent_count === 1 ? "person" : "people"}
                 {h.failed_count ? <span className="font-bold text-brand-red"> · {h.failed_count} not sent{h.error ? ` (${h.error})` : ""}</span> : null}

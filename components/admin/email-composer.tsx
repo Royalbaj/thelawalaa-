@@ -35,13 +35,18 @@ function parseAddresses(text: string) {
  * Admin → Email: write once in the Thelawalaa layout, see it exactly as it
  * will arrive, test it on yourself, then send — everyone gets their own copy.
  */
-export default function EmailComposer({ groups, me, reply }: {
+export default function EmailComposer({ groups, me, reply, initialTo, initialStarter }: {
   groups: RecipientGroup[]; me: { name: string; email: string }; reply?: ReplyTo | null;
+  /** Opened from Sent → "Write to them again" (with a starter, e.g. "again"). */
+  initialTo?: Recipient[]; initialStarter?: string;
 }) {
   const router = useRouter();
-  const [draft, setDraft] = useState<EmailDraft>(() => reply ? { ...BLANK, subject: reSubject(reply.subject), heading: replyHeading(reply.subject), signoff: "personal" } : BLANK);
-  const [starter, setStarter] = useState("blank");
-  const [to, setTo] = useState<Recipient[]>(reply ? [reply.to] : []);
+  const opening = STARTERS.find((s) => s.id === initialStarter);
+  const [draft, setDraft] = useState<EmailDraft>(() => reply
+    ? { ...BLANK, subject: reSubject(reply.subject), heading: replyHeading(reply.subject), signoff: "personal" }
+    : opening?.draft ?? BLANK);
+  const [starter, setStarter] = useState(opening?.id ?? "blank");
+  const [to, setTo] = useState<Recipient[]>(reply ? [reply.to] : (initialTo ?? []).slice(0, MAX_RECIPIENTS));
   const [typing, setTyping] = useState("");
   const [replyTo, setReplyTo] = useState(me.email);
   const [html, setHtml] = useState("");
