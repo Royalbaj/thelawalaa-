@@ -91,11 +91,11 @@ async function Inbox({ archived }: { archived: boolean }) {
 
   return (
     <div className="space-y-4">
-      <InboxSetup status={status} />
+      <InboxSetup status={status} forwardTo={settings.forward_to} />
 
       <InboxList mails={mails ?? []} archived={archived} receiving={status.state === "on"} />
 
-      {status.state === "on" && (
+      {status.state === "on" && status.webhook && settings.forward_to && (
         <section className="card p-4 sm:p-5"><InboxForward current={settings.forward_to} /></section>
       )}
     </div>

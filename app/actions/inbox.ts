@@ -5,12 +5,13 @@ import { revalidatePath } from "next/cache";
 import { requireRole } from "@/lib/supabase/server";
 import { supabaseAdmin, audit } from "@/lib/supabase/admin";
 import { resendClient, EMAIL_DOMAIN } from "@/lib/email";
-import { getReceivingStatus, recheckDomain, syncInbox, turnOnReceiving } from "@/lib/inbox";
+import { forwardReceived, getReceivingStatus, recheckDomain, syncInbox, turnOnReceiving, type InboxRow } from "@/lib/inbox";
 
-// Admin → Email → Inbox: receiving email at @thelawalaa.com. Turning it on
-// (1) switches on receiving for the domain in Resend, which hands back ONE MX
-// record to add in Vercel DNS, and (2) creates the Resend webhook that tells
-// /api/email/received about each new email, keeping its signing secret.
+// Admin → Email → Inbox: receiving email at @thelawalaa.com. "Turn on"
+// (connectInbox) switches on receiving for the domain in Resend (which needs
+// ONE MX record in Vercel DNS), creates the Resend webhook that tells
+// /api/email/received about each new email, and saves the Gmail that every
+// email is copied to.
 
 export type { ReceivingStatus } from "@/lib/inbox";
 
@@ -18,16 +19,6 @@ export type { ReceivingStatus } from "@/lib/inbox";
 export async function receivingStatus() {
   await requireRole(["super_admin"]);
   return getReceivingStatus();
-}
-
-/** "Turn on receiving": domain capability + webhook. Safe to press again (repairs a missing webhook). */
-export async function enableReceiving() {
-  const { user } = await requireRole(["super_admin"]);
-  const r = await turnOnReceiving();
-  if ("error" in r) return { error: r.error };
-  await audit({ actor_id: user.id, action: "EMAIL_RECEIVING_ON", target_table: "email_inbox_settings", new_data: { domain: EMAIL_DOMAIN, webhook: r.webhookId } });
-  revalidatePath("/admin/email");
-  return { ok: true, status: r.status };
 }
 
 /** "Check again" after adding the MX record: Resend re-checks DNS, then the inbox pulls anything new. */
@@ -40,13 +31,49 @@ export async function recheckReceiving() {
   return { ok: true, status: await getReceivingStatus(), added: sync.added };
 }
 
+const forwardSchema = z.object({ to: z.string().trim().toLowerCase().max(200).email("Check the email address").or(z.literal("")) });
+const ownDomain = (to: string) => to.endsWith(`@${EMAIL_DOMAIN}`)
+  ? `Use an address outside ${EMAIL_DOMAIN} (like your Gmail) — a copy sent back to ${EMAIL_DOMAIN} would arrive here again` : null;
+
+/**
+ * The one-step setup: "Get every email in Gmail". Turns receiving on (with the
+ * webhook), saves the Gmail, asks Resend to re-check the MX record, pulls in
+ * what Resend has already received, and sends those to the Gmail too.
+ */
+export async function connectInbox(input: unknown) {
+  const { user } = await requireRole(["super_admin"]);
+  const parsed = forwardSchema.safeParse(input);
+  if (!parsed.success || !parsed.data.to) return { error: parsed.success ? "Type the Gmail address to send everything to" : parsed.error.issues[0]?.message ?? "Check the email address" };
+  const to = parsed.data.to;
+  const bad = ownDomain(to);
+  if (bad) return { error: bad };
+
+  const r = await turnOnReceiving();
+  if ("error" in r) return { error: r.error };
+  await supabaseAdmin.from("email_inbox_settings").update({ forward_to: to, updated_at: new Date().toISOString() }).eq("id", 1);
+  await recheckDomain();
+  const sync = await syncInbox();
+
+  // What arrived before this (Resend kept it) goes to the Gmail as well, oldest first.
+  const { data: waiting } = await supabaseAdmin.from("inbox_emails").select("*")
+    .is("forwarded_to", null).is("archived_at", null).order("received_at", { ascending: true }).limit(30);
+  let forwarded = 0;
+  for (const row of (waiting ?? []) as InboxRow[]) if (!(await forwardReceived(row, to)).error) forwarded++;
+
+  await audit({ actor_id: user.id, action: "EMAIL_RECEIVING_ON", target_table: "email_inbox_settings",
+    new_data: { domain: EMAIL_DOMAIN, webhook: r.webhookId, forward_to: to, received: sync.added, forwarded } });
+  revalidatePath("/admin", "layout");
+  return { ok: true, status: await getReceivingStatus(), received: sync.added, forwarded };
+}
+
 /** Where a copy of every received email also goes ("" = nowhere). Never our own domain — it would loop. */
 export async function setInboxForward(input: unknown) {
   const { user } = await requireRole(["super_admin"]);
-  const parsed = z.object({ to: z.string().trim().toLowerCase().max(200).email("Check the email address").or(z.literal("")) }).safeParse(input);
+  const parsed = forwardSchema.safeParse(input);
   if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Check the email address" };
   const to = parsed.data.to;
-  if (to.endsWith(`@${EMAIL_DOMAIN}`)) return { error: `Use an address outside ${EMAIL_DOMAIN} (like your Gmail) — a copy sent back to ${EMAIL_DOMAIN} would arrive here again` };
+  const bad = ownDomain(to);
+  if (bad) return { error: bad };
   await supabaseAdmin.from("email_inbox_settings").update({ forward_to: to || null, updated_at: new Date().toISOString() }).eq("id", 1);
   await audit({ actor_id: user.id, action: "EMAIL_INBOX_FORWARD", target_table: "email_inbox_settings", new_data: { forward_to: to || null } });
   revalidatePath("/admin/email");
