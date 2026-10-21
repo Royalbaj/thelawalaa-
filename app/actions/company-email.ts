@@ -11,9 +11,10 @@ import { MAX_RECIPIENTS } from "@/lib/company-email-templates";
 // Admin → Email: the company writes to people by hand — a job applicant, a
 // supplier, a customer who asked for a reply — in the Thelawalaa layout.
 // Everyone gets their own copy (nobody sees the other addresses); replies go
-// to the reply-to address (the admin's own by default: hello@thelawalaa.com
-// can't receive mail yet). Offers to customers stay in Admin → Notifications,
-// which only emails people who joined offers and adds the unsubscribe link.
+// to the reply-to address (the admin's own by default) — anything sent to an
+// @thelawalaa.com address lands in Admin → Email → Inbox. Offers to
+// customers stay in Admin → Notifications, which only emails people who
+// joined offers and adds the unsubscribe link.
 
 const FROM = "Thelawalaa <hello@thelawalaa.com>";
 
@@ -70,9 +71,16 @@ export async function sendCompanyEmail(input: unknown) {
     recipients: z.array(recipientSchema).max(MAX_RECIPIENTS * 2),
     replyTo: z.string().trim().toLowerCase().email("Check the reply-to address").or(z.literal("")).default(""),
     test: z.boolean().default(false),
+    // Answering an email from the Inbox: keeps it in the same conversation in their mail app.
+    inboxId: z.string().uuid().nullable().optional(),
   }).safeParse(input);
   if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Check the email" };
-  const { draft, replyTo, test } = parsed.data;
+  const { draft, replyTo, test, inboxId } = parsed.data;
+  const { data: answering } = inboxId
+    ? await supabaseAdmin.from("inbox_emails").select("id, message_id").eq("id", inboxId).maybeSingle()
+    : { data: null };
+  const thread = answering?.message_id && /^<[^<>\s]{3,900}>$/.test(answering.message_id)
+    ? { "In-Reply-To": answering.message_id, References: answering.message_id } : undefined;
   const problem = readyError(draft);
   if (problem) return { error: problem };
 
@@ -95,6 +103,7 @@ export async function sendCompanyEmail(input: unknown) {
       return {
         from: FROM, to: r.email, replyTo: reply,
         subject: test ? `[Test] ${mail.subject}` : mail.subject, html: mail.html, text: mail.text,
+        ...(thread && !test ? { headers: thread } : {}),
       };
     });
     const { error: sendError } = await resend.batch.send(batch);
@@ -111,6 +120,7 @@ export async function sendCompanyEmail(input: unknown) {
     }).select("id").single();
     await audit({ actor_id: user.id, action: "COMPANY_EMAIL_SEND", target_table: "company_emails", target_id: row?.id ?? null,
       new_data: { subject: draft.subject, recipients: people.length, sent, failed } });
+    if (answering && sent) await supabaseAdmin.from("inbox_emails").update({ replied_at: new Date().toISOString() }).eq("id", answering.id);
     revalidatePath("/admin/email");
   }
   if (!sent) return { error: error ? `Not sent — ${error}` : "Not sent" };

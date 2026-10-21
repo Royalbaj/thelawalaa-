@@ -9,6 +9,12 @@ import { cn } from "@/lib/utils";
 
 export type Recipient = { email: string; name: string | null };
 export type RecipientGroup = { id: string; label: string; hint: string; people: Recipient[] };
+/** Answering an email from the Inbox. */
+export type ReplyTo = { inboxId: string; to: Recipient; subject: string; quote: string; when: string };
+
+const reSubject = (s: string) => (/^re:/i.test(s.trim()) ? s.trim() : `Re: ${s.trim() || "your email"}`).slice(0, 150);
+/** The heading inside a reply: their subject without the "Re: Fwd:" in front. */
+const replyHeading = (s: string) => s.replace(/^\s*((re|fwd?|aw)\s*:\s*)+/i, "").trim().slice(0, 120);
 
 const EMAIL = /^[^\s@<>(),;]+@[^\s@<>(),;]+\.[^\s@<>(),;]+$/;
 
@@ -29,11 +35,13 @@ function parseAddresses(text: string) {
  * Admin → Email: write once in the Thelawalaa layout, see it exactly as it
  * will arrive, test it on yourself, then send — everyone gets their own copy.
  */
-export default function EmailComposer({ groups, me }: { groups: RecipientGroup[]; me: { name: string; email: string } }) {
+export default function EmailComposer({ groups, me, reply }: {
+  groups: RecipientGroup[]; me: { name: string; email: string }; reply?: ReplyTo | null;
+}) {
   const router = useRouter();
-  const [draft, setDraft] = useState<EmailDraft>(BLANK);
+  const [draft, setDraft] = useState<EmailDraft>(() => reply ? { ...BLANK, subject: reSubject(reply.subject), heading: replyHeading(reply.subject), signoff: "personal" } : BLANK);
   const [starter, setStarter] = useState("blank");
-  const [to, setTo] = useState<Recipient[]>([]);
+  const [to, setTo] = useState<Recipient[]>(reply ? [reply.to] : []);
   const [typing, setTyping] = useState("");
   const [replyTo, setReplyTo] = useState(me.email);
   const [html, setHtml] = useState("");
@@ -73,7 +81,9 @@ export default function EmailComposer({ groups, me }: { groups: RecipientGroup[]
   const pickStarter = (id: string) => {
     if (dirty && !confirm("Replace what you've written with this template?")) return;
     setStarter(id);
-    setDraft(STARTERS.find((s) => s.id === id)?.draft ?? BLANK);
+    const picked = STARTERS.find((s) => s.id === id)?.draft ?? BLANK;
+    // A reply keeps its "Re: …" subject so it stays in the same conversation.
+    setDraft(reply ? { ...picked, subject: reSubject(reply.subject), heading: picked.heading || replyHeading(reply.subject) } : picked);
   };
 
   const send = (test: boolean) => {
@@ -85,10 +95,11 @@ export default function EmailComposer({ groups, me }: { groups: RecipientGroup[]
       if (!confirm(`Send "${draft.subject || "(no subject)"}" to ${people.length} ${people.length === 1 ? "person" : "people"}?`)) return;
     }
     startSend(async () => {
-      const r = await sendCompanyEmail({ draft, recipients: people, replyTo, test });
+      const r = await sendCompanyEmail({ draft, recipients: people, replyTo, test, inboxId: reply?.inboxId ?? null });
       if (r?.error) { toast.error(r.error); return; }
       if (test) { toast.success(`Test sent to ${me.email}`); return; }
       toast.success(`Sent to ${r.sent} ${r.sent === 1 ? "person" : "people"}${r.failed ? ` — ${r.failed} not sent` : ""}`);
+      if (reply) { router.replace("/admin/email"); return; }
       setTo([]); setTyping(""); setDraft(BLANK); setStarter("blank");
       router.refresh();
     });
@@ -101,6 +112,16 @@ export default function EmailComposer({ groups, me }: { groups: RecipientGroup[]
     <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
       {/* ── Compose ── */}
       <div className="space-y-4">
+        {reply && (
+          <section className="card border-l-4 border-l-brand-orange p-4 sm:p-5">
+            <div className="flex flex-wrap items-baseline justify-between gap-2">
+              <p className="text-sm font-bold text-stone-900">Replying to {reply.to.name ?? reply.to.email}</p>
+              <a href="/admin/email?tab=write" className="text-xs font-bold text-stone-400 hover:text-brand-red">Cancel reply</a>
+            </div>
+            <p className="text-xs text-stone-400">{reply.when}</p>
+            {reply.quote && <p className="mt-2 line-clamp-6 whitespace-pre-line rounded-xl bg-stone-50 p-3 text-sm text-stone-600">{reply.quote}</p>}
+          </section>
+        )}
         <section className="card p-4 sm:p-5">
           <p className="mb-2 text-xs font-bold uppercase tracking-wide text-stone-400">Start from</p>
           <div className="flex flex-wrap gap-2">
@@ -192,7 +213,7 @@ export default function EmailComposer({ groups, me }: { groups: RecipientGroup[]
           <label className="block">
             <span className="label">Replies go to</span>
             <input value={replyTo} onChange={(e) => setReplyTo(e.target.value)} type="email" inputMode="email" className={field} placeholder={me.email} />
-            <span className="mt-1 block text-[11px] text-stone-400">Sent from hello@thelawalaa.com, which can&apos;t receive mail yet — so replies come here.</span>
+            <span className="mt-1 block text-[11px] text-stone-400">Sent from hello@thelawalaa.com. Replies come back to this address — anything sent to an @thelawalaa.com address shows in the Inbox.</span>
           </label>
         </section>
 

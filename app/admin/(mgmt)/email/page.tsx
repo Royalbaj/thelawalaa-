@@ -1,12 +1,19 @@
+import Link from "next/link";
 import { requireRole } from "@/lib/supabase/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
-import EmailComposer, { type Recipient, type RecipientGroup } from "@/components/admin/email-composer";
+import EmailComposer, { type Recipient, type RecipientGroup, type ReplyTo } from "@/components/admin/email-composer";
+import { InboxForward, InboxSetup } from "@/components/admin/inbox-setup";
+import InboxList from "@/components/admin/inbox-list";
+import { receivingStatus } from "@/app/actions/inbox";
+import { inboxSettings, syncInbox } from "@/lib/inbox";
 import { npDateTime } from "@/lib/nepal-time";
+import { cn } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
 
 const EMAIL = /^[^\s@<>(),;]+@[^\s@<>(),;]+\.[^\s@<>(),;]+$/;
 const STAFF_ROLES = ["super_admin", "pos_user", "delivery_driver", "accountant"];
+const UUID = /^[0-9a-f-]{36}$/;
 
 /** Sign-in emails for these profile ids (they live in Supabase Auth, not in profiles). */
 async function authEmails(ids: Set<string>) {
@@ -21,20 +28,87 @@ async function authEmails(ids: Set<string>) {
 }
 
 /**
- * Admin → Email: write to people in the Thelawalaa email layout. Quick-add
- * groups are the people the business is already talking to — job applicants,
- * customers who asked for a reply in feedback, the team. Offers to customers
- * go through Admin → Notifications (consent + unsubscribe link).
+ * Admin → Email: the Inbox (everything sent to an @thelawalaa.com address —
+ * replies to our emails included), Write (an email in the Thelawalaa layout:
+ * applicants, suppliers, a customer who asked for a reply, or an answer to an
+ * inbox email) and Sent. Offers to customers go through Admin → Notifications
+ * (consent + unsubscribe link).
  */
-export default async function EmailPage() {
+export default async function EmailPage({ searchParams }: { searchParams: Promise<Record<string, string | undefined>> }) {
   const { user, profile } = await requireRole(["super_admin"]);
-  const [{ data: applicants }, { data: replies }, { data: staff }, { data: history }] = await Promise.all([
+  const sp = await searchParams;
+  const replyId = sp.reply && UUID.test(sp.reply) ? sp.reply : null;
+  const tab = replyId || sp.tab === "write" ? "write" : sp.tab === "sent" ? "sent" : "inbox";
+
+  const { count: unread } = await supabaseAdmin.from("inbox_emails").select("id", { count: "exact", head: true })
+    .is("read_at", null).is("archived_at", null);
+  const tabs = [
+    { id: "inbox", label: "Inbox", href: "/admin/email", count: unread ?? 0 },
+    { id: "write", label: "Write", href: "/admin/email?tab=write", count: 0 },
+    { id: "sent", label: "Sent", href: "/admin/email?tab=sent", count: 0 },
+  ];
+
+  return (
+    <div className="space-y-5">
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <h1 className="font-display text-xl font-bold text-brand-brown">Email</h1>
+          <p className="text-sm text-stone-500">
+            Email to and from @thelawalaa.com, in the Thelawalaa layout. To send offers to every customer who joined
+            them, use <a href="/admin/notifications" className="font-bold text-brand-orange">Notifications</a>.
+          </p>
+        </div>
+        <nav className="flex rounded-full bg-stone-100 p-1" aria-label="Email">
+          {tabs.map((t) => (
+            <Link key={t.id} href={t.href} aria-current={tab === t.id ? "page" : undefined}
+              className={cn("flex items-center gap-1.5 rounded-full px-4 py-1.5 text-sm font-bold transition",
+                tab === t.id ? "bg-white text-brand-brown shadow-sm" : "text-stone-500 hover:text-stone-800")}>
+              {t.label}
+              {t.count > 0 && <span className="rounded-full bg-brand-red px-1.5 text-[10px] font-extrabold text-white">{t.count}</span>}
+            </Link>
+          ))}
+        </nav>
+      </div>
+
+      {tab === "inbox" && <Inbox archived={sp.box === "archived"} />}
+      {tab === "write" && <Write replyId={replyId} me={{ name: profile.full_name, email: user.email ?? "" }} />}
+      {tab === "sent" && <Sent />}
+    </div>
+  );
+}
+
+async function Inbox({ archived }: { archived: boolean }) {
+  const status = await receivingStatus();
+  // The webhook brings new email straight in; this catches anything it missed.
+  if (status.state === "on") await syncInbox();
+  let q = supabaseAdmin.from("inbox_emails")
+    .select("id, from_email, from_name, to_emails, subject, snippet, attachments, received_at, read_at, replied_at")
+    .order("received_at", { ascending: false }).limit(100);
+  q = archived ? q.not("archived_at", "is", null) : q.is("archived_at", null);
+  const [{ data: mails }, settings] = await Promise.all([q, inboxSettings()]);
+
+  return (
+    <div className="space-y-4">
+      <InboxSetup status={status} />
+
+      <InboxList mails={mails ?? []} archived={archived} receiving={status.state === "on"} />
+
+      {status.state === "on" && (
+        <section className="card p-4 sm:p-5"><InboxForward current={settings.forward_to} /></section>
+      )}
+    </div>
+  );
+}
+
+async function Write({ replyId, me }: { replyId: string | null; me: { name: string; email: string } }) {
+  const [{ data: applicants }, { data: replies }, { data: staff }, { data: answering }] = await Promise.all([
     supabaseAdmin.from("job_applications").select("name, email, position, status").not("email", "is", null)
       .in("status", ["new", "shortlisted", "interview"]).order("created_at", { ascending: false }).limit(200),
     supabaseAdmin.from("feedback").select("name, contact").eq("wants_reply", true).order("created_at", { ascending: false }).limit(200),
     supabaseAdmin.from("profiles").select("id, full_name").in("role", STAFF_ROLES).eq("is_active", true),
-    supabaseAdmin.from("company_emails").select("id, subject, recipients, sent_count, failed_count, error, created_at, sender:profiles!company_emails_sent_by_fkey(full_name)")
-      .order("created_at", { ascending: false }).limit(30),
+    replyId
+      ? supabaseAdmin.from("inbox_emails").select("id, from_email, from_name, reply_to, subject, snippet, text_body, received_at").eq("id", replyId).maybeSingle()
+      : Promise.resolve({ data: null }),
   ]);
 
   const staffEmails = await authEmails(new Set((staff ?? []).map((s) => s.id)));
@@ -53,40 +127,44 @@ export default async function EmailPage() {
     },
   ].filter((g) => g.people.length > 0);
 
+  const reply: ReplyTo | null = answering ? {
+    inboxId: answering.id,
+    to: { email: answering.reply_to || answering.from_email, name: answering.from_name },
+    subject: answering.subject,
+    quote: (answering.text_body ?? answering.snippet ?? "").split(/\r?\n/).filter((l: string) => !/^\s*>/.test(l)).join("\n").trim().slice(0, 1200),
+    when: `${answering.from_name ?? answering.from_email} wrote on ${npDateTime(answering.received_at)}`,
+  } : null;
+
+  return <EmailComposer key={reply?.inboxId ?? "new"} groups={groups} me={me} reply={reply} />;
+}
+
+async function Sent() {
+  const { data: history } = await supabaseAdmin.from("company_emails")
+    .select("id, subject, recipients, sent_count, failed_count, error, created_at, sender:profiles!company_emails_sent_by_fkey(full_name)")
+    .order("created_at", { ascending: false }).limit(50);
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="font-display text-xl font-bold text-brand-brown">Email</h1>
-        <p className="text-sm text-stone-500">
-          Write to anyone in the Thelawalaa email layout — an applicant, a supplier, a customer. To send offers to every customer
-          who joined them, use <a href="/admin/notifications" className="font-bold text-brand-orange">Notifications</a>.
-        </p>
-      </div>
-
-      <EmailComposer groups={groups} me={{ name: profile.full_name, email: user.email ?? "" }} />
-
-      <section className="card overflow-hidden">
-        <h2 className="px-5 pt-5 font-bold text-brand-brown">Sent</h2>
-        <ul className="mt-2 divide-y divide-stone-100">
-          {(history ?? []).map((h) => {
-            const sender = (h.sender as unknown as { full_name: string } | null)?.full_name;
-            return (
-              <li key={h.id} className="px-5 py-3">
-                <div className="flex flex-wrap items-baseline justify-between gap-2">
-                  <p className="font-bold text-stone-900">{h.subject}</p>
-                  <span className="text-xs text-stone-400">{npDateTime(h.created_at)}{sender ? ` · ${sender}` : ""}</span>
-                </div>
-                <p className="text-xs text-stone-500">
-                  Sent to {h.sent_count} {h.sent_count === 1 ? "person" : "people"}
-                  {h.failed_count ? <span className="font-bold text-brand-red"> · {h.failed_count} not sent{h.error ? ` (${h.error})` : ""}</span> : null}
-                  {" · "}<span className="text-stone-400">{(h.recipients as string[]).slice(0, 4).join(", ")}{(h.recipients as string[]).length > 4 ? ` +${(h.recipients as string[]).length - 4} more` : ""}</span>
-                </p>
-              </li>
-            );
-          })}
-          {(history ?? []).length === 0 && <li className="px-5 py-8 text-center text-sm text-stone-400">Nothing sent yet.</li>}
-        </ul>
-      </section>
-    </div>
+    <section className="card overflow-hidden">
+      <h2 className="px-5 pt-5 font-bold text-brand-brown">Sent</h2>
+      <ul className="mt-2 divide-y divide-stone-100">
+        {(history ?? []).map((h) => {
+          const sender = (h.sender as unknown as { full_name: string } | null)?.full_name;
+          const to = h.recipients as string[];
+          return (
+            <li key={h.id} className="px-5 py-3">
+              <div className="flex flex-wrap items-baseline justify-between gap-2">
+                <p className="font-bold text-stone-900">{h.subject}</p>
+                <span className="text-xs text-stone-400">{npDateTime(h.created_at)}{sender ? ` · ${sender}` : ""}</span>
+              </div>
+              <p className="text-xs text-stone-500">
+                Sent to {h.sent_count} {h.sent_count === 1 ? "person" : "people"}
+                {h.failed_count ? <span className="font-bold text-brand-red"> · {h.failed_count} not sent{h.error ? ` (${h.error})` : ""}</span> : null}
+                {" · "}<span className="text-stone-400">{to.slice(0, 4).join(", ")}{to.length > 4 ? ` +${to.length - 4} more` : ""}</span>
+              </p>
+            </li>
+          );
+        })}
+        {(history ?? []).length === 0 && <li className="px-5 py-8 text-center text-sm text-stone-400">Nothing sent yet.</li>}
+      </ul>
+    </section>
   );
 }
