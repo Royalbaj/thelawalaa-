@@ -5,7 +5,7 @@ import { revalidatePath } from "next/cache";
 import { requireRole } from "@/lib/supabase/server";
 import { supabaseAdmin, audit } from "@/lib/supabase/admin";
 import { resendClient, EMAIL_DOMAIN } from "@/lib/email";
-import { forwardReceived, getReceivingStatus, recheckDomain, syncInbox, turnOnReceiving, type InboxRow } from "@/lib/inbox";
+import { forwardReceived, getReceivingStatus, inboxSettings, recheckDomain, syncInbox, turnOnReceiving, type InboxRow } from "@/lib/inbox";
 
 // Admin → Email → Inbox: receiving email at @thelawalaa.com. "Turn on"
 // (connectInbox) switches on receiving for the domain in Resend (which needs
@@ -35,6 +35,26 @@ const forwardSchema = z.object({ to: z.string().trim().toLowerCase().max(200).em
 const ownDomain = (to: string) => to.endsWith(`@${EMAIL_DOMAIN}`)
   ? `Use an address outside ${EMAIL_DOMAIN} (like your Gmail) — a copy sent back to ${EMAIL_DOMAIN} would arrive here again` : null;
 
+/** Emails that arrived before the Gmail was set (Resend kept them) go there too, oldest first. */
+async function forwardBacklog(to: string) {
+  const { data: waiting } = await supabaseAdmin.from("inbox_emails").select("*")
+    .is("forwarded_to", null).is("archived_at", null).order("received_at", { ascending: true }).limit(30);
+  let forwarded = 0;
+  for (const row of (waiting ?? []) as InboxRow[]) if (!(await forwardReceived(row, to)).error) forwarded++;
+  return forwarded;
+}
+
+/** "Send them to Gmail": the inbox emails that haven't been copied to the Gmail yet. */
+export async function forwardWaiting() {
+  const { user } = await requireRole(["super_admin"]);
+  const { forward_to: to } = await inboxSettings();
+  if (!to) return { error: "Save the Gmail address first" };
+  const forwarded = await forwardBacklog(to);
+  await audit({ actor_id: user.id, action: "EMAIL_INBOX_FORWARD", target_table: "inbox_emails", new_data: { forward_to: to, forwarded } });
+  revalidatePath("/admin/email");
+  return forwarded ? { ok: true, forwarded } : { error: `Couldn't send them to ${to} — try again in a minute` };
+}
+
 /**
  * The one-step setup: "Get every email in Gmail". Turns receiving on (with the
  * webhook), saves the Gmail, asks Resend to re-check the MX record, pulls in
@@ -54,11 +74,7 @@ export async function connectInbox(input: unknown) {
   await recheckDomain();
   const sync = await syncInbox();
 
-  // What arrived before this (Resend kept it) goes to the Gmail as well, oldest first.
-  const { data: waiting } = await supabaseAdmin.from("inbox_emails").select("*")
-    .is("forwarded_to", null).is("archived_at", null).order("received_at", { ascending: true }).limit(30);
-  let forwarded = 0;
-  for (const row of (waiting ?? []) as InboxRow[]) if (!(await forwardReceived(row, to)).error) forwarded++;
+  const forwarded = await forwardBacklog(to);
 
   await audit({ actor_id: user.id, action: "EMAIL_RECEIVING_ON", target_table: "email_inbox_settings",
     new_data: { domain: EMAIL_DOMAIN, webhook: r.webhookId, forward_to: to, received: sync.added, forwarded } });

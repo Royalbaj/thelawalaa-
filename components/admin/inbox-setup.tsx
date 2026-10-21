@@ -3,7 +3,7 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import toast from "react-hot-toast";
 import { Check, Copy, RefreshCw } from "lucide-react";
-import { connectInbox, recheckReceiving, setInboxForward, type ReceivingStatus } from "@/app/actions/inbox";
+import { connectInbox, forwardWaiting, recheckReceiving, setInboxForward, type ReceivingStatus } from "@/app/actions/inbox";
 import { cn } from "@/lib/utils";
 
 function CopyValue({ value }: { value: string }) {
@@ -114,26 +114,39 @@ function Notice({ tone, children }: { tone: "red"; children: React.ReactNode }) 
 }
 
 /** Change (or clear) the Gmail that every new email is copied to — reply-to the sender, so it can be answered from a phone. */
-export function InboxForward({ current }: { current: string | null }) {
+export function InboxForward({ current, waiting }: { current: string | null; waiting: number }) {
   const router = useRouter();
   const [value, setValue] = useState(current ?? "");
   const [busy, start] = useTransition();
   const changed = value.trim().toLowerCase() !== (current ?? "");
   return (
-    <form className="flex flex-wrap items-end gap-2" onSubmit={(e) => {
-      e.preventDefault();
-      start(async () => {
-        const r = await setInboxForward({ to: value });
-        if (r.error) { toast.error(r.error); return; }
-        toast.success(value.trim() ? `New email will also go to ${value.trim()}` : "Copies switched off");
-        router.refresh();
-      });
-    }}>
-      <label className="min-w-[14rem] flex-1">
-        <span className="label">Send a copy of every new email to</span>
-        <input value={value} onChange={(e) => setValue(e.target.value)} type="email" inputMode="email" placeholder="yourname@gmail.com" className="input text-sm" />
-      </label>
-      <button type="submit" disabled={busy || !changed} className="btn-primary px-5 py-2.5 text-sm">{busy ? "Saving…" : "Save"}</button>
-    </form>
+    <div className="space-y-3">
+      {current && waiting > 0 && (
+        <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl bg-amber-50 px-4 py-3 text-sm ring-1 ring-amber-100">
+          <p className="font-bold text-amber-900">{waiting} email{waiting === 1 ? " here hasn't" : "s here haven't"} gone to {current} yet</p>
+          <button type="button" disabled={busy} className="btn-primary px-4 py-2 text-sm" onClick={() => start(async () => {
+            const r = await forwardWaiting();
+            if (r.error) { toast.error(r.error); return; }
+            toast.success(`Sent ${r.forwarded} to ${current}`);
+            router.refresh();
+          })}>{busy ? "Sending…" : "Send them to Gmail"}</button>
+        </div>
+      )}
+      <form className="flex flex-wrap items-end gap-2" onSubmit={(e) => {
+        e.preventDefault();
+        start(async () => {
+          const r = await setInboxForward({ to: value });
+          if (r.error) { toast.error(r.error); return; }
+          toast.success(value.trim() ? `New email will also go to ${value.trim()}` : "Copies switched off");
+          router.refresh();
+        });
+      }}>
+        <label className="min-w-[14rem] flex-1">
+          <span className="label">Send a copy of every new email to</span>
+          <input value={value} onChange={(e) => setValue(e.target.value)} type="email" inputMode="email" placeholder="yourname@gmail.com" className="input text-sm" />
+        </label>
+        <button type="submit" disabled={busy || !changed} className="btn-primary px-5 py-2.5 text-sm">{busy ? "Saving…" : "Save"}</button>
+      </form>
+    </div>
   );
 }

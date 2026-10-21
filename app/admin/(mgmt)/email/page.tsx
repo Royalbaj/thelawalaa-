@@ -87,7 +87,8 @@ async function Inbox({ archived }: { archived: boolean }) {
     .select("id, from_email, from_name, to_emails, subject, snippet, attachments, received_at, read_at, replied_at")
     .order("received_at", { ascending: false }).limit(100);
   q = archived ? q.not("archived_at", "is", null) : q.is("archived_at", null);
-  const [{ data: mails }, settings] = await Promise.all([q, inboxSettings()]);
+  const [{ data: mails }, settings, { count: waiting }] = await Promise.all([q, inboxSettings(),
+    supabaseAdmin.from("inbox_emails").select("id", { count: "exact", head: true }).is("forwarded_to", null).is("archived_at", null)]);
 
   return (
     <div className="space-y-4">
@@ -96,7 +97,7 @@ async function Inbox({ archived }: { archived: boolean }) {
       <InboxList mails={mails ?? []} archived={archived} receiving={status.state === "on"} />
 
       {status.state === "on" && status.webhook && settings.forward_to && (
-        <section className="card p-4 sm:p-5"><InboxForward current={settings.forward_to} /></section>
+        <section className="card p-4 sm:p-5"><InboxForward current={settings.forward_to} waiting={waiting ?? 0} /></section>
       )}
     </div>
   );
