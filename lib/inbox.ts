@@ -137,3 +137,92 @@ export async function forwardReceived(row: InboxRow, to: string) {
   await supabaseAdmin.from("inbox_emails").update({ forwarded_to: to }).eq("id", row.id);
   return { ok: true };
 }
+
+// ── Turning receiving on ────────────────────────────────────────────────
+
+export type ReceivingStatus =
+  | { state: "no_key" }
+  | { state: "no_domain" }
+  | { state: "error"; error: string }
+  | { state: "off" }
+  | { state: "on"; record: { name: string; value: string; priority: number; status: string } | null; webhook: boolean };
+
+/** Our domain's id in Resend (null = not added), or what went wrong. */
+async function findDomain(): Promise<{ id: string | null; error: string | null }> {
+  const list = await resendClient()!.domains.list();
+  if (list.error) return { id: null, error: list.error.message };
+  return { id: (list.data?.data ?? []).find((d) => d.name === EMAIL_DOMAIN)?.id ?? null, error: null };
+}
+
+/** Where receiving stands: switched on in Resend, the MX record's DNS check, the webhook. Callers check the role. */
+export async function getReceivingStatus(): Promise<ReceivingStatus> {
+  const resend = resendClient();
+  if (!resend) return { state: "no_key" };
+  try {
+    const d = await findDomain();
+    if (d.error) return { state: "error", error: d.error };
+    if (!d.id) return { state: "no_domain" };
+    const got = await resend.domains.get(d.id);
+    if (got.error || !got.data) return { state: "error", error: got.error?.message ?? "Couldn't read the domain" };
+    if (got.data.capabilities?.receiving !== "enabled") return { state: "off" };
+    const mx = got.data.records.find((r) => r.record === "Receiving");
+    const s = await inboxSettings();
+    return {
+      state: "on", webhook: !!s.webhook_secret,
+      record: mx ? { name: mx.name, value: mx.value, priority: Number("priority" in mx ? mx.priority : 10), status: mx.status } : null,
+    };
+  } catch (e) {
+    return { state: "error", error: e instanceof Error ? e.message : "Couldn't reach Resend" };
+  }
+}
+
+/**
+ * Switches receiving on for the domain in Resend and makes sure the
+ * "email.received" webhook exists (reusing one already pointing at us), with
+ * its signing secret saved. Safe to run again — it repairs a missing webhook.
+ */
+export async function turnOnReceiving(): Promise<{ error: string } | { ok: true; webhookId: string; status: ReceivingStatus }> {
+  const resend = resendClient();
+  if (!resend) return { error: "No RESEND_API_KEY is set in Vercel" };
+  const d = await findDomain();
+  if (d.error) return { error: d.error };
+  if (!d.id) return { error: `${EMAIL_DOMAIN} isn't in Resend yet — add it in Admin → Settings → Email setup first` };
+
+  const upd = await resend.domains.update({ id: d.id, capabilities: { receiving: "enabled" } });
+  if (upd.error) return { error: upd.error.message };
+
+  const s = await inboxSettings();
+  let hook: { id: string; secret: string } | null = null;
+  if (s.webhook_id) {
+    const w = await resend.webhooks.get(s.webhook_id);
+    if (w.data && w.data.endpoint === INBOX_WEBHOOK_URL && w.data.status === "enabled") hook = { id: w.data.id, secret: w.data.signing_secret };
+  }
+  if (!hook) {
+    const all = await resend.webhooks.list();
+    const mine = all.data?.data.find((w) => w.endpoint === INBOX_WEBHOOK_URL && w.status === "enabled" && (w.events ?? []).includes("email.received"));
+    const got = mine ? await resend.webhooks.get(mine.id) : null;
+    if (got?.data) hook = { id: got.data.id, secret: got.data.signing_secret };
+  }
+  if (!hook) {
+    const made = await resend.webhooks.create({ endpoint: INBOX_WEBHOOK_URL, events: ["email.received"] });
+    if (made.error || !made.data) return { error: `Receiving is on, but the webhook couldn't be made: ${made.error?.message ?? "no answer"}` };
+    hook = { id: made.data.id, secret: made.data.signing_secret };
+  }
+  await supabaseAdmin.from("email_inbox_settings").update({ webhook_id: hook.id, webhook_secret: hook.secret, updated_at: new Date().toISOString() }).eq("id", 1);
+
+  const status = await getReceivingStatus();
+  if (status.state === "on" && status.record) {
+    // Also in the Vercel logs, so whoever adds it to Vercel DNS can copy it from there.
+    console.info(`[email] Receiving on — add MX record: name "${status.record.name}" value "${status.record.value}" priority ${status.record.priority}`);
+  }
+  return { ok: true, webhookId: hook.id, status };
+}
+
+/** Asks Resend to look up the DNS records again (after adding the MX record). */
+export async function recheckDomain() {
+  const d = resendClient() ? await findDomain() : { id: null };
+  if (d.id) {
+    await resendClient()!.domains.verify(d.id);
+    await new Promise((r) => setTimeout(r, 2500)); // Resend checks DNS in the background
+  }
+}
