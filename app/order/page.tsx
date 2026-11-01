@@ -27,6 +27,7 @@ type Product = { id: string; name: string; description: string | null; price: nu
 type Category = { id: string; name: string };
 type Branch = { id: string; name: string; address: string };
 type Pin = { lat: number; lng: number; accuracy: number };
+const ADD_ON_ASKED = "tw-addon-asked"; // this tab already asked about the Coca-Cola for this order
 
 /** eSewa's integration model is a full-page redirect via POSTed form, not a fetch. */
 function redirectToEsewa(action: string, fields: Record<string, string>) {
@@ -46,7 +47,7 @@ function redirectToEsewa(action: string, fields: Record<string, string>) {
 
 export default function OrderPage() {
   const router = useRouter();
-  const { items, setQty, remove, clear } = useCart();
+  const { items, setQty, remove, clear, add } = useCart();
   const [step, setStep] = useState<1 | 2 | 3>(1);
   const [products, setProducts] = useState<Product[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
@@ -147,6 +148,29 @@ export default function OrderPage() {
   const area = deliveryArea(settings);
   const checkPoint = pin;
   const tooFar = type === "delivery" && !!checkPoint && outsideArea(area, checkPoint);
+  // Website delivery only once the customer has shared their location (owner's call) —
+  // Place order stays off until then. Staff ordering for someone may type an address.
+  const needsPin = type === "delivery" && !staffOrder && !pin;
+
+  // The Coca-Cola add-on (owner's call): going to checkout without one asks once per
+  // order. Only while it's on the menu (the browser only ever sees available items).
+  const addOn = products.find((p) => /coca[\s-]?cola|\bcoke\b/i.test(p.name)) ?? null;
+  const [askAddOn, setAskAddOn] = useState(false);
+  const goCheckout = () => {
+    let asked = false;
+    try { asked = sessionStorage.getItem(ADD_ON_ASKED) === "1"; } catch { /* storage blocked */ }
+    if (addOn && !asked && !items.some((i) => i.product_id === addOn.id)) { setAskAddOn(true); return; }
+    setStep(2);
+  };
+  const answerAddOn = (yes: boolean) => {
+    try { sessionStorage.setItem(ADD_ON_ASKED, "1"); } catch { /* storage blocked */ }
+    if (yes && addOn) {
+      add({ product_id: addOn.id, name: addOn.name, price: priceOf(addOn) });
+      toast.success(`${addOn.name} added`);
+    }
+    setAskAddOn(false);
+    setStep(2);
+  };
 
   // Opening hours (Admin → Settings): pickup follows the store hours, delivery the
   // delivery hours (or the store's when those are off). The clock ticks so slots
@@ -270,6 +294,7 @@ export default function OrderPage() {
         const form = await getEsewaPaymentForm({ orderId: ok.orderId });
         if ("error" in form) { toast.error(form.error); return; }
         clear();
+        try { sessionStorage.removeItem(ADD_ON_ASKED); } catch { /* storage blocked */ }
         redirectToEsewa(form.action, form.fields); // navigates away — no further code runs
         return;
       }
@@ -283,6 +308,7 @@ export default function OrderPage() {
         { duration: 7000 }
       );
       clear();
+      try { sessionStorage.removeItem(ADD_ON_ASKED); } catch { /* storage blocked */ } // the next order asks again
       // replace, not push: Back shouldn't return to a checkout that's already been placed.
       router.replace(`/track/${ok.orderId}`);
     } finally {
@@ -309,7 +335,7 @@ export default function OrderPage() {
           
           {step === 1 && items.length > 0 && (
             <button
-              onClick={() => setStep(2)}
+              onClick={goCheckout}
               className="lg:hidden flex items-center gap-2 rounded-full bg-brand-orange px-4 py-2 font-bold text-white shadow-md shadow-orange-500/30 text-sm hover:brightness-110 transition"
             >
               <span className="bg-white/20 px-2 py-0.5 rounded-full text-xs">{items.length}</span>
@@ -399,7 +425,7 @@ export default function OrderPage() {
             <aside className="card h-fit p-5 sticky top-20 flex flex-col max-h-[80vh]">
               <div className="flex justify-between items-center border-b border-orange-50 pb-3 mb-3">
                 <h2 className="font-display text-lg font-bold">Your cart</h2>
-                {items.length > 0 && <button onClick={() => setStep(2)} className="bg-brand-orange text-white text-xs px-3 py-1.5 rounded-full font-bold shadow-sm hover:brightness-110">Checkout →</button>}
+                {items.length > 0 && <button onClick={goCheckout} className="bg-brand-orange text-white text-xs px-3 py-1.5 rounded-full font-bold shadow-sm hover:brightness-110">Checkout →</button>}
               </div>
               {items.length === 0 ? (
                 <p className="mt-3 text-sm text-stone-500">Cart&apos;s empty — add something crispy!</p>
@@ -419,7 +445,7 @@ export default function OrderPage() {
                     ))}
                   </ul>
                   <p className="mt-4 flex justify-between border-t pt-3 font-bold"><span>Subtotal</span><span>{npr(subtotal)}</span></p>
-                  <button onClick={() => setStep(2)} className="btn-primary mt-4 w-full">Continue →</button>
+                  <button onClick={goCheckout} className="btn-primary mt-4 w-full">Continue →</button>
                 </>
               )}
             </aside>
@@ -700,15 +726,44 @@ export default function OrderPage() {
             <p className="text-center text-xs text-stone-500">
               By placing this order you agree to our <Link href="/terms" target="_blank" className="font-bold text-brand-orange">Terms &amp; Conditions</Link>. Offers and prices can change without notice.
             </p>
+            {needsPin && (
+              <div lang="ne" role="status" className="rounded-2xl bg-amber-50 p-4 text-center ring-1 ring-amber-200">
+                <p className="font-bold text-amber-900">डेलिभरी अर्डर गर्न पहिले आफ्नो लोकेसन पठाउनुहोस्।</p>
+                <button type="button" onClick={shareLocation} disabled={locating}
+                  className="mt-3 inline-flex items-center justify-center gap-2 rounded-full bg-brand-orange px-6 py-2.5 font-bold text-white shadow-md shadow-orange-500/25 transition hover:brightness-110 disabled:opacity-60">
+                  {locating ? <Loader2 size={17} className="animate-spin" /> : <LocateFixed size={17} />}
+                  {locating ? "लोकेसन खोज्दै…" : "मेरो लोकेसन पठाउनुहोस्"}
+                </button>
+                {locError && <p role="alert" className="mt-2 text-sm font-bold text-brand-red">{locError}</p>}
+              </div>
+            )}
             <div className="flex gap-3">
               <button onClick={() => setStep(1)} className="rounded-full bg-white px-6 py-3 font-bold border border-stone-200">← Back</button>
-              <button onClick={placeOrder} disabled={busy || items.length === 0 || tooFar || noSlots} className="btn-primary flex-1 shadow-lg shadow-orange-500/30">
+              <button onClick={placeOrder} disabled={busy || items.length === 0 || tooFar || noSlots || needsPin} className="btn-primary flex-1 shadow-lg shadow-orange-500/30">
                 {busy ? "Placing order…" : `Place order • ${npr(finalTotal)}`}
               </button>
             </div>
           </div>
         )}
       </div>
+      {askAddOn && addOn && (
+        <div className="fixed inset-0 z-[90] flex items-end justify-center bg-black/50 p-4 sm:items-center" role="dialog" aria-modal="true" aria-labelledby="addon-title"
+          style={{ paddingBottom: "calc(env(safe-area-inset-bottom) + 1rem)" }}>
+          <div className="w-full max-w-sm overflow-hidden rounded-3xl bg-white text-center shadow-2xl">
+            {addOn.image_url && (
+              <div className="relative h-40 w-full bg-brand-cream">
+                <Image src={addOn.image_url} alt="" fill sizes="384px" className="object-cover" />
+              </div>
+            )}
+            <div className="p-5">
+              <p id="addon-title" className="font-display text-xl font-bold text-brand-brown">Add a chilled {addOn.name.replace(/\s*\(.*\)\s*$/, "")}?</p>
+              <p className="mt-1 text-sm text-stone-500">Goes perfectly with momo and chatpate.</p>
+              <button onClick={() => answerAddOn(true)} className="btn-primary mt-4 w-full !py-3">Add · {npr(priceOf(addOn))}</button>
+              <button onClick={() => answerAddOn(false)} className="mt-2 w-full py-2.5 text-sm font-bold text-stone-500">No thanks</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
