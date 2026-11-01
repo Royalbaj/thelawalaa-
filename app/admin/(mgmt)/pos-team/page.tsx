@@ -27,6 +27,11 @@ export default async function PosTeamPage() {
           Who can use the POS, their PIN, and what their role lets them do — a change shows on the till within a minute. Day expenses, issues, stock added on the POS and changes waiting
           for approval are in <a href={`${ACCOUNTS_URL}/pos`} target="_blank" rel="noopener noreferrer" className="font-bold text-brand-orange">Accounts → POS</a>.
         </p>
+        <p className="mt-3 rounded-xl border-l-4 border-brand-orange bg-orange-50 px-4 py-3 text-sm text-stone-700">
+          <span className="font-bold text-brand-brown">The till follows the person logged in on it.</span> A role&apos;s tools (Stock work, Outlet
+          expenses and issues, Manager discount) show only while that person is on the till with their own PIN. To check someone&apos;s role: on the till,
+          tap the name at the top left → Log out → type their PIN. The name menu shows who&apos;s on and their role.
+        </p>
       </div>
       <PosPeople people={people ?? []} roles={(roles ?? []).map(({ id, name }) => ({ id, name }))} videoIds={(videos ?? []).map((v) => v.id)} />
       <PosRoles roles={(roles ?? []).map((r) => ({ id: r.id, name: r.name, features: cleanFeatures(r.features), people: count(r.id) }))} />
