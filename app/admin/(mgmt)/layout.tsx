@@ -4,6 +4,7 @@ import { ROLE_HOME } from "@/lib/role-home";
 import AdminShell from "@/components/admin/shell";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import SessionGuard from "@/components/session-guard";
+import VersionGuard from "@/components/version-guard";
 
 export const dynamic = "force-dynamic";
 
@@ -23,6 +24,7 @@ export default async function ManagementLayout({ children }: { children: React.R
   return (
     <>
       <SessionGuard userId={profile.id} />
+      <VersionGuard />
       <AdminShell fullName={profile.full_name} badges={{ "/admin/feedback": newFeedback ?? 0, "/admin/careers": newApplications ?? 0, "/admin/email": unreadEmail ?? 0 }}>{children}</AdminShell>
     </>
   );

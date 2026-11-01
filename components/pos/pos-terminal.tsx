@@ -723,6 +723,8 @@ export default function PosTerminal({
 
   return (
     <div className="relative flex h-full min-h-0 flex-col overflow-hidden lg:flex-row">
+      {/* A cart is being built: an update waits until it's sold or cleared (components/version-guard.tsx). */}
+      {cart.length > 0 && <span data-keep-page hidden />}
       {/* Product grid */}
       <div className="flex min-h-0 min-w-0 flex-1 flex-col">
         <div className="flex shrink-0 items-center gap-2 overflow-x-auto border-b border-orange-100 bg-white p-3 dark:border-stone-800 dark:bg-stone-900">

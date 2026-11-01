@@ -4,6 +4,7 @@ import { getVerifiedUser } from "@/lib/supabase/server";
 import { ROLE_HOME } from "@/lib/role-home";
 import PosHeader from "@/components/admin/pos-header";
 import SessionGuard from "@/components/session-guard";
+import VersionGuard from "@/components/version-guard";
 import { PosThemeRoot } from "@/components/pos/pos-theme";
 import PosFooter from "@/components/pos/pos-footer";
 import PosSession from "@/components/pos/pos-session";
@@ -57,6 +58,7 @@ export default async function PosLayout({ children }: { children: React.ReactNod
   return (
     <PosThemeRoot initialDark>
       <SessionGuard userId={profile.id} />
+      <VersionGuard />
       <PosSession signedInAt={user?.last_sign_in_at ?? null} />
       {/* Order sound always on: any tap (PIN screen too) turns it on; a bar shows while it's off. */}
       <OrderSoundKeeper />

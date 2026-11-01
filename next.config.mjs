@@ -39,6 +39,13 @@ const POS_HOST = "pos.thelawalaa.com";
 
 const nextConfig = {
   poweredByHeader: false, // don't advertise the framework
+  // Which build this is (each Vercel deployment is a new one). Pages that stay open
+  // all day (POS, Admin, rider app) compare it with /api/version and reload by
+  // themselves after a deploy — an old page's buttons stop working once the server
+  // is a newer build ("Failed to find Server Action"). components/version-guard.tsx.
+  env: {
+    NEXT_PUBLIC_APP_VERSION: process.env.VERCEL_DEPLOYMENT_ID || process.env.VERCEL_URL || "dev",
+  },
   images: {
     // Keep in sync with img-src in the CSP above — legacy seed data
     // (supabase/migrations/004_legacy_update_images.sql) still points some

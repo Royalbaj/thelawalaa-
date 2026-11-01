@@ -23,6 +23,11 @@ const csp = [
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   poweredByHeader: false,
+  // Which build this is — open pages compare it with /api/version and reload by
+  // themselves after a deploy (components/version-guard.tsx; copy of the main site's).
+  env: {
+    NEXT_PUBLIC_APP_VERSION: process.env.VERCEL_DEPLOYMENT_ID || process.env.VERCEL_URL || "dev",
+  },
   // Its own project inside the main repo — don't let Next treat the repo
   // root (which has its own lockfile) as this app's workspace root.
   outputFileTracingRoot: fileURLToPath(new URL(".", import.meta.url)),

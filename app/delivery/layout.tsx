@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { getVerifiedUser } from "@/lib/supabase/server";
 import { unreadCount } from "@/lib/notifications";
 import SessionGuard from "@/components/session-guard";
+import VersionGuard from "@/components/version-guard";
 import BrandLogo from "@/components/brand-logo";
 import DriverTabs from "@/components/delivery/driver-tabs";
 
@@ -29,6 +30,7 @@ export default async function DeliveryLayout({ children }: { children: React.Rea
   return (
     <div className="min-h-dvh bg-stone-950 text-white pl-[env(safe-area-inset-left)] pr-[env(safe-area-inset-right)]">
       <SessionGuard userId={profile.id} />
+      <VersionGuard />
       <header className="sticky top-0 z-30 border-b border-white/10 bg-stone-950/90 pt-[env(safe-area-inset-top)] backdrop-blur-md">
         <div className="mx-auto flex max-w-lg items-center justify-between gap-3 px-4 py-3">
           <BrandLogo size="sm" tone="dark" label="Driver" />
