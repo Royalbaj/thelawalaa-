@@ -24,7 +24,7 @@ export default async function PosTeamPage() {
       <div>
         <h1 className="font-display text-xl font-bold text-brand-brown">POS team &amp; roles</h1>
         <p className="text-sm text-stone-500">
-          Who can use the POS, their PIN, and what their role lets them do. Day expenses, issues, stock added on the POS and changes waiting
+          Who can use the POS, their PIN, and what their role lets them do — a change shows on the till within a minute. Day expenses, issues, stock added on the POS and changes waiting
           for approval are in <a href={`${ACCOUNTS_URL}/pos`} target="_blank" rel="noopener noreferrer" className="font-bold text-brand-orange">Accounts → POS</a>.
         </p>
       </div>

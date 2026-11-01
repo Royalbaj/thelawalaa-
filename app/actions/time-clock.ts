@@ -9,6 +9,7 @@ import { isPin, verifyPin } from "@/lib/accounts-pin";
 import { isYmd } from "@/lib/dates";
 import { clockTime, fromNepal, isStale } from "@/lib/time-clock";
 import { getPosStaff, posLoginKey } from "@/lib/pos-staff";
+import { posRoleStamp } from "@/lib/pos-features";
 import { POS_STAFF_COOKIE, posStaffCookieOptions, signPosStaff } from "@/lib/pos-staff-cookie";
 
 // POS time clock (migration 036) and staff login (037). The POS login is
@@ -143,6 +144,15 @@ export async function posStaffLogout() {
   (await cookies()).delete(POS_STAFF_COOKIE);
   if (staff) await audit({ actor_id: user.id, action: "POS_LOGOUT", target_table: "training_people", target_id: staff.id, new_data: { person: staff.name } });
   return { ok: true as const };
+}
+
+/**
+ * The till checks this every minute (components/pos/pos-role-watch.tsx): a role
+ * changed in Admin → POS team & roles shows without logging out and in again.
+ */
+export async function getPosRoleStamp() {
+  const { user } = await requireRole(["pos_user"]);
+  return posRoleStamp(await getPosStaff(posLoginKey(user)));
 }
 
 /**

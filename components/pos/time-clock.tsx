@@ -54,7 +54,8 @@ export default function TimeClockButton({ label = "Clock", className }: { label?
   );
 }
 
-function TimeClockSheet({ onChanged, onClose }: { onChanged: () => void; onClose: () => void }) {
+/** The PIN pad sheet — also opened from the name menu on phones (components/pos/staff-menu.tsx). */
+export function TimeClockSheet({ onChanged, onClose }: { onChanged: () => void; onClose: () => void }) {
   const [step, setStep] = useState<Step>({ kind: "pin" });
   const [board, setBoard] = useState<Board | null>(null);
   const [pending, start] = useTransition();

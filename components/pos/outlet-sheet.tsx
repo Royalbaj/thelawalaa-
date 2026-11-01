@@ -3,22 +3,23 @@ import { useCallback, useEffect, useState, useTransition } from "react";
 import toast from "react-hot-toast";
 import { NotebookPen, X, RefreshCw, Camera, AlertTriangle, CheckCircle2, Clock, Paperclip } from "lucide-react";
 import { getOutletDay, addPosExpense, createPosBillUpload, requestExpenseChange, addPosStock, requestStockChange, addIssue } from "@/app/actions/outlet";
-import { getPosStock } from "@/app/actions/pos";
 import { createClient } from "@/lib/supabase/client";
 import { EXPENSE_CATEGORIES, PAID_WITH, ISSUE_KINDS, type PaidWith, type IssueKind } from "@/lib/pos-outlet";
 import type { PosFeature } from "@/lib/pos-features";
-import type { PosStock, StockLevel } from "@/lib/stock-alerts";
+import type { StockLevel } from "@/lib/stock-alerts";
 import type { OutletExpense, OutletRequest } from "@/lib/outlet";
 import { npTime, npDayMonthTime } from "@/lib/nepal-time";
 import { npr, cn } from "@/lib/utils";
 
-// The outlet's own records at the POS (migration 051) — for roles with the
-// outlet tools (Admin → POS team & roles): day expenses, adding stock, asking
-// for stock/expense fixes (an Accounts person approves) and issues & notes.
-// Everything shows in the Accounts app's POS section.
+// The outlet's own records at the POS (migration 051) — for roles with them
+// (Admin → POS team & roles): day expenses (changing one needs approval) and
+// issues & notes. Everything shows in the Accounts app's POS section. Stock work
+// (add / waste / recount / fix) lives in the Stock sheet with the stock list —
+// StockActions, StockAddRow and RequestList below are used there.
 
 type Day = Exclude<Awaited<ReturnType<typeof getOutletDay>>, { error: string }>;
-type Tab = "expenses" | "stock" | "issues";
+export type OutletDay = Day;
+type Tab = "expenses" | "issues";
 
 const muted = "text-stone-500 dark:text-stone-400";
 const card = "rounded-2xl bg-white p-4 ring-1 ring-stone-200 dark:bg-stone-900 dark:ring-stone-800";
@@ -32,7 +33,7 @@ export default function OutletButton({ features }: { features: PosFeature[] }) {
   const [open, setOpen] = useState(false);
   return (
     <>
-      <button onClick={() => setOpen(true)} aria-label="Outlet — expenses, stock, issues" title="Outlet · expenses, stock, issues"
+      <button onClick={() => setOpen(true)} aria-label="Outlet — expenses and issues" title="Outlet · expenses and issues"
         className="flex h-8 items-center gap-1.5 rounded-full bg-white/10 px-2.5 text-xs font-bold text-white/80 transition hover:bg-white/20 hover:text-white">
         <NotebookPen size={15} /> <span className="hidden sm:inline">Outlet</span>
       </button>
@@ -44,19 +45,17 @@ export default function OutletButton({ features }: { features: PosFeature[] }) {
 function OutletSheet({ features, onClose }: { features: PosFeature[]; onClose: () => void }) {
   const tabs = ([
     ["expenses", "Expenses", features.includes("expenses")],
-    ["stock", "Stock", features.includes("stock_add") || features.includes("stock_edit")],
     ["issues", "Issues & notes", features.includes("issues")],
   ] as const).filter(([, , on]) => on);
   const [tab, setTab] = useState<Tab>(tabs[0]?.[0] ?? "expenses");
   const [day, setDay] = useState<Day | null>(null);
-  const [stock, setStock] = useState<PosStock | null>(null);
   const [failed, setFailed] = useState(false);
   const [loading, start] = useTransition();
   const load = useCallback(() => start(async () => {
     try {
-      const [d, s] = await Promise.all([getOutletDay(), getPosStock()]);
+      const d = await getOutletDay();
       if ("error" in d) { setFailed(true); toast.error(d.error ?? "Couldn't load"); return; }
-      setDay(d); setStock(s); setFailed(false);
+      setDay(d); setFailed(false);
     } catch { setFailed(true); }
   }), []);
   useEffect(load, [load]);
@@ -73,7 +72,7 @@ function OutletSheet({ features, onClose }: { features: PosFeature[]; onClose: (
         <div className="flex shrink-0 items-center justify-between gap-2 border-b border-stone-200 bg-white px-4 py-3 dark:border-stone-800 dark:bg-stone-900">
           <div className="min-w-0">
             <p className="font-display text-lg font-extrabold text-brand-brown dark:text-orange-100">Outlet</p>
-            <p className={cn("text-xs", muted)}>Today&apos;s expenses, stock and notes — the manager sees them in Accounts → POS</p>
+            <p className={cn("text-xs", muted)}>Today&apos;s expenses and notes — the manager sees them in Accounts → POS</p>
           </div>
           <div className="flex items-center gap-2">
             <button onClick={load} aria-label="Refresh" className="flex h-9 w-9 items-center justify-center rounded-full bg-stone-100 dark:bg-stone-800"><RefreshCw size={16} className={cn(loading && "animate-spin")} /></button>
@@ -95,7 +94,6 @@ function OutletSheet({ features, onClose }: { features: PosFeature[]; onClose: (
           {!day ? <p className={cn("py-12 text-center text-sm", muted)}>Loading…</p> : (
             <>
               {tab === "expenses" && <ExpensesTab day={day} onSaved={load} />}
-              {tab === "stock" && <StockTab day={day} stock={stock} canAdd={features.includes("stock_add")} canFix={features.includes("stock_edit")} onSaved={load} />}
               {tab === "issues" && <IssuesTab day={day} onSaved={load} />}
             </>
           )}
@@ -253,31 +251,11 @@ function ExpenseRow({ e, onSaved }: { e: OutletExpense; onSaved: () => void }) {
 }
 
 // ── Stock ────────────────────────────────────────────────────────
-function StockTab({ day, stock, canAdd, canFix, onSaved }: { day: Day; stock: PosStock | null; canAdd: boolean; canFix: boolean; onSaved: () => void }) {
-  const requests = day.requests.filter((r) => r.kind.startsWith("stock_"));
-  return (
-    <div className="space-y-4">
-      <p className={cn("text-sm", muted)}>
-        {canAdd && "Adding stock that has arrived counts straight away. "}
-        {canFix && "Waste, a recount or fixing an add waits until an Accounts person approves it."}
-      </p>
-      {!stock ? <p className={cn("text-sm", muted)}>Loading stock…</p> : stock.all.length === 0 ? (
-        <p className={cn("text-sm", muted)}>No stock items yet — they&apos;re set up in the Accounts app.</p>
-      ) : (
-        <ul className="grid gap-2 sm:grid-cols-2">{stock.all.map((s) => <StockRow key={s.id} s={s} canAdd={canAdd} canFix={canFix} onSaved={onSaved} />)}</ul>
-      )}
-      {canFix && day.stockAdds.length > 0 && (
-        <section>
-          <p className="mb-2 font-bold">Stock added on the POS (last 7 days)</p>
-          <ul className="space-y-2">{day.stockAdds.map((a) => <StockAddRow key={a.id} a={a} onSaved={onSaved} />)}</ul>
-        </section>
-      )}
-      <RequestList requests={requests} />
-    </div>
-  );
-}
-
-function StockRow({ s, canAdd, canFix, onSaved }: { s: StockLevel; canAdd: boolean; canFix: boolean; onSaved: () => void }) {
+/**
+ * Add stock (counts straight away) and Waste / Recount (wait for an Accounts
+ * person) for one stock item — shown on its row in the Stock sheet.
+ */
+export function StockActions({ s, canAdd, canFix, onSaved }: { s: StockLevel; canAdd: boolean; canFix: boolean; onSaved: () => void }) {
   const [mode, setMode] = useState<"add" | "stock_waste" | "stock_count" | null>(null);
   const [qty, setQty] = useState("");
   const [note, setNote] = useState("");
@@ -292,42 +270,32 @@ function StockRow({ s, canAdd, canFix, onSaved }: { s: StockLevel; canAdd: boole
     toast.success(mode === "add" ? `Added ${quantity} ${s.unit} of ${s.name}` : "Sent for approval — an Accounts person will check it");
     close(); onSaved();
   });
-  return (
-    <li className={card}>
-      <div className="flex items-start justify-between gap-2">
-        <p className="font-bold">{s.name}</p>
-        <p className={cn("shrink-0 font-display text-lg font-extrabold tabular-nums", s.state === "out" ? "text-brand-red" : s.state === "low" ? "text-amber-600 dark:text-amber-400" : "")}>
-          {s.remaining} <span className={cn("text-xs font-bold", muted)}>{s.unit}</span>
-        </p>
+  if (!canAdd && !canFix) return null;
+  return !mode ? (
+    <div className="mt-2.5 flex flex-wrap gap-1.5">
+      {canAdd && <button onClick={() => setMode("add")} className="rounded-full bg-brand-green px-3 py-1.5 text-xs font-bold text-white">+ Add stock</button>}
+      {canFix && <button onClick={() => setMode("stock_waste")} className="rounded-full px-3 py-1.5 text-xs font-bold text-stone-600 ring-1 ring-stone-200 dark:text-stone-300 dark:ring-stone-700">Waste</button>}
+      {canFix && <button onClick={() => setMode("stock_count")} className="rounded-full px-3 py-1.5 text-xs font-bold text-stone-600 ring-1 ring-stone-200 dark:text-stone-300 dark:ring-stone-700">Recount</button>}
+    </div>
+  ) : (
+    <div className="mt-3 space-y-2">
+      <p className="text-xs font-bold">{mode === "add" ? "How much arrived?" : mode === "stock_waste" ? "How much was wasted?" : "How much is there really?"}</p>
+      <div className="flex gap-2">
+        <input value={qty} onChange={(e) => setQty(num(e.target.value))} inputMode="decimal" placeholder={s.unit} aria-label="Amount" autoFocus className={cn(field, "!w-28 text-right font-bold")} />
+        <input value={note} onChange={(e) => setNote(e.target.value.slice(0, mode === "add" ? 200 : 300))}
+          placeholder={mode === "add" ? "Note (optional), e.g. from the supplier" : "Why? (needed)"} aria-label="Note" className={field} />
       </div>
-      {!mode && (
-        <div className="mt-2 flex flex-wrap gap-1.5">
-          {canAdd && <button onClick={() => setMode("add")} className="rounded-full bg-brand-green px-3 py-1.5 text-xs font-bold text-white">+ Add stock</button>}
-          {canFix && <button onClick={() => setMode("stock_waste")} className="rounded-full px-3 py-1.5 text-xs font-bold text-stone-600 ring-1 ring-stone-200 dark:text-stone-300 dark:ring-stone-700">Waste</button>}
-          {canFix && <button onClick={() => setMode("stock_count")} className="rounded-full px-3 py-1.5 text-xs font-bold text-stone-600 ring-1 ring-stone-200 dark:text-stone-300 dark:ring-stone-700">Recount</button>}
-        </div>
-      )}
-      {mode && (
-        <div className="mt-3 space-y-2">
-          <p className="text-xs font-bold">{mode === "add" ? "How much arrived?" : mode === "stock_waste" ? "How much was wasted?" : "How much is there really?"}</p>
-          <div className="flex gap-2">
-            <input value={qty} onChange={(e) => setQty(num(e.target.value))} inputMode="decimal" placeholder={s.unit} aria-label="Amount" autoFocus className={cn(field, "!w-28 text-right font-bold")} />
-            <input value={note} onChange={(e) => setNote(e.target.value.slice(0, mode === "add" ? 200 : 300))}
-              placeholder={mode === "add" ? "Note (optional), e.g. from the supplier" : "Why? (needed)"} aria-label="Note" className={field} />
-          </div>
-          <div className="flex gap-2">
-            <button onClick={send} disabled={pending || qty === "" || (mode !== "add" && note.trim().length < 2)} className="btn-primary !px-5 !py-2.5 text-sm">
-              {pending ? "Saving…" : mode === "add" ? "Add" : "Send for approval"}
-            </button>
-            <button onClick={close} className={cn("px-3 text-sm font-bold", muted)}>Cancel</button>
-          </div>
-        </div>
-      )}
-    </li>
+      <div className="flex gap-2">
+        <button onClick={send} disabled={pending || qty === "" || (mode !== "add" && note.trim().length < 2)} className="btn-primary !px-5 !py-2.5 text-sm">
+          {pending ? "Saving…" : mode === "add" ? "Add" : "Send for approval"}
+        </button>
+        <button onClick={close} className={cn("px-3 text-sm font-bold", muted)}>Cancel</button>
+      </div>
+    </div>
   );
 }
 
-function StockAddRow({ a, onSaved }: { a: Day["stockAdds"][number]; onSaved: () => void }) {
+export function StockAddRow({ a, onSaved }: { a: OutletDay["stockAdds"][number]; onSaved: () => void }) {
   const [open, setOpen] = useState(false);
   const [qty, setQty] = useState(String(a.quantity));
   const [why, setWhy] = useState("");
@@ -425,7 +393,7 @@ function IssuesTab({ day, onSaved }: { day: Day; onSaved: () => void }) {
 }
 
 // ── Requests waiting for / decided by an Accounts person ─────────
-function RequestList({ requests }: { requests: OutletRequest[] }) {
+export function RequestList({ requests }: { requests: OutletRequest[] }) {
   if (!requests.length) return null;
   const STATUS = {
     pending: { label: "Waiting", tint: "bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300" },

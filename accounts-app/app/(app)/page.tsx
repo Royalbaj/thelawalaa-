@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ArrowDownLeft, ArrowUpRight, Paperclip, Lightbulb, AlertTriangle } from "lucide-react";
+import { ArrowDownLeft, ArrowUpRight, Paperclip, Lightbulb, AlertTriangle, Trash2 } from "lucide-react";
 import { getLowStock } from "@/lib/stock";
 import { requireAuth } from "@/lib/supabase/server";
 import { nepalToday, startOfWeek, startOfMonth, resolveRange, rangeQuery, longDate, dayCount, type RangeKey } from "@/lib/dates";
@@ -57,6 +57,7 @@ export default async function Dashboard({ searchParams }: { searchParams: Promis
         <div className="hidden gap-2 md:flex">
           <Link href="/entries/new?kind=in" className="btn-outline !px-4 !py-2.5 text-sm"><ArrowDownLeft size={16} style={{ color: SERIES.in }} /> Money in</Link>
           <Link href="/entries/new?kind=out" className="btn-primary !px-4 !py-2.5 text-sm"><ArrowUpRight size={16} /> Money out</Link>
+          <Link href="/stock/waste?add=1" className="btn-outline !px-4 !py-2.5 text-sm"><Trash2 size={16} className="text-brand-red" /> Waste / loss</Link>
         </div>
       </div>
 

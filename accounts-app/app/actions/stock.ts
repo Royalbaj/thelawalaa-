@@ -15,6 +15,10 @@ const itemSchema = z.object({
   name: z.string().trim().min(1, "Give it a name").max(60),
   unit: z.string().trim().min(1, "Pick a unit").max(20),
   reorder_level: amount("when to warn"),
+  // What one unit costs to buy — values waste (Stock → Waste & loss). Blank = not known.
+  cost_per_unit: z.preprocess((v) => (v === "" || v == null ? 0 : v),
+    z.coerce.number({ invalid_type_error: "Check the cost" }).min(0, "Check the cost").max(1_000_000, "That cost is too big"))
+    .transform((v) => Math.round(v * 100) / 100),
   // POS menu items that use this stock, and how much of it each one sold uses.
   links: z.array(z.object({ product_id: id, units_per_sale: z.coerce.number().positive("Uses per sale must be more than 0").max(1000) })).max(60),
 });

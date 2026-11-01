@@ -2,7 +2,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
-import { LayoutDashboard, ListOrdered, BarChart3, Settings, Package, Lock, LogOut, Plus, ArrowDownLeft, ArrowUpRight, X, UserRound, Gauge, Store } from "lucide-react";
+import { LayoutDashboard, ListOrdered, BarChart3, Settings, Package, Lock, LogOut, Plus, ArrowDownLeft, ArrowUpRight, X, UserRound, Gauge, Store, Trash2 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { lockAccounts } from "@/app/actions/pin";
 import { cn } from "@/lib/utils";
@@ -121,7 +121,7 @@ export default function Shell({ person, lowStock, posWaiting = 0, children }: { 
         {/* Phones and tablets: bottom tabs with a big "+" in the middle. */}
         {adding && <div className="fixed inset-0 z-40 bg-black/30 md:hidden" onClick={() => setAdding(false)} />}
         {adding && (
-          <div className="fixed inset-x-4 z-50 grid grid-cols-2 gap-3 md:hidden" style={{ bottom: "calc(env(safe-area-inset-bottom) + 7rem)" }}>
+          <div className="fixed inset-x-4 z-50 grid grid-cols-3 gap-3 md:hidden" style={{ bottom: "calc(env(safe-area-inset-bottom) + 7rem)" }}>
             <Link href="/entries/new?kind=in" onClick={() => setAdding(false)}
               className="flex flex-col items-center gap-1 rounded-2xl bg-white p-4 font-bold text-brand-brown shadow-xl">
               <ArrowDownLeft size={22} className="text-[#2a78d6]" /> Money in
@@ -129,6 +129,11 @@ export default function Shell({ person, lowStock, posWaiting = 0, children }: { 
             <Link href="/entries/new?kind=out" onClick={() => setAdding(false)}
               className="flex flex-col items-center gap-1 rounded-2xl bg-white p-4 font-bold text-brand-brown shadow-xl">
               <ArrowUpRight size={22} className="text-[#eb6834]" /> Money out
+            </Link>
+            {/* Not money out — the money was spent when it was bought (Stock → Waste & loss). */}
+            <Link href="/stock/waste?add=1" onClick={() => setAdding(false)}
+              className="flex flex-col items-center gap-1 rounded-2xl bg-white p-4 font-bold text-brand-brown shadow-xl">
+              <Trash2 size={22} className="text-brand-red" /> Waste / loss
             </Link>
           </div>
         )}
@@ -141,7 +146,7 @@ export default function Shell({ person, lowStock, posWaiting = 0, children }: { 
           <div className="grid grid-cols-5 items-center gap-1">
             {tab("/")}
             {tab("/entries")}
-            <button onClick={() => setAdding((v) => !v)} aria-label="Add money in or out" className="flex items-center justify-center">
+            <button onClick={() => setAdding((v) => !v)} aria-label="Add money in, money out or a loss" className="flex items-center justify-center">
               <span className={cn("-mt-8 flex h-16 w-16 items-center justify-center rounded-full bg-brand-orange text-white shadow-lg shadow-orange-500/40 ring-4 ring-white transition active:scale-95", adding && "rotate-45")}>
                 {adding ? <X size={26} className="-rotate-45" /> : <Plus size={28} />}
               </span>

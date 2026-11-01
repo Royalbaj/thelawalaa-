@@ -118,12 +118,13 @@ function StockCard({ s, links, onEdit }: { s: Level; links: Link[]; onEdit: () =
   );
 }
 
-function ItemForm({ item, links, products, onClose }: { item: Level | null; links: Link[]; products: Product[]; onClose: () => void }) {
+function ItemForm({ item, links, products, cost, onClose }: { item: Level | null; links: Link[]; products: Product[]; cost: number; onClose: () => void }) {
   const router = useRouter();
   const [name, setName] = useState(item?.name ?? "");
   const [unit, setUnit] = useState(item?.unit ?? "plates");
   const [quantity, setQuantity] = useState("");
   const [warnAt, setWarnAt] = useState(item ? fmt(item.reorder_level) : "10");
+  const [costPer, setCostPer] = useState(cost > 0 ? fmt(cost) : "");
   const [chosen, setChosen] = useState<Map<string, string>>(new Map(links.map((l) => [l.product_id, fmt(l.units_per_sale)])));
   const [search, setSearch] = useState("");
   const [pending, start] = useTransition();
@@ -136,7 +137,7 @@ function ItemForm({ item, links, products, onClose }: { item: Level | null; link
   const toggle = (id: string) => setChosen((c) => { const n = new Map(c); if (n.has(id)) n.delete(id); else n.set(id, "1"); return n; });
 
   const save = () => start(async () => {
-    const payload = { name, unit, reorder_level: warnAt, links: [...chosen.entries()].map(([product_id, u]) => ({ product_id, units_per_sale: u || "1" })) };
+    const payload = { name, unit, reorder_level: warnAt, cost_per_unit: costPer, links: [...chosen.entries()].map(([product_id, u]) => ({ product_id, units_per_sale: u || "1" })) };
     const r = item ? await updateStockItem(item.id, payload) : await createStockItem({ ...payload, quantity });
     if (r?.error) { toast.error(r.error); return; }
     toast.success(item ? "Saved" : "Stock item added");
@@ -173,6 +174,10 @@ function ItemForm({ item, links, products, onClose }: { item: Level | null; link
             )}
             <label className="block"><span className="label">Warn me at</span>
               <input value={warnAt} onChange={(e) => setWarnAt(e.target.value.replace(/[^\d.]/g, ""))} inputMode="decimal" required className="input text-base sm:text-sm" />
+            </label>
+            <label className="block"><span className="label">Cost of one (Rs)</span>
+              <input value={costPer} onChange={(e) => setCostPer(e.target.value.replace(/[^\d.]/g, ""))} inputMode="decimal" placeholder="Optional" className="input text-base sm:text-sm" />
+              <span className="mt-1 block text-[11px] text-stone-500">One of the {unit} — values its waste</span>
             </label>
           </div>
           <div>
@@ -221,7 +226,9 @@ function ItemForm({ item, links, products, onClose }: { item: Level | null; link
   );
 }
 
-export default function StockBoard({ levels, links, products, changes }: { levels: Level[]; links: Link[]; products: Product[]; changes: Change[] }) {
+export default function StockBoard({ levels, links, products, changes, costs = {} }: {
+  levels: Level[]; links: Link[]; products: Product[]; changes: Change[]; costs?: Record<string, number>;
+}) {
   const [editing, setEditing] = useState<Level | "new" | null>(null);
   const linksOf = (id: string) => links.filter((l) => l.stock_item_id === id);
   const low = levels.filter((s) => statusOf(s) !== "ok");
@@ -280,7 +287,7 @@ export default function StockBoard({ levels, links, products, changes }: { level
 
       {editing && (
         <ItemForm item={editing === "new" ? null : editing} links={editing === "new" ? [] : linksOf(editing.id)}
-          products={products} onClose={() => setEditing(null)} />
+          products={products} cost={editing === "new" ? 0 : costs[editing.id] ?? 0} onClose={() => setEditing(null)} />
       )}
     </div>
   );

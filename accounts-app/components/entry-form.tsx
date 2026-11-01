@@ -22,7 +22,7 @@ const MAX_BYTES = 10 * 1024 * 1024;
 
 // Phone photos are 3–10 MB; a bill stays readable at 1600px as JPEG and
 // uploads in a second or two on mobile data. PDFs go up as they are.
-async function prepareBill(file: File): Promise<Blob> {
+export async function prepareBill(file: File): Promise<Blob> {
   if (file.type === "application/pdf") {
     if (file.size > MAX_BYTES) throw new Error("That PDF is over 10 MB");
     return file;

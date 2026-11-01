@@ -20,5 +20,13 @@ export const DEFAULT_FEATURES: PosFeature[] = ["close_shift", "cancel_orders"];
 export const cleanFeatures = (list: unknown): PosFeature[] =>
   Array.isArray(list) ? POS_FEATURE_KEYS.filter((k) => list.includes(k)) : [];
 
-/** The outlet sheet (expenses / stock / issues) shows when any of these is on. */
+/** Any of these lets the person load the outlet's records (getOutletDay). */
 export const OUTLET_FEATURES: PosFeature[] = ["expenses", "issues", "stock_add", "stock_edit"];
+/** The Outlet sheet (day expenses, issues & notes). */
+export const NOTE_FEATURES: PosFeature[] = ["expenses", "issues"];
+/** Stock work inside the Stock sheet (add, waste / recount / fix). */
+export const STOCK_FEATURES: PosFeature[] = ["stock_add", "stock_edit"];
+
+/** What the header was drawn for — when the server's answer differs (a new role, switched off), the till redraws. */
+export const posRoleStamp = (staff: { name: string; role: string | null; features: readonly string[] } | null | undefined) =>
+  staff ? `${staff.name}|${staff.role ?? ""}|${[...staff.features].sort().join(",")}` : "";
