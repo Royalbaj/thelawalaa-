@@ -78,7 +78,8 @@ function ManagerApproval({ onClose, onApproved }: { onClose: () => void; onAppro
 }
 
 /** Member deal: the counter types the last 3 digits of the member's card before member price applies. */
-function MemberCardCheck({ onClose, onFound }: { onClose: () => void; onFound: (m: MemberCard) => void }) {
+// Closing the box keeps Member chosen (no member price, no order) — "Not a member" switches it off.
+function MemberCardCheck({ onClose, onFound, onOff }: { onClose: () => void; onFound: (m: MemberCard) => void; onOff: () => void }) {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
     window.addEventListener("keydown", onKey);
@@ -102,6 +103,9 @@ function MemberCardCheck({ onClose, onFound }: { onClose: () => void; onFound: (
           <button onClick={onClose} aria-label="Cancel" className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-stone-100 dark:bg-stone-800"><X size={18} /></button>
         </div>
         <PinPad submit={submit} idle="Last 3 digits of the card" length={3} />
+        <button onClick={onOff} className="mt-4 w-full rounded-2xl py-3 text-sm font-bold text-stone-500 ring-1 ring-stone-200 dark:text-stone-300 dark:ring-stone-700">
+          No card — switch Member off
+        </button>
       </div>
     </div>
   );
@@ -317,7 +321,11 @@ export default function PosTerminal({
     return (p: Product) => m.get(p.category_id ?? "") ?? null;
   }, [categories]);
   const priceOf = (p: Product) => applyOpeningPromoPrice(Number(p.price), categoryName(p), openingPromo);
-  const memberApplies = (p: Product) => deal === "member" && memberUnitPrice(priceOf(p), p.member_price) < priceOf(p);
+  // Member price only once the member's card is checked. Member chosen but no card yet
+  // (the box was closed) = no member price AND no order until the card is typed or Member is off.
+  const memberOn = deal === "member" && !!memberCard;
+  const memberNeedsCard = deal === "member" && !memberCard;
+  const memberApplies = (p: Product) => memberOn && memberUnitPrice(priceOf(p), p.member_price) < priceOf(p);
   // What this sale charges for one: the member price when Member is on and the item has one.
   const unitOf = (p: Product) => (memberApplies(p) ? memberUnitPrice(priceOf(p), p.member_price) : priceOf(p));
   const isPromo = (p: Product) => promoActive && priceOf(p) !== Number(p.price);
@@ -366,7 +374,6 @@ export default function PosTerminal({
   const staffFreeLeft = staff ? staffLimit - staff.used : 0;
   // Manager discount: everything free except frozen items and membership cards — same function createPosOrder uses.
   const managerOn = deal === "manager" && !!manager;
-  const memberOn = deal === "member" && !!memberCard;
   const codeOn = deal === "code" && !!posCode;
   // The code has a minimum order and the cart is below it (shown on the button; the order is refused).
   const codeShort = codeOn && subtotal < posCode!.min;
@@ -378,7 +385,7 @@ export default function PosTerminal({
   const tileFree = (p: Product) => (staffFreeLeft > 0 && !p.is_membership_card) || managerFreeOf(p);
   const discount = managerFree ? managerFree.saving
     : staff ? staff.saving
-    : deal === "member" ? Math.round(memberSaving * 100) / 100
+    : memberOn ? Math.round(memberSaving * 100) / 100
     : codeOn ? (codeShort ? 0 : codeDiscount(posCode!.type, posCode!.value, subtotal))
     : deal === "student" ? studentDiscount(eligible) : 0;
   // Delivery: the same charge as online — Rs 20 under Rs 99 of food (lib/delivery-fee.ts), paid to the rider.
@@ -421,7 +428,10 @@ export default function PosTerminal({
     // Manager needs a manager's PIN first, Member the member's card; switching either
     // (or to another deal) off forgets the approval.
     if (d === "manager" && deal !== "manager") { setAskManager(true); return; }
-    if (d === "member" && deal !== "member") { setAskMember(true); return; }
+    // Member: chosen straight away, but it only counts once the card is typed — and the sale
+    // can't be placed until it is (or Member is switched off in the card box).
+    if (d === "member" && deal !== "member") { setManager(null); setPosCode(null); setMemberCard(null); setDeal("member"); setAskMember(true); return; }
+    if (d === "member" && !memberCard) { setAskMember(true); return; }
     if (d === "code" && deal !== "code") { setAskCode(true); return; }
     setManager(null);
     setMemberCard(null);
@@ -431,6 +441,7 @@ export default function PosTerminal({
 
   // cashIn: the cash handed over, from CashReceived. A cash sale with something to pay asks for it first.
   const placeOrder = (cashIn?: number) => {
+    if (memberNeedsCard) { toast.error("Type the member's card (last 3 digits) — or switch Member off"); setAskMember(true); return; }
     // Selling membership cards: each needs the new member's name and number first.
     const newMembers: { full_name: string; phone: string; card_number?: string }[] = [];
     for (let i = 0; i < cardCount; i++) {
@@ -501,13 +512,15 @@ export default function PosTerminal({
   // Four deals: two across. Three or five: three across, compact (narrow beside the cart on an iPad).
   const dealCount = 3 + (staffLimit > 0 ? 1 : 0) + (managerDeal ? 1 : 0);
   const threeDeals = dealCount !== 4;
-  const dealButton = (d: Exclude<Deal, "none">, Icon: typeof Crown, label: string, onText?: string) => {
+  const dealButton = (d: Exclude<Deal, "none">, Icon: typeof Crown, label: string, onText?: string, waiting = false) => {
     const on = deal === d;
     return (
       <button onClick={() => toggleDeal(d)} aria-pressed={on}
         className={cn("flex touch-manipulation flex-col items-center justify-center rounded-xl border py-1.5 transition",
           threeDeals ? "px-1" : "px-2",
-          on
+          on && waiting
+            ? "border-amber-400 bg-amber-50 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300"
+            : on
             ? "border-brand-green bg-green-50 text-brand-green dark:bg-green-950/40 dark:text-green-400"
             : "border-orange-100 bg-white text-stone-600 dark:border-stone-700 dark:bg-stone-800 dark:text-stone-300")}>
         {/* Three across is narrow beside the cart on an iPad — the icon goes above the name. */}
@@ -673,7 +686,7 @@ export default function PosTerminal({
           })()}
           <div className={cn("grid gap-2", threeDeals ? "grid-cols-3" : "grid-cols-2")}>
             {dealButton("student", GraduationCap, "Student 5%")}
-            {dealButton("member", Crown, "Member", memberCard ? `${memberCard.name.split(" ")[0]} · ${discount ? `−${npr(discount)}` : "on"}` : undefined)}
+            {dealButton("member", Crown, "Member", memberCard ? `${memberCard.name.split(" ")[0]} · ${discount ? `−${npr(discount)}` : "on"}` : "Card needed", memberNeedsCard)}
             {dealButton("code", Ticket, "Code", posCode ? (codeShort ? `Min ${npr(posCode.min)}` : `${posCode.code} · −${npr(discount)}`) : undefined)}
             {staffLimit > 0 && dealButton("staff", ChefHat, "Staff", `${staff?.used ?? 0} of ${staffLimit} free`)}
             {managerDeal && dealButton("manager", ShieldCheck, "Manager", manager ? `${manager.name.split(" ")[0]} · ${discount ? `−${npr(discount)}` : "on"}` : undefined)}
@@ -692,10 +705,17 @@ export default function PosTerminal({
             </p>
             {isDelivery && <p className="mt-1 text-xs font-bold text-sky-700 dark:text-sky-300">{fee ? `incl. delivery ${npr(fee)}` : "free delivery"}</p>}
           </div>
-          <button onClick={() => placeOrder()} disabled={pending || cart.length === 0}
-            className="btn-primary min-w-0 flex-1 touch-manipulation !px-4 !py-4 text-base disabled:opacity-50">
-            {pending ? "Placing…" : "Place order"}
-          </button>
+          {memberNeedsCard ? (
+            <button onClick={() => setAskMember(true)} disabled={cart.length === 0}
+              className="min-w-0 flex-1 touch-manipulation rounded-full bg-amber-500 px-4 py-4 text-base font-bold text-white disabled:opacity-50">
+              Enter member card
+            </button>
+          ) : (
+            <button onClick={() => placeOrder()} disabled={pending || cart.length === 0}
+              className="btn-primary min-w-0 flex-1 touch-manipulation !px-4 !py-4 text-base disabled:opacity-50">
+              {pending ? "Placing…" : "Place order"}
+            </button>
+          )}
         </div>
       </div>
     </>
@@ -910,6 +930,7 @@ export default function PosTerminal({
       {askMember && (
         <MemberCardCheck
           onClose={() => setAskMember(false)}
+          onOff={() => { setMemberCard(null); setDeal("none"); setAskMember(false); }}
           onFound={(m) => { setMemberCard(m); setManager(null); setPosCode(null); setDeal("member"); setAskMember(false); toast.success(`Member: ${m.name} · card ${m.card}`); }}
         />
       )}
