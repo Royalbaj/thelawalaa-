@@ -65,13 +65,15 @@ export type StockChange = {
 };
 export async function getRecentStockChanges(limit = 25): Promise<StockChange[]> {
   const { data } = await supabaseAdmin.from("stock_movements")
-    .select("id, type, quantity, note, created_at, stock_items(name, unit), person:account_users!stock_movements_entered_by_fkey(name)")
+    .select("id, type, quantity, note, created_at, source, pos_person_name, stock_items(name, unit), person:account_users!stock_movements_entered_by_fkey(name)")
     .order("created_at", { ascending: false }).limit(limit);
   return (data ?? []).map((m) => {
     const item = m.stock_items as unknown as { name: string; unit: string } | null;
     return {
       id: m.id, type: m.type, quantity: Number(m.quantity), note: m.note, created_at: m.created_at,
-      item: item?.name ?? "—", unit: item?.unit ?? "", person: (m.person as unknown as { name: string } | null)?.name ?? "—",
+      item: item?.name ?? "—", unit: item?.unit ?? "",
+      // Added on the POS (migration 051): the counter person's name.
+      person: m.source === "pos" ? `POS · ${m.pos_person_name ?? "counter"}` : (m.person as unknown as { name: string } | null)?.name ?? "—",
     };
   });
 }

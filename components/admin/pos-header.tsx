@@ -9,6 +9,8 @@ import StockButton from "@/components/pos/stock-sheet";
 import TimeClockButton from "@/components/pos/time-clock";
 import StaffMenu from "@/components/pos/staff-menu";
 import PosSignOutButton from "@/components/pos/pos-sign-out";
+import OutletButton from "@/components/pos/outlet-sheet";
+import { OUTLET_FEATURES, type PosFeature } from "@/lib/pos-features";
 
 // pos_user only reaches this header now — super_admin no longer shares
 // the POS terminal, so there's no "back to dashboard" link to show here.
@@ -16,7 +18,13 @@ import PosSignOutButton from "@/components/pos/pos-sign-out";
 // their name menu holds Log out (hand the till over), Staff training and the
 // full "Sign out of the POS". The Clock button (clock in/out, once a shift) and
 // the full sign-out (power icon; in the name menu on phones) are always here.
-export default function PosHeader({ fullName, staff }: { fullName: string; staff?: { name: string; clockedInSince: string | null } | null }) {
+// staff.features: what their POS role allows (Admin → POS team & roles) — the
+// Outlet button (expenses / stock / issues) and Close shift follow it.
+export default function PosHeader({ fullName, staff }: {
+  fullName: string;
+  staff?: { name: string; clockedInSince: string | null; role: string | null; features: PosFeature[] } | null;
+}) {
+  const outlet = staff ? staff.features.filter((f) => OUTLET_FEATURES.includes(f)) : [];
   return (
     <header className="flex shrink-0 items-center justify-between border-b border-orange-900/20 bg-brand-dark px-4 py-2.5 text-white">
       {/* Phones: just the TW tile, so all the buttons fit on one row. */}
@@ -24,14 +32,16 @@ export default function PosHeader({ fullName, staff }: { fullName: string; staff
       <BrandLogo size="sm" tone="dark" label="POS" className="hidden sm:inline-flex" />
       <div className="flex items-center gap-1.5">
         {staff ? (
-          <StaffMenu name={staff.name} clockedInSince={staff.clockedInSince} />
+          <StaffMenu name={staff.name} clockedInSince={staff.clockedInSince} role={staff.role} />
         ) : (
           <span className="hidden text-xs font-bold text-white/60 lg:inline">{fullName}</span>
         )}
         {/* Each counter person clocks in / out with their own PIN — once a shift. */}
         <TimeClockButton />
+        {/* The outlet's own records — day expenses, stock, issues — for roles that have them. */}
+        {outlet.length > 0 && <OutletButton features={outlet} />}
         {/* Today's sales + the end-of-shift cash count. */}
-        <DaySalesButton countedBy={staff?.name} />
+        <DaySalesButton countedBy={staff?.name} canClose={!staff || staff.features.includes("close_shift")} />
         {/* Every stock item and what's left — look only. */}
         <StockButton />
         {/* Fetches orders, menu and stock again — the cart being built is kept. */}

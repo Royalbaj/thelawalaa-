@@ -8,6 +8,8 @@ import RealtimeFeed from "@/components/admin/realtime-feed";
 import { getTodayCloses } from "@/lib/day-sales";
 import { getHoursSummary } from "@/lib/time-clock";
 import HoursSummary from "@/components/admin/hours/hours-summary";
+import { outletCounts } from "@/lib/outlet";
+import { ACCOUNTS_URL } from "@/lib/role-home";
 import Link from "next/link";
 import { Package, Wallet, Clock, Bell, Bike, XCircle, ClipboardList, UtensilsCrossed, Megaphone, GraduationCap, MessageSquareHeart, Timer } from "lucide-react";
 
@@ -18,7 +20,7 @@ export default async function DashboardPage() {
   // Nepal days throughout — the server clock is UTC (5h45m behind Banepa).
   const nepalDay = nepalToday();
   const today = new Date(`${nepalDay}T00:00:00+05:45`).toISOString();
-  const [{ data: timed }, { data: todays }, { count: activeDeliveries }, { count: pendingCount }, training, hours] = await Promise.all([
+  const [{ data: timed }, { data: todays }, { count: activeDeliveries }, { count: pendingCount }, training, hours, outlet] = await Promise.all([
     supabaseAdmin.from("orders").select("created_at, ready_at, served_at, status, placed_by")
       .gte("created_at", `${addDays(nepalDay, -6)}T00:00:00+05:45`),
     supabaseAdmin.from("orders").select("total, payment_status, status").gte("created_at", today),
@@ -27,6 +29,7 @@ export default async function DashboardPage() {
     supabaseAdmin.from("orders").select("id", { count: "exact", head: true }).eq("status", "pending"),
     getTrainingStatus(),
     getHoursSummary(),
+    outletCounts(),
   ]);
   const closes = await getTodayCloses();
   const { data: feedbackRows } = await supabaseAdmin.from("feedback").select("rating, is_read");
@@ -130,6 +133,20 @@ export default async function DashboardPage() {
           ))}
         </div>
       </section>
+
+      {/* The outlet's own records (POS → Outlet) live in the Accounts app's POS section */}
+      {(outlet.openIssues > 0 || outlet.pending > 0) && (
+        <a href={`${ACCOUNTS_URL}/pos`} target="_blank" rel="noopener noreferrer"
+          className="flex items-center gap-3 rounded-2xl border border-amber-300 bg-amber-50 p-4 transition hover:shadow-md">
+          <div className="min-w-0 flex-1">
+            <p className="text-sm font-bold text-brand-brown">
+              Outlet: {[outlet.openIssues && `${outlet.openIssues} open issue${outlet.openIssues === 1 ? "" : "s"}`, outlet.pending && `${outlet.pending} change${outlet.pending === 1 ? "" : "s"} waiting for approval`].filter(Boolean).join(" · ")}
+            </p>
+            <p className="truncate text-xs text-stone-500">Written on the POS — see and approve them in Accounts → POS</p>
+          </div>
+          <span className="shrink-0 text-sm font-bold text-brand-orange">Open →</span>
+        </a>
+      )}
 
       {/* Staff hours from the POS time clock — totals only; shifts and fixes are in Staff Hours */}
       <HoursSummary s={hours} link />

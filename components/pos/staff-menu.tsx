@@ -15,7 +15,7 @@ const time = (iso: string) => new Date(iso).toLocaleTimeString("en-GB", { timeZo
  * "Sign out of the POS" is the full one — the whole device (components/pos/pos-sign-out.tsx).
  * Logging out is a full page load, so the next person never sees the last one's screen.
  */
-export default function StaffMenu({ name, clockedInSince }: { name: string; clockedInSince: string | null }) {
+export default function StaffMenu({ name, clockedInSince, role }: { name: string; clockedInSince: string | null; role?: string | null }) {
   const [open, setOpen] = useState(false);
   const [pending, start] = useTransition();
   const ref = useRef<HTMLDivElement>(null);
@@ -45,7 +45,7 @@ export default function StaffMenu({ name, clockedInSince }: { name: string; cloc
       {open && (
         <div role="menu" className="absolute left-0 top-10 z-[70] w-60 rounded-2xl bg-stone-900 p-1.5 text-sm text-stone-100 shadow-2xl ring-1 ring-stone-700">
           <div className="px-3 pb-2 pt-1.5">
-            <p className="font-bold">{name}</p>
+            <p className="font-bold">{name}{role && <span className="ml-1.5 text-xs font-normal text-stone-400">· {role}</span>}</p>
             <p className={cn("text-xs", clockedInSince ? "text-stone-400" : "text-amber-300")}>
               {clockedInSince ? `Clocked in at ${time(clockedInSince)}` : "Not clocked in — use the Clock button"}
             </p>

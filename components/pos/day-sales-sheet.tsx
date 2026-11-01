@@ -13,7 +13,7 @@ const time = (iso: string) => new Date(iso).toLocaleTimeString("en-GB", { timeZo
 const num = (v: string) => Math.max(0, Math.floor(Number(v.replace(/[^\d]/g, "")) || 0));
 
 /** POS header button → today's sales and the end-of-shift cash count. */
-export default function DaySalesButton({ countedBy }: { countedBy?: string }) {
+export default function DaySalesButton({ countedBy, canClose = true }: { countedBy?: string; canClose?: boolean }) {
   const [open, setOpen] = useState(false);
   return (
     <>
@@ -21,12 +21,13 @@ export default function DaySalesButton({ countedBy }: { countedBy?: string }) {
         className="flex h-8 items-center gap-1.5 rounded-full bg-white/10 px-2.5 text-xs font-bold text-white/80 transition hover:bg-white/20 hover:text-white">
         <Calculator size={15} /> <span className="hidden sm:inline">Today</span>
       </button>
-      {open && <DaySalesSheet onClose={() => setOpen(false)} countedBy={countedBy} />}
+      {open && <DaySalesSheet onClose={() => setOpen(false)} countedBy={countedBy} canClose={canClose} />}
     </>
   );
 }
 
-export function DaySalesSheet({ onClose, initial, countedBy: loggedIn }: { onClose: () => void; initial?: DaySales; countedBy?: string }) {
+// canClose: the logged-in person's POS role has "Close shift" (Admin → POS team & roles).
+export function DaySalesSheet({ onClose, initial, countedBy: loggedIn, canClose = true }: { onClose: () => void; initial?: DaySales; countedBy?: string; canClose?: boolean }) {
   const [period, setPeriod] = useState<"day" | "shift">("day");
   const [data, setData] = useState<DaySales | null>(initial ?? null);
   const [loadError, setLoadError] = useState(false);
@@ -49,7 +50,8 @@ export function DaySalesSheet({ onClose, initial, countedBy: loggedIn }: { onClo
 
   const counted = useMemo(() => num(cash), [cash]);
   const anyCounted = cash.trim() !== "";
-  const expected = (data?.cashReceived ?? 0) + num(float);
+  // Till cash spent on day expenses (POS outlet sheet) has left the drawer.
+  const expected = (data?.cashReceived ?? 0) - (data?.tillExpenses ?? 0) + num(float);
   const diff = counted - expected;
   const problems = data?.problems.reduce((n, p) => n + p.orders.length, 0) ?? 0;
 
@@ -221,7 +223,9 @@ export function DaySalesSheet({ onClose, initial, countedBy: loggedIn }: { onClo
               <div className="text-sm">
                 <p className={muted}>Should be in drawer</p>
                 <p className="font-display text-lg font-extrabold">{npr(expected)}</p>
-                <p className={cn("text-[11px]", muted)}>float {npr(num(float))} + cash taken {npr(data.cashReceived)}</p>
+                <p className={cn("text-[11px]", muted)}>
+                  float {npr(num(float))} + cash taken {npr(data.cashReceived)}{data.tillExpenses ? ` − spent from the till ${npr(data.tillExpenses)}` : ""}
+                </p>
               </div>
               <div className="text-sm">
                 <p className={muted}>Counted</p>
@@ -231,9 +235,13 @@ export function DaySalesSheet({ onClose, initial, countedBy: loggedIn }: { onClo
                 !anyCounted ? "bg-stone-100 text-stone-500 dark:bg-stone-800" : Math.abs(diff) < 1 ? "bg-green-100 text-green-800 dark:bg-green-950/50 dark:text-green-300" : diff < 0 ? "bg-red-100 text-red-700 dark:bg-red-950/50 dark:text-red-300" : "bg-amber-100 text-amber-800 dark:bg-amber-950/50 dark:text-amber-300")}>
                 {!anyCounted ? "Enter the cash in the drawer" : Math.abs(diff) < 1 ? "✓ Balanced" : diff < 0 ? `Short ${npr(-diff)}` : `Over ${npr(diff)}`}
               </div>
-              <button onClick={save} disabled={saving || !anyCounted} className="btn-primary ml-auto !py-3">
-                {saving ? "Saving…" : "Close shift"}
-              </button>
+              {canClose ? (
+                <button onClick={save} disabled={saving || !anyCounted} className="btn-primary ml-auto !py-3">
+                  {saving ? "Saving…" : "Close shift"}
+                </button>
+              ) : (
+                <p className={cn("ml-auto max-w-[14rem] text-right text-xs", muted)}>Your role can&apos;t close the shift — the coordinator or manager does.</p>
+              )}
             </div>
           </div>
         )}

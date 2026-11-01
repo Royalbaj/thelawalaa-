@@ -2,7 +2,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
-import { LayoutDashboard, ListOrdered, BarChart3, Settings, Package, Lock, LogOut, Plus, ArrowDownLeft, ArrowUpRight, X, UserRound, Gauge } from "lucide-react";
+import { LayoutDashboard, ListOrdered, BarChart3, Settings, Package, Lock, LogOut, Plus, ArrowDownLeft, ArrowUpRight, X, UserRound, Gauge, Store } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { lockAccounts } from "@/app/actions/pin";
 import { cn } from "@/lib/utils";
@@ -13,6 +13,8 @@ const NAV = [
   { href: "/stock", label: "Stock", icon: Package },
   { href: "/reports", label: "Reports", icon: BarChart3 },
   { href: "/running", label: "Running cost", icon: Gauge },
+  // The counter's own records (migration 051) — apart from the money book.
+  { href: "/pos", label: "POS", icon: Store },
   { href: "/settings", label: "Settings", icon: Settings },
 ];
 const IDLE_LOCK_MS = 15 * 60_000;
@@ -22,16 +24,17 @@ async function lockNow() {
   window.location.replace(`/pin?next=${encodeURIComponent(location.pathname + location.search)}`);
 }
 
-/** Red count on the Stock tab while something is running low. */
-function Badge({ n }: { n: number }) {
+/** Red count on a tab: stock running low, or POS changes / urgent issues waiting. */
+function Badge({ n, label = "running low" }: { n: number; label?: string }) {
   if (!n) return null;
   return (
     <span className="absolute -right-2 -top-1.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-brand-red px-1 text-[10px] font-extrabold text-white"
-      aria-label={`${n} running low`}>{n}</span>
+      aria-label={`${n} ${label}`}>{n}</span>
   );
 }
 
-export default function Shell({ person, lowStock, children }: { person: string; lowStock: number; children: React.ReactNode }) {
+// posWaiting: changes from the POS waiting for approval + urgent open issues (badge on POS).
+export default function Shell({ person, lowStock, posWaiting = 0, children }: { person: string; lowStock: number; posWaiting?: number; children: React.ReactNode }) {
   const pathname = usePathname();
   const [adding, setAdding] = useState(false);
   // Running cost lives under the Reports tab on phones (the bottom bar has no room for a sixth tab).
@@ -87,7 +90,7 @@ export default function Shell({ person, lowStock, children }: { person: string; 
                     isActive(href) && !(href === "/reports" && pathname.startsWith("/running"))
                       ? "bg-brand-orange text-white" : "text-stone-500 hover:bg-orange-50 hover:text-brand-brown")}>
                   {/* Labels from lg: six items don't fit a tablet's width with them. */}
-                  <span className="relative"><Icon size={15} />{href === "/stock" && <Badge n={lowStock} />}</span> <span className="hidden lg:inline">{label}</span>
+                  <span className="relative"><Icon size={15} />{href === "/stock" && <Badge n={lowStock} />}{href === "/pos" && <Badge n={posWaiting} label="waiting at the POS" />}</span> <span className="hidden lg:inline">{label}</span>
                 </Link>
               ))}
             </nav>
@@ -97,6 +100,10 @@ export default function Shell({ person, lowStock, children }: { person: string; 
               className="flex h-10 items-center gap-1.5 rounded-full bg-stone-100 px-3 text-sm font-bold text-stone-700 transition hover:bg-stone-200">
               <UserRound size={15} /> <span className="max-w-[7rem] truncate">{person}</span> <Lock size={13} className="text-stone-400" />
             </button>
+            {/* Phones: the bottom bar has no room for POS — it's up here, with its count. */}
+            <Link href="/pos" aria-label="POS" className={cn("relative flex h-10 w-10 items-center justify-center rounded-full transition hover:bg-stone-100 md:hidden", pathname.startsWith("/pos") ? "text-brand-orange" : "text-stone-500")}>
+              <span className="relative"><Store size={18} /><Badge n={posWaiting} label="waiting at the POS" /></span>
+            </Link>
             <Link href="/settings" aria-label="Settings" className="flex h-10 w-10 items-center justify-center rounded-full text-stone-500 transition hover:bg-stone-100 md:hidden">
               <Settings size={18} />
             </Link>

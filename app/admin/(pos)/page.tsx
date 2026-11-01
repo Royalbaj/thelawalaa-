@@ -3,7 +3,7 @@ import { supabaseAdmin } from "@/lib/supabase/admin";
 import { fetchLiveOrders } from "@/lib/live-orders";
 import { getPosStock } from "@/lib/stock-alerts";
 import PosWorkspace from "@/components/pos/pos-workspace";
-import { getPosStaff, posLockOn, posLoginKey } from "@/lib/pos-staff";
+import { getPosStaff, posCan, posLockOn, posLoginKey } from "@/lib/pos-staff";
 import { hasManager } from "@/lib/manager-pin";
 
 export const dynamic = "force-dynamic";
@@ -38,12 +38,15 @@ export default async function AdminDashboard() {
     supabaseAdmin.rpc("peek_membership_card"), // "give card no. 118" when selling a membership card
   ]);
 
+  // The counter may cancel only if Admin → Settings allows it AND this person's role has "Cancel orders".
+  const canCancelRole = await posCan(user, "cancel_orders");
+
   return (
     <PosWorkspace
       products={(products ?? []) as any}
       categories={(categories ?? []) as any}
       openingPromo={settings ?? null}
-      canCancel={settings?.pos_can_cancel ?? true}
+      canCancel={(settings?.pos_can_cancel ?? true) && canCancelRole}
       staffFreeItems={Number(settings?.staff_free_items ?? 0)}
       managerDeal={managerDeal}
       nextCard={(nextCard as number | null) ?? null}

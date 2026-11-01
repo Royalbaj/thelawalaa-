@@ -9,7 +9,7 @@ import { requireRole } from "@/lib/supabase/server";
 import { supabaseAdmin, audit, resolveStaffBranchId } from "@/lib/supabase/admin";
 import { applyOpeningPromoPrice } from "@/lib/promo";
 import { studentDiscount, memberUnitPrice, staffFreeItems, managerFreeItems, halfPlatePrice, halfPlateName, STUDENT_DISCOUNT_LABEL, MEMBER_PRICE_LABEL, STAFF_LABEL, MANAGER_LABEL } from "@/lib/discounts";
-import { getPosStaff, posLockOn, posLoginKey } from "@/lib/pos-staff";
+import { getPosStaff, posCan, posLockOn, posLoginKey } from "@/lib/pos-staff";
 import { managerForPin } from "@/lib/manager-pin";
 import { memberForCard } from "@/lib/member-card";
 import { findCode, codeProblem, codeAmount, useCode } from "@/lib/promo-codes";
@@ -257,18 +257,21 @@ const closeSchema = z.object({
  * Kept in audit_logs (SHIFT_CLOSE); the next shift starts from this moment.
  */
 export async function closeShift(input: unknown) {
-  const { user } = await requireRole(["pos_user", "super_admin"]);
+  const { user, profile } = await requireRole(["pos_user", "super_admin"]);
+  // Only roles with "Close shift" (Admin → POS team & roles).
+  if (profile.role === "pos_user" && !(await posCan(user, "close_shift"))) return { error: "Your role can't close the shift — ask the manager" };
   const parsed = closeSchema.safeParse(input);
   if (!parsed.success) return { error: "Check the cash count" };
   const d = parsed.data;
   const counted = Math.round(d.counted_cash * 100) / 100;
   const day = await loadDaySales(d.period);
-  const expected = Math.round((d.opening_float + day.cashReceived) * 100) / 100;
+  // Cash spent from the till on day expenses (the POS outlet sheet) isn't in the drawer any more.
+  const expected = Math.round((d.opening_float + day.cashReceived - day.tillExpenses) * 100) / 100;
   const difference = Math.round((counted - expected) * 100) / 100;
   await audit({
     actor_id: user.id, action: "SHIFT_CLOSE", target_table: "orders",
     new_data: {
-      from: day.from, period: d.period, opening_float: d.opening_float, cash_received: day.cashReceived,
+      from: day.from, period: d.period, opening_float: d.opening_float, cash_received: day.cashReceived, till_expenses: day.tillExpenses,
       expected_cash: expected, counted_cash: counted, difference,
       sales: day.sales, orders: day.orders, by_method: day.byMethod, to_collect: day.toCollect.amount,
       counted_by: d.counted_by || null, note: d.note || null, problems: day.problems.reduce((n, p) => n + p.orders.length, 0),

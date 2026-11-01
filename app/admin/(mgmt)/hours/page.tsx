@@ -1,12 +1,11 @@
 import { Download } from "lucide-react";
 import { requireRole } from "@/lib/supabase/server";
-import { supabaseAdmin } from "@/lib/supabase/admin";
 import { nepalToday, prettyDate, rangeQuery, resolveRange, type RangeKey } from "@/lib/dates";
 import { getHoursSummary, getStaffHours, hoursLabel, MAX_SHIFT_HOURS } from "@/lib/time-clock";
 import RangePicker from "@/components/admin/range-picker";
 import ShiftRow, { ClockOutNow } from "@/components/admin/hours/shift-row";
 import AddShift from "@/components/admin/hours/add-shift";
-import ClockPeople from "@/components/admin/hours/clock-people";
+import Link from "next/link";
 import HoursSummary from "@/components/admin/hours/hours-summary";
 
 export const dynamic = "force-dynamic";
@@ -18,10 +17,9 @@ const KEYS: RangeKey[] = ["today", "week", "month", "last-month", "custom"];
 export default async function StaffHoursPage({ searchParams }: { searchParams: Promise<Record<string, string | undefined>> }) {
   await requireRole(["super_admin"]);
   const range = resolveRange(await searchParams, "month");
-  const [h, summary, { data: videos }] = await Promise.all([
+  const [h, summary] = await Promise.all([
     getStaffHours(range.from, range.to),
     getHoursSummary(),
-    supabaseAdmin.from("training_videos").select("id").eq("is_active", true),
   ]);
   const clockers = h.people.filter((p) => p.pos_clock);
   const today = nepalToday();
@@ -42,8 +40,8 @@ export default async function StaffHoursPage({ searchParams }: { searchParams: P
 
       {clockers.length === 0 && (
         <p className="rounded-2xl bg-amber-50 p-4 text-sm text-amber-900 ring-1 ring-amber-200">
-          Nobody is set up yet, so the POS opens without a PIN. Under <b>POS staff · PINs</b> below, switch on your counter staff (or add them
-          with a PIN). From then on the POS asks for a PIN to log in, and they clock in and out with the Clock button.
+          Nobody is set up yet, so the POS opens without a PIN. In <Link href="/admin/pos-team" className="font-bold underline">POS team &amp; roles</Link>,
+          switch on your counter staff (or add them with a PIN). From then on the POS asks for a PIN to log in, and they clock in and out with the Clock button.
         </p>
       )}
       {h.error && <p className="rounded-xl bg-red-50 p-3 text-sm font-bold text-brand-red">Couldn&apos;t load the shifts. Refresh to try again.</p>}
@@ -133,7 +131,13 @@ export default async function StaffHoursPage({ searchParams }: { searchParams: P
         )}
       </section>
 
-      <ClockPeople people={h.people} videoIds={(videos ?? []).map((v) => v.id)} />
+      <Link href="/admin/pos-team" className="card flex items-center justify-between gap-3 p-4 transition hover:shadow-md">
+        <span>
+          <span className="block font-bold text-brand-brown">POS team &amp; roles</span>
+          <span className="block text-xs text-stone-500">Who can use the POS, their PINs, and what each role can do</span>
+        </span>
+        <span className="shrink-0 text-sm font-bold text-brand-orange">Open →</span>
+      </Link>
     </div>
   );
 }

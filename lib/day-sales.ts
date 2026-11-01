@@ -3,6 +3,7 @@ import { supabaseAdmin } from "@/lib/supabase/admin";
 import { nepalToday } from "@/lib/dates";
 import { servingStats, type ServingStats } from "@/lib/serving-time";
 import { MANAGER_LABEL, STAFF_LABEL } from "@/lib/discounts";
+import { tillCashExpensesSince } from "@/lib/outlet";
 
 // The POS "Today" sheet: what was sold today (Nepal day) or since the last
 // shift close, how it was paid, how much cash should be in the drawer, and
@@ -32,6 +33,7 @@ export type DaySales = {
   managerFree: { amount: number; count: number }; // manager-approved free sales (part of discounts)
   toCollect: { amount: number; count: number };
   cashReceived: number;   // cash paid in this period — what the drawer should hold above the float
+  tillExpenses: number;   // cash taken OUT of the till for day expenses this period (POS outlet sheet)
   topItems: { name: string; qty: number }[];
   serving: ServingStats;  // placed → handed over / ready, this period
   problems: Problem[];
@@ -158,6 +160,7 @@ export async function getDaySales(period: "day" | "shift" = "day"): Promise<DayS
     })(),
     toCollect: { amount: unpaid.reduce((s, o) => s + Number(o.total), 0), count: unpaid.length },
     cashReceived,
+    tillExpenses: await tillCashExpensesSince(from),
     serving: servingStats(inPeriod),
     topItems: [...qty.entries()].map(([name, n]) => ({ name, qty: n })).sort((a, b) => b.qty - a.qty).slice(0, 8),
     problems,

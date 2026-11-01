@@ -10,6 +10,7 @@ import { supabaseAdmin, audit, loyaltyAward, loyaltyUnaward, loyaltyOnCancel } f
 import { fetchLiveOrders } from "@/lib/live-orders";
 import { sendEmail, EMAIL_SITE } from "@/lib/email";
 import { staffInviteEmail } from "@/lib/account-emails";
+import { posCan } from "@/lib/pos-staff";
 
 /** Branded invite (lib/account-emails.ts); true only if Resend accepted it. */
 async function sendInvite(to: string, name: string, role: string, url: string, fresh = false) {
@@ -172,6 +173,8 @@ export async function adminUpdateOrderStatus(orderId: string, status: string) {
   if (status === "cancelled" && profile.role === "pos_user") {
     const { data: s } = await supabaseAdmin.from("app_settings").select("pos_can_cancel").eq("id", 1).single();
     if (s?.pos_can_cancel === false) return { error: "Cancelling is switched off for the counter — ask the manager." };
+    // …and whether this person's POS role may cancel (Admin → POS team & roles).
+    if (!(await posCan(user, "cancel_orders"))) return { error: "Your role can't cancel orders — ask the manager." };
   }
   const { error } = await supabaseAdmin.from("orders").update({ status }).eq("id", orderId);
   if (error) return { error: "Couldn't update the order — try again" };
